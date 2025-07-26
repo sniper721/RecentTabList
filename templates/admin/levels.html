@@ -50,18 +50,18 @@
                                         <td>
                                             <div class="btn-group" role="group">
                                                 <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editLevelModal"
-                                                        data-level-id="{{ level.id }}" data-level-name="{{ level.name }}"
+                                                        data-level-game-id="{{ level._id }}" data-level-name="{{ level.name }}"
                                                         data-level-creator="{{ level.creator }}" data-level-verifier="{{ level.verifier }}"
                                                         data-level-difficulty="{{ level.difficulty }}" data-level-position="{{ level.position }}"
                                                         data-level-video="{{ level.video_url }}" data-level-description="{{ level.description }}"
-                                                        data-level-id="{{ level.level_id }}" data-level-points="{{ level.points }}"
+                                                        data-level-game-id="{{ level.level_id }}" data-level-points="{{ level.points }}"
                                                         data-level-min-percentage="{{ level.min_percentage }}">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
-                                                <button class="btn btn-sm btn-warning ms-1" data-bs-toggle="modal" data-bs-target="#moveLegacyModal" data-level-id="{{ level.id }}">
+                                                <button class="btn btn-sm btn-warning ms-1" data-bs-toggle="modal" data-bs-target="#moveLegacyModal" data-level-game-id="{{ level._id }}">
                                                     <i class="fas fa-archive"></i>
                                                 </button>
-                                                <button class="btn btn-sm btn-danger ms-1" data-bs-toggle="modal" data-bs-target="#deleteLevelModal" data-level-id="{{ level.id }}">
+                                                <button class="btn btn-sm btn-danger ms-1" data-bs-toggle="modal" data-bs-target="#deleteLevelModal" data-level-game-id="{{ level._id }}">
                                                     <i class="fas fa-trash"></i>
                                                 </button>
                                             </div>
@@ -104,18 +104,18 @@
                                         <td>
                                             <div class="btn-group" role="group">
                                                 <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editLevelModal"
-                                                        data-level-id="{{ level.id }}" data-level-name="{{ level.name }}"
+                                                        data-level-game-id="{{ level._id }}" data-level-name="{{ level.name }}"
                                                         data-level-creator="{{ level.creator }}" data-level-verifier="{{ level.verifier }}"
                                                         data-level-difficulty="{{ level.difficulty }}" data-level-position="{{ level.position }}"
                                                         data-level-video="{{ level.video_url }}" data-level-description="{{ level.description }}"
-                                                        data-level-id="{{ level.level_id }}" data-level-points="{{ level.points }}"
+                                                        data-level-game-id="{{ level.level_id }}" data-level-points="{{ level.points }}"
                                                         data-level-min-percentage="{{ level.min_percentage }}">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
-                                                <button class="btn btn-sm btn-info ms-1" data-bs-toggle="modal" data-bs-target="#moveMainModal" data-level-id="{{ level.id }}">
+                                                <button class="btn btn-sm btn-info ms-1" data-bs-toggle="modal" data-bs-target="#moveMainModal" data-level-game-id="{{ level._id }}">
                                                     <i class="fas fa-arrow-up"></i>
                                                 </button>
-                                                <button class="btn btn-sm btn-danger ms-1" data-bs-toggle="modal" data-bs-target="#deleteLevelModal" data-level-id="{{ level.id }}">
+                                                <button class="btn btn-sm btn-danger ms-1" data-bs-toggle="modal" data-bs-target="#deleteLevelModal" data-level-game-id="{{ level._id }}">
                                                     <i class="fas fa-trash"></i>
                                                 </button>
                                             </div>
@@ -368,7 +368,7 @@
     // Populate edit modal with level data
     document.querySelectorAll('[data-bs-target="#editLevelModal"]').forEach(button => {
         button.addEventListener('click', function() {
-            const levelId = this.getAttribute('data-level-id');
+            const levelId = this.getAttribute('data-level-game-id');
             const levelName = this.getAttribute('data-level-name');
             const levelCreator = this.getAttribute('data-level-creator');
             const levelVerifier = this.getAttribute('data-level-verifier');
@@ -376,7 +376,7 @@
             const levelPosition = this.getAttribute('data-level-position');
             const levelVideo = this.getAttribute('data-level-video');
             const levelDescription = this.getAttribute('data-level-description');
-            const levelGameId = this.getAttribute('data-level-id');
+            const levelGameId = this.getAttribute('data-level-game-id');
             const levelPoints = this.getAttribute('data-level-points');
             const levelMinPercentage = this.getAttribute('data-level-min-percentage');
             
@@ -397,7 +397,7 @@
     // Set level ID for move to legacy modal
     document.querySelectorAll('[data-bs-target="#moveLegacyModal"]').forEach(button => {
         button.addEventListener('click', function() {
-            const levelId = this.getAttribute('data-level-id');
+            const levelId = this.getAttribute('data-level-game-id');
             document.getElementById('legacy_level_id').value = levelId;
         });
     });
@@ -405,7 +405,7 @@
     // Set level ID for move to main modal
     document.querySelectorAll('[data-bs-target="#moveMainModal"]').forEach(button => {
         button.addEventListener('click', function() {
-            const levelId = this.getAttribute('data-level-id');
+            const levelId = this.getAttribute('data-level-game-id');
             document.getElementById('main_level_id').value = levelId;
         });
     });
@@ -413,7 +413,7 @@
     // Set level ID for delete modal
     document.querySelectorAll('[data-bs-target="#deleteLevelModal"]').forEach(button => {
         button.addEventListener('click', function() {
-            const levelId = this.getAttribute('data-level-id');
+            const levelId = this.getAttribute('data-level-game-id');
             document.getElementById('delete_level_id').value = levelId;
         });
     });

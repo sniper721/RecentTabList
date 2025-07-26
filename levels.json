@@ -1,0 +1,34 @@
+[
+  {
+    "_id": 1,
+    "name": "Bloodbath",
+    "creator": "Riot",
+    "verifier": "Riot",
+    "level_id": "10565740",
+    "video_url": "https://www.youtube.com/watch?v=example1",
+    "thumbnail_url": null,
+    "description": "Extreme demon level",
+    "difficulty": 10.0,
+    "position": 1,
+    "is_legacy": false,
+    "date_added": {"$date": "2024-01-01T00:00:00.000Z"},
+    "points": 10.0,
+    "min_percentage": 100
+  },
+  {
+    "_id": 2,
+    "name": "Sonic Wave",
+    "creator": "Cyclic",
+    "verifier": "Sunix",
+    "level_id": "26681070",
+    "video_url": "https://www.youtube.com/watch?v=example2",
+    "thumbnail_url": null,
+    "description": "Another extreme demon",
+    "difficulty": 9.8,
+    "position": 2,
+    "is_legacy": false,
+    "date_added": {"$date": "2024-01-02T00:00:00.000Z"},
+    "points": 9.9,
+    "min_percentage": 100
+  }
+]

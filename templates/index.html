@@ -11,7 +11,7 @@
             </div>
             <div class="card-body p-0">
                 {% for level in levels %}
-                <div class="level-row border-bottom" data-level-id="{{ level.id if level is not mapping else level['id'] }}" style="cursor: pointer; position: relative; height: 120px; margin-bottom: 2px; overflow: hidden;">
+                <div class="level-row border-bottom" data-level-id="{{ level._id if level is not mapping else level['_id'] }}" style="cursor: pointer; position: relative; height: 120px; margin-bottom: 2px; overflow: hidden;">
                     {% set thumbnail_url = level.thumbnail_url if level is not mapping else level.get('thumbnail_url') %}
                     {% set video_url = level.video_url if level is not mapping else level['video_url'] %}
                     {% if thumbnail_url %}

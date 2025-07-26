@@ -60,7 +60,7 @@
                         <tbody>
                             {% for user in users %}
                             <tr>
-                                <td>{{ user.id }}</td>
+                                <td>{{ user._id }}</td>
                                 <td>{{ user.username }}</td>
                                 <td>{{ user.email }}</td>
                                 <td>{{ user.points or 0 }}</td>
@@ -73,7 +73,7 @@
                                 </td>
                                 <td>{{ user.date_joined.strftime('%Y-%m-%d') }}</td>
                                 <td>
-                                    <form method="POST" action="{{ url_for('admin_toggle_admin', user_id=user.id) }}" style="display: inline;">
+                                    <form method="POST" action="{{ url_for('admin_toggle_admin', user_id=user._id) }}" style="display: inline;">
                                         <button type="submit" class="btn btn-sm {% if user.is_admin %}btn-warning{% else %}btn-success{% endif %}">
                                             {% if user.is_admin %}Remove Admin{% else %}Make Admin{% endif %}
                                         </button>

@@ -1,0 +1,26 @@
+[
+  {
+    "_id": 1,
+    "username": "ENGINE",
+    "email": "spinerspinerreal@gmail.com",
+    "password_hash": "pbkdf2:sha256:600000$9aubiI1ia100QjyZ$c0c36d3847c1c7d2abeb7c9b77cfd4e324053acd8359e1c9f5a4342ffe42115b",
+    "is_admin": true,
+    "points": 0,
+    "date_joined": {
+      "$date": "2025-07-25 08:53:50.047992"
+    },
+    "google_id": "113146991651080581286"
+  },
+  {
+    "_id": 2,
+    "username": "dark",
+    "email": "darkplaguegamesreal@gmail.com",
+    "password_hash": null,
+    "is_admin": false,
+    "points": 0,
+    "date_joined": {
+      "$date": "2025-07-26 08:10:26.749468"
+    },
+    "google_id": "105596165376761086552"
+  }
+]

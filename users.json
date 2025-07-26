@@ -1,0 +1,22 @@
+[
+  {
+    "_id": 1,
+    "username": "admin",
+    "email": "admin@example.com",
+    "password_hash": "$2b$12$example_hash",
+    "is_admin": true,
+    "points": 0,
+    "date_joined": {"$date": "2024-01-01T00:00:00.000Z"},
+    "google_id": null
+  },
+  {
+    "_id": 2,
+    "username": "player1",
+    "email": "player1@example.com",
+    "password_hash": "$2b$12$example_hash2",
+    "is_admin": false,
+    "points": 150.5,
+    "date_joined": {"$date": "2024-01-15T10:30:00.000Z"},
+    "google_id": null
+  }
+]

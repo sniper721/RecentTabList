@@ -1,0 +1,20 @@
+[
+  {
+    "_id": 1,
+    "user_id": 2,
+    "level_id": 1,
+    "progress": 100,
+    "video_url": "https://www.youtube.com/watch?v=record1",
+    "status": "approved",
+    "date_submitted": {"$date": "2024-01-20T15:30:00.000Z"}
+  },
+  {
+    "_id": 2,
+    "user_id": 2,
+    "level_id": 2,
+    "progress": 87,
+    "video_url": "https://www.youtube.com/watch?v=record2",
+    "status": "pending",
+    "date_submitted": {"$date": "2024-01-25T12:00:00.000Z"}
+  }
+]
