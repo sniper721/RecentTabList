@@ -862,7 +862,7 @@ def admin_users():
             db.session.commit()
             flash('User created successfully!', 'success')
     
-    users = User.query.all()
+    users = User.query.order_by(User.date_joined.desc()).all()
     return render_template('admin/users.html', users=users)
 
 @app.route('/admin/toggle_admin/<int:user_id>', methods=['POST'])
