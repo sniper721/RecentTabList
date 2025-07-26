@@ -25,14 +25,24 @@ app.config['GOOGLE_CLIENT_SECRET'] = os.environ.get('GOOGLE_CLIENT_SECRET')
 
 # Initialize MongoDB and OAuth
 try:
-    mongo_client = MongoClient(mongodb_uri, tlsAllowInvalidCertificates=True)
+    mongo_client = MongoClient(
+        mongodb_uri,
+        tls=True,
+        tlsAllowInvalidCertificates=True,
+        tlsAllowInvalidHostnames=True,
+        serverSelectionTimeoutMS=5000
+    )
     mongo_db = mongo_client[mongodb_db]
     # Test connection
     mongo_client.admin.command('ping')
     print("✓ MongoDB initialized successfully")
 except Exception as e:
     print(f"MongoDB initialization error: {e}")
-    raise e
+    print("Falling back to SQLite...")
+    # Fall back to SQLite if MongoDB fails
+    import subprocess
+    subprocess.run(['python', 'main_sqlite_backup.py'])
+    exit()
     
 oauth = OAuth(app)
 
