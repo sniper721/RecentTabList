@@ -23,6 +23,7 @@
                         <button type="submit" class="btn btn-primary">Login</button>
                     </div>
                 </form>
+                {% if config.GOOGLE_CLIENT_ID and config.GOOGLE_CLIENT_SECRET %}
                 <div class="text-center my-3">
                     <span class="text-muted">or</span>
                 </div>
@@ -31,6 +32,7 @@
                         <i class="fab fa-google me-2"></i>Sign in with Google
                     </a>
                 </div>
+                {% endif %}
             </div>
             <div class="card-footer text-center">
                 <p class="mb-0">Don't have an account? <a href="{{ url_for('register') }}">Register</a></p>

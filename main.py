@@ -4,6 +4,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from authlib.integrations.flask_client import OAuth
 import os
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -19,16 +23,18 @@ app.config['GOOGLE_CLIENT_SECRET'] = os.environ.get('GOOGLE_CLIENT_SECRET')
 db = SQLAlchemy(app)
 oauth = OAuth(app)
 
-# Configure Google OAuth
-google = oauth.register(
-    name='google',
-    client_id=app.config['GOOGLE_CLIENT_ID'],
-    client_secret=app.config['GOOGLE_CLIENT_SECRET'],
-    server_metadata_url='https://accounts.google.com/.well-known/openid_configuration',
-    client_kwargs={
-        'scope': 'openid email profile'
-    }
-)
+# Configure Google OAuth only if credentials are provided
+google = None
+if app.config['GOOGLE_CLIENT_ID'] and app.config['GOOGLE_CLIENT_SECRET']:
+    google = oauth.register(
+        name='google',
+        client_id=app.config['GOOGLE_CLIENT_ID'],
+        client_secret=app.config['GOOGLE_CLIENT_SECRET'],
+        server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+        client_kwargs={
+            'scope': 'openid email profile'
+        }
+    )
 
 # Function to check if a column exists in a table
 def column_exists(table_name, column_name):
@@ -409,15 +415,24 @@ def logout():
 
 @app.route('/auth/google')
 def google_login():
+    if not google:
+        flash('Google Sign-In is not configured', 'danger')
+        return redirect(url_for('login'))
     redirect_uri = url_for('google_callback', _external=True)
     return google.authorize_redirect(redirect_uri)
 
 @app.route('/auth/google/callback')
 def google_callback():
-    token = google.authorize_access_token()
-    user_info = token.get('userinfo')
+    if not google:
+        flash('Google Sign-In is not configured', 'danger')
+        return redirect(url_for('login'))
     
-    if user_info:
+    try:
+        token = google.authorize_access_token()
+        # Get user info from Google
+        resp = google.get('https://openidconnect.googleapis.com/v1/userinfo', token=token)
+        user_info = resp.json()
+        
         google_id = user_info['sub']
         email = user_info['email']
         name = user_info.get('name', email.split('@')[0])
@@ -454,8 +469,12 @@ def google_callback():
         flash('Successfully logged in with Google!', 'success')
         return redirect(url_for('index'))
     
-    flash('Google login failed', 'danger')
-    return redirect(url_for('login'))
+    except Exception as e:
+        import traceback
+        print(f"Google login error: {e}")
+        print(f"Full traceback: {traceback.format_exc()}")
+        flash(f'Google login failed: {str(e)}', 'danger')
+        return redirect(url_for('login'))
 
 @app.route('/profile')
 def profile():
