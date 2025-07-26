@@ -25,7 +25,7 @@ app.config['GOOGLE_CLIENT_SECRET'] = os.environ.get('GOOGLE_CLIENT_SECRET')
 
 # Initialize MongoDB and OAuth
 try:
-    mongo_client = MongoClient(mongodb_uri)
+    mongo_client = MongoClient(mongodb_uri, tlsAllowInvalidCertificates=True)
     mongo_db = mongo_client[mongodb_db]
     # Test connection
     mongo_client.admin.command('ping')
