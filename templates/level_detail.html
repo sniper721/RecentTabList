@@ -1,6 +1,6 @@
 {% extends "layout.html" %}
 
-{% block title %}{{ level.name }} - Geometry Dash Demon List{% endblock %}
+{% block title %}{{ level.name }} - GD Recent Tab List{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -40,14 +40,7 @@
                         {% set min_percentage = level.min_percentage if level is not mapping else level['min_percentage'] %}
                         <p><strong>Minimum Percentage:</strong> {{ min_percentage }}%</p>
                         
-                        {% set video_url = level.video_url if level is not mapping else level['video_url'] %}
-                        {% if video_url %}
-                        <p>
-                            <a href="{{ video_url }}" target="_blank" class="btn btn-danger">
-                                <i class="fab fa-youtube"></i> Watch Verification Video
-                            </a>
-                        </p>
-                        {% endif %}
+
                     </div>
                 </div>
                 

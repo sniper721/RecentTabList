@@ -48,6 +48,15 @@ def fix_database():
             cursor.execute("ALTER TABLE user ADD COLUMN google_id TEXT")
             cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_google_id ON user(google_id)")
         
+        # Get table info for level table again to check for thumbnail_url
+        cursor.execute("PRAGMA table_info(level)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        # Add thumbnail_url column to level table if it doesn't exist
+        if 'thumbnail_url' not in columns:
+            print("Adding thumbnail_url column to level table...")
+            cursor.execute("ALTER TABLE level ADD COLUMN thumbnail_url TEXT")
+        
         # Get table info for record table
         cursor.execute("PRAGMA table_info(record)")
         columns = [column[1] for column in cursor.fetchall()]
