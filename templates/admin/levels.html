@@ -144,7 +144,7 @@
                 <h5 class="modal-title" id="addLevelModalLabel">Add New Level</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form method="POST" action="{{ url_for('admin_levels') }}">
+            <form method="POST" action="{{ url_for('admin_levels') }}" enctype="multipart/form-data">
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-md-6">
@@ -188,6 +188,12 @@
                                 <label for="video_url" class="form-label">Video URL</label>
                                 <input type="url" class="form-control" id="video_url" name="video_url" required>
                             </div>
+                            <div class="mb-3">
+                                <label for="thumbnail_url" class="form-label">Custom Thumbnail (Optional)</label>
+                                <input type="url" class="form-control mb-2" id="thumbnail_url" name="thumbnail_url" placeholder="Or paste image URL">
+                                <input type="file" class="form-control" id="thumbnail_file" name="thumbnail_file" accept="image/*">
+                                <small class="form-text text-muted">Upload image file or paste URL. If empty, YouTube thumbnail will be used</small>
+                            </div>
                             <div class="mb-3 form-check">
                                 <input type="checkbox" class="form-check-input" id="is_legacy" name="is_legacy">
                                 <label class="form-check-label" for="is_legacy">Add to Legacy List</label>
@@ -216,7 +222,7 @@
                 <h5 class="modal-title" id="editLevelModalLabel">Edit Level</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form method="POST" action="{{ url_for('admin_edit_level') }}">
+            <form method="POST" action="{{ url_for('admin_edit_level') }}" enctype="multipart/form-data">
                 <input type="hidden" id="edit_level_id" name="level_id">
                 <div class="modal-body">
                     <!-- Same form fields as Add Level Modal -->
@@ -261,6 +267,12 @@
                             <div class="mb-3">
                                 <label for="edit_video_url" class="form-label">Video URL</label>
                                 <input type="url" class="form-control" id="edit_video_url" name="video_url" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="edit_thumbnail_url" class="form-label">Custom Thumbnail (Optional)</label>
+                                <input type="url" class="form-control mb-2" id="edit_thumbnail_url" name="thumbnail_url" placeholder="Or paste image URL">
+                                <input type="file" class="form-control" id="edit_thumbnail_file" name="thumbnail_file" accept="image/*">
+                                <small class="form-text text-muted">Upload image file or paste URL. If empty, YouTube thumbnail will be used</small>
                             </div>
                         </div>
                     </div>

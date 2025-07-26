@@ -1,46 +1,50 @@
 {% extends "layout.html" %}
 
-{% block title %}Main List - Geometry Dash Demon List{% endblock %}
+{% block title %}Main List - GD Recent Tab List{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-lg-8">
         <div class="card shadow-sm">
             <div class="card-header bg-primary text-white">
-                <h2 class="mb-0">The Geometry Dash Recent Tab List</h2>
+                <h2 class="mb-0">The GD Recent Tab List</h2>
             </div>
             <div class="card-body p-0">
-                <div class="level-grid">
-                    {% for level in levels %}
-                    <div class="level-card" data-level-id="{{ level.id if level is not mapping else level['id'] }}">
-                        <div class="level-thumbnail">
+                {% for level in levels %}
+                <div class="d-flex align-items-center p-3 border-bottom level-row" data-level-id="{{ level.id if level is not mapping else level['id'] }}" style="cursor: pointer;">
+                    <div class="me-3">
+                        <div class="position-relative" style="width: 80px; height: 80px;">
+                            {% set thumbnail_url = level.thumbnail_url if level is not mapping else level.get('thumbnail_url') %}
                             {% set video_url = level.video_url if level is not mapping else level['video_url'] %}
-                            {% if video_url and 'youtube.com' in video_url %}
+                            {% if thumbnail_url %}
+                                <img src="{{ thumbnail_url }}" alt="{{ level.name if level is not mapping else level['name'] }}" class="img-fluid rounded" style="width: 80px; height: 80px; object-fit: cover;">
+                            {% elif video_url and 'youtube.com' in video_url %}
                                 {% set video_id = video_url.split('v=')[1].split('&')[0] %}
-                                <img src="https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg" alt="{{ level.name if level is not mapping else level['name'] }}">
+                                <img src="https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg" alt="{{ level.name if level is not mapping else level['name'] }}" class="img-fluid rounded" style="width: 80px; height: 80px; object-fit: cover;">
                             {% elif video_url and 'youtu.be' in video_url %}
                                 {% set video_id = video_url.split('/')[-1] %}
-                                <img src="https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg" alt="{{ level.name if level is not mapping else level['name'] }}">
+                                <img src="https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg" alt="{{ level.name if level is not mapping else level['name'] }}" class="img-fluid rounded" style="width: 80px; height: 80px; object-fit: cover;">
                             {% else %}
-                                <div class="no-thumbnail">No Video</div>
+                                <div class="bg-secondary rounded d-flex align-items-center justify-content-center text-white" style="width: 80px; height: 80px;">No Image</div>
                             {% endif %}
-                            <div class="level-position">{{ level.position if level is not mapping else level['position'] }}</div>
-                            {% set difficulty = level.difficulty|round|int if level is not mapping else level['difficulty']|round|int %}
-                            <div class="level-difficulty-indicator level-difficulty-{{ difficulty }}"></div>
-                        </div>
-                        <div class="level-info">
-                            <h5 class="level-title">{{ level.name if level is not mapping else level['name'] }}</h5>
-                            <div class="level-meta">
-                                <span class="level-creator">By {{ level.creator if level is not mapping else level['creator'] }}</span>
-                                <span class="level-verifier">Verified by {{ level.verifier if level is not mapping else level['verifier'] }}</span>
+                            <div class="position-absolute top-0 start-0 bg-dark text-white px-2 py-1 rounded-end" style="font-size: 0.8rem; font-weight: bold;">
+                                {{ level.position if level is not mapping else level['position'] }}
                             </div>
-                            {% set position = level.position if level is not mapping else level['position'] %}
-                            {% set points = level.points if level is not mapping else level['points'] %}
-                            <div class="level-points">{{ points or ((100 - position + 1) / 10)|round(2) }} Points</div>
                         </div>
                     </div>
-                    {% endfor %}
+                    <div class="flex-grow-1">
+                        <h5 class="mb-1">{{ level.name if level is not mapping else level['name'] }}</h5>
+                        <p class="mb-1 text-muted">By {{ level.creator if level is not mapping else level['creator'] }} • Verified by {{ level.verifier if level is not mapping else level['verifier'] }}</p>
+                        <div class="d-flex align-items-center">
+                            {% set difficulty = level.difficulty|round|int if level is not mapping else level['difficulty']|round|int %}
+                            <span class="badge me-2" style="background-color: {{ get_difficulty_color(difficulty) }};">{{ difficulty }}/10</span>
+                            {% set position = level.position if level is not mapping else level['position'] %}
+                            {% set points = level.points if level is not mapping else level['points'] %}
+                            <small class="text-muted">{{ points or ((100 - position + 1) / 10)|round(2) }} Points</small>
+                        </div>
+                    </div>
                 </div>
+                {% endfor %}
             </div>
         </div>
     </div>
@@ -51,12 +55,12 @@
                 <h4 class="mb-0">About</h4>
             </div>
             <div class="card-body">
-                <p>Welcome to the Geometry Dash Demon List! This is a community-driven list of the hardest demon levels in Geometry Dash, ranked by difficulty.</p>
+                <p>Welcome to the GD Recent Tab List! This is a community-driven list that ranks recent tab levels by difficulty.</p>
                 <p>Click on any level to view more details, including records and information about the level.</p>
             </div>
         </div>
         
-        <div class="card shadow-sm">
+        <div class="card shadow-sm mb-4">
             <div class="card-header bg-info text-white">
                 <h4 class="mb-0">Top Players (by Points)</h4>
             </div>
@@ -77,6 +81,29 @@
                     </li>
                     {% endfor %}
                 </ul>
+            </div>
+        </div>
+        
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Join Our Discord</h4>
+            </div>
+            <div class="card-body text-center">
+                <a href="https://discord.gg/TSjXSecuaz" target="_blank" class="btn btn-primary">
+                    <i class="fab fa-discord me-2"></i>Join Discord Server
+                </a>
+            </div>
+        </div>
+        
+        <div class="card shadow-sm">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0">Credits</h4>
+            </div>
+            <div class="card-body">
+                <p><strong>List Admin:</strong> Miifin</p>
+                <p><strong>List Moderators:</strong> Kye, Monika, Dairyfarmer, DetiousMage</p>
+                <p><strong>List Coder:</strong> ENGINE</p>
+                <p><strong>Server Moderator:</strong> Cesium</p>
             </div>
         </div>
     </div>

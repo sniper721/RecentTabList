@@ -11,7 +11,7 @@ load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.urandom(24)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here-change-in-production')
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///demonlist.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -135,6 +135,7 @@ class Level(db.Model):
     verifier = db.Column(db.String(80), nullable=False)
     level_id = db.Column(db.String(20))
     video_url = db.Column(db.String(200))
+    thumbnail_url = db.Column(db.String(200))
     description = db.Column(db.Text)
     difficulty = db.Column(db.Float, nullable=False)  # For precise ranking
     position = db.Column(db.Integer, nullable=False)  # Current position in the list
@@ -544,6 +545,26 @@ def admin_levels():
         verifier = request.form.get('verifier')
         level_id = request.form.get('level_id')
         video_url = request.form.get('video_url')
+        thumbnail_url = request.form.get('thumbnail_url')
+        
+        # Handle file upload
+        if 'thumbnail_file' in request.files:
+            file = request.files['thumbnail_file']
+            if file and file.filename:
+                import os
+                from werkzeug.utils import secure_filename
+                
+                # Create uploads directory if it doesn't exist
+                upload_folder = os.path.join('static', 'uploads')
+                os.makedirs(upload_folder, exist_ok=True)
+                
+                # Save file
+                filename = secure_filename(file.filename)
+                file_path = os.path.join(upload_folder, filename)
+                file.save(file_path)
+                
+                # Use uploaded file URL instead of provided URL
+                thumbnail_url = f'/static/uploads/{filename}'
         description = request.form.get('description')
         difficulty = request.form.get('difficulty')
         position = request.form.get('position')
@@ -560,6 +581,7 @@ def admin_levels():
             verifier=verifier,
             level_id=level_id,
             video_url=video_url,
+            thumbnail_url=thumbnail_url,
             description=description,
             difficulty=float(difficulty),
             position=int(position),
@@ -600,6 +622,28 @@ def admin_edit_level():
     level.verifier = request.form.get('verifier')
     level.level_id = request.form.get('level_id')
     level.video_url = request.form.get('video_url')
+    thumbnail_url = request.form.get('thumbnail_url')
+    
+    # Handle file upload
+    if 'thumbnail_file' in request.files:
+        file = request.files['thumbnail_file']
+        if file and file.filename:
+            import os
+            from werkzeug.utils import secure_filename
+            
+            # Create uploads directory if it doesn't exist
+            upload_folder = os.path.join('static', 'uploads')
+            os.makedirs(upload_folder, exist_ok=True)
+            
+            # Save file
+            filename = secure_filename(file.filename)
+            file_path = os.path.join(upload_folder, filename)
+            file.save(file_path)
+            
+            # Use uploaded file URL instead of provided URL
+            thumbnail_url = f'/static/uploads/{filename}'
+    
+    level.thumbnail_url = thumbnail_url
     level.description = request.form.get('description')
     level.difficulty = float(request.form.get('difficulty'))
     
