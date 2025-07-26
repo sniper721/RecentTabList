@@ -1,0 +1,418 @@
+/* 
+ * Geometry Dash Demon List - Custom Styles
+ * A custom theme for the Geometry Dash Demon List website
+ */
+
+:root {
+    /* Custom color variables - Teal/Turquoise Theme with Light Background */
+    --primary-color: #00bcd4;    /* Teal/Turquoise */
+    --secondary-color: #006064;  /* Dark Teal */
+    --accent-color: #1de9b6;     /* Light Turquoise */
+    --background-color: #ffffff; /* White background */
+    --card-bg: #f8f9fa;          /* Light gray card background */
+    --text-color: #212529;       /* Dark text (almost black) */
+    --text-muted: #6c757d;       /* Gray text for less important content */
+    --border-color: #dee2e6;     /* Light gray border */
+}
+
+/* Base styles */
+body {
+    background-color: var(--background-color);
+    color: var(--text-color);
+    font-family: 'Roboto', sans-serif;
+    line-height: 1.6;
+}
+
+/* Table styling override for light theme */
+.table {
+    color: var(--text-color);
+}
+
+.table-dark {
+    color: #fff;
+}
+
+.table-striped > tbody > tr:nth-of-type(odd) {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.table-hover > tbody > tr:hover {
+    background-color: rgba(0, 188, 212, 0.1);
+}
+
+/* Navbar styling */
+.navbar {
+    background-color: var(--secondary-color);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.5rem;
+}
+
+.nav-link {
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+.nav-link:hover {
+    color: var(--accent-color) !important;
+}
+
+/* Card styling */
+.card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+}
+
+.card-header {
+    border-bottom: 1px solid var(--border-color);
+    font-weight: bold;
+}
+
+/* Table styling */
+.table {
+    margin-bottom: 0;
+}
+
+/* Form styling override for light theme */
+.form-control {
+    background-color: #fff;
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+
+.form-control:focus {
+    background-color: #fff;
+    color: var(--text-color);
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.25rem rgba(0, 188, 212, 0.25);
+}
+
+/* Level grid styling */
+.level-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+    padding: 15px;
+}
+
+.level-card {
+    background-color: var(--card-bg);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transition: transform 0.3s, box-shadow 0.3s;
+    cursor: pointer;
+}
+
+.level-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+}
+
+.level-thumbnail {
+    position: relative;
+    width: 100%;
+    height: 140px;
+    overflow: hidden;
+}
+
+.level-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.no-thumbnail {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #333;
+    color: #aaa;
+    font-weight: bold;
+}
+
+.level-position {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    font-weight: bold;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.level-difficulty-indicator {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 5px;
+}
+
+.level-info {
+    padding: 15px;
+}
+
+.level-title {
+    margin: 0 0 10px 0;
+    font-weight: bold;
+    font-size: 16px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.level-meta {
+    display: flex;
+    flex-direction: column;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+}
+
+.level-points {
+    font-weight: bold;
+    color: var(--primary-color);
+    font-size: 14px;
+}
+
+/* Legacy level row styling (for backward compatibility) */
+.level-row {
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.level-row:hover {
+    background-color: rgba(52, 152, 219, 0.2) !important;
+}
+
+.level-name {
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+}
+
+.level-difficulty {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+
+.position {
+    font-weight: bold;
+    text-align: center;
+}
+
+/* Button styling */
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+    background-color: #00acc1;
+    border-color: #00acc1;
+}
+
+.btn-danger {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+    color: #333;
+}
+
+.btn-danger:hover {
+    background-color: #00bfa5;
+    border-color: #00bfa5;
+    color: #333;
+}
+
+/* Override Bootstrap theme colors */
+.bg-primary {
+    background-color: var(--primary-color) !important;
+}
+
+.bg-secondary {
+    background-color: var(--secondary-color) !important;
+}
+
+.bg-info {
+    background-color: #26c6da !important;
+}
+
+.bg-warning {
+    background-color: #4db6ac !important;
+}
+
+.bg-danger {
+    background-color: var(--accent-color) !important;
+    color: #333 !important;
+}
+
+.badge.bg-primary {
+    background-color: var(--primary-color) !important;
+}
+
+.badge.bg-secondary {
+    background-color: var(--secondary-color) !important;
+}
+
+
+.form-check-input:checked {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+/* Footer styling */
+.footer {
+    background-color: var(--secondary-color);
+    color: var(--text-muted);
+}
+
+/* Profile page styling */
+.profile-avatar {
+    color: var(--primary-color);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .card {
+        margin-bottom: 20px;
+    }
+    
+    .table-responsive {
+        border-radius: 0;
+    }
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+/* Custom badge colors for difficulty */
+.badge-extreme {
+    background-color: #ff0000;
+}
+
+.badge-insane {
+    background-color: #ff5500;
+}
+
+.badge-hard {
+    background-color: #ffaa00;
+}
+
+.badge-medium {
+    background-color: #ffff00;
+    color: #333;
+}
+
+.badge-easy {
+    background-color: #00ff00;
+    color: #333;
+}
+
+/* Difficulty level indicators */
+.level-difficulty-badge {
+    background-color: var(--primary-color);
+}
+
+.level-difficulty-10 {
+    background-color: #ff0000 !important; /* Extreme */
+}
+
+.level-difficulty-9 {
+    background-color: #ff5500 !important; /* Insane */
+}
+
+.level-difficulty-8 {
+    background-color: #ff5500 !important; /* Insane */
+}
+
+.level-difficulty-7 {
+    background-color: #ffaa00 !important; /* Hard */
+}
+
+.level-difficulty-6 {
+    background-color: #ffaa00 !important; /* Hard */
+}
+
+.level-difficulty-5 {
+    background-color: #ffff00 !important; /* Medium */
+    color: #333;
+}
+
+.level-difficulty-4 {
+    background-color: #ffff00 !important; /* Medium */
+    color: #333;
+}
+
+.level-difficulty-3 {
+    background-color: #00ff00 !important; /* Easy */
+    color: #333;
+}
+
+.level-difficulty-2 {
+    background-color: #00ff00 !important; /* Easy */
+    color: #333;
+}
+
+.level-difficulty-1 {
+    background-color: #00ff00 !important; /* Easy */
+    color: #333;
+}
+
+/* Modal styling */
+.modal-content {
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+.modal-header {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-footer {
+    border-top: 1px solid var(--border-color);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}

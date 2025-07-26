@@ -1,0 +1,166 @@
+{% extends "layout.html" %}
+
+{% block title %}Profile - Geometry Dash Demon List{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-4">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">{{ user.username }}</h3>
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-4">
+                    <div class="profile-avatar mb-3">
+                        <i class="fas fa-user-circle fa-6x text-primary"></i>
+                    </div>
+                    <h4>{{ user.username }}</h4>
+                    <p class="text-muted">Member since {{ user.date_joined.strftime('%Y-%m-%d') }}</p>
+                </div>
+                
+                <div class="mb-3">
+                    <h5>Stats</h5>
+                    <ul class="list-group">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Total Records
+                            <span class="badge bg-primary rounded-pill">{{ records|length }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Completed Levels
+                            <span class="badge bg-success rounded-pill">
+                                {{ records|selectattr('progress', 'equalto', 100)|list|length }}
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            Pending Records
+                            <span class="badge bg-warning rounded-pill">
+                                {{ records|selectattr('status', 'equalto', 'pending')|list|length }}
+                            </span>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('submit_record') }}" class="btn btn-primary">Submit New Record</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <ul class="nav nav-tabs card-header-tabs" id="profileTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active text-dark" id="records-tab" data-bs-toggle="tab" data-bs-target="#records" type="button" role="tab" aria-controls="records" aria-selected="true">My Records</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link text-dark" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab" aria-controls="pending" aria-selected="false">Pending</button>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body">
+                <div class="tab-content" id="profileTabsContent">
+                    <div class="tab-pane fade show active" id="records" role="tabpanel" aria-labelledby="records-tab">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Level</th>
+                                        <th>Position</th>
+                                        <th>Progress</th>
+                                        <th>Status</th>
+                                        <th>Date</th>
+                                        <th>Video</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for record in records|selectattr('status', 'equalto', 'approved')|list %}
+                                    <tr>
+                                        <td>
+                                            <a href="{{ url_for('level_detail', level_id=record.level.id) }}">
+                                                {{ record.level.name }}
+                                            </a>
+                                        </td>
+                                        <td>{{ record.level.position }}</td>
+                                        <td>
+                                            {% if record.progress == 100 %}
+                                            <span class="badge bg-success">100%</span>
+                                            {% else %}
+                                            <span class="badge bg-warning">{{ record.progress }}%</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><span class="badge bg-success">Approved</span></td>
+                                        <td>{{ record.date_submitted.strftime('%Y-%m-%d') }}</td>
+                                        <td>
+                                            {% if record.video_url %}
+                                            <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-danger">
+                                                <i class="fab fa-youtube"></i>
+                                            </a>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center py-3">No approved records yet.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="tab-pane fade" id="pending" role="tabpanel" aria-labelledby="pending-tab">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Level</th>
+                                        <th>Position</th>
+                                        <th>Progress</th>
+                                        <th>Status</th>
+                                        <th>Date</th>
+                                        <th>Video</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for record in records|selectattr('status', 'equalto', 'pending')|list %}
+                                    <tr>
+                                        <td>
+                                            <a href="{{ url_for('level_detail', level_id=record.level.id) }}">
+                                                {{ record.level.name }}
+                                            </a>
+                                        </td>
+                                        <td>{{ record.level.position }}</td>
+                                        <td>
+                                            {% if record.progress == 100 %}
+                                            <span class="badge bg-success">100%</span>
+                                            {% else %}
+                                            <span class="badge bg-warning">{{ record.progress }}%</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><span class="badge bg-warning">Pending</span></td>
+                                        <td>{{ record.date_submitted.strftime('%Y-%m-%d') }}</td>
+                                        <td>
+                                            {% if record.video_url %}
+                                            <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-danger">
+                                                <i class="fab fa-youtube"></i>
+                                            </a>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center py-3">No pending records.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

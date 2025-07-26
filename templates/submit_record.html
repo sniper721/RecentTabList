@@ -1,0 +1,115 @@
+{% extends "layout.html" %}
+
+{% block title %}Submit Record - Geometry Dash Demon List{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">Submit Record</h3>
+            </div>
+            <div class="card-body">
+                {% if 'user_id' not in session %}
+                <div class="alert alert-warning">
+                    <p>You need to <a href="{{ url_for('login') }}">login</a> to submit a record.</p>
+                    <p>Don't have an account? <a href="{{ url_for('register') }}">Register</a> now.</p>
+                </div>
+                {% else %}
+                <form method="POST" action="{{ url_for('submit_record') }}">
+                    <div class="mb-3">
+                        <label for="level_id" class="form-label">Level</label>
+                        <select class="form-select" id="level_id" name="level_id" required>
+                            <option value="" selected disabled>Select a level</option>
+                            <optgroup label="Main List">
+                                {% for level in levels if not level.is_legacy %}
+                                <option value="{{ level.id }}">{{ level.position }}. {{ level.name }} by {{ level.creator }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            <optgroup label="Legacy List">
+                                {% for level in levels if level.is_legacy %}
+                                <option value="{{ level.id }}">{{ level.position }}. {{ level.name }} by {{ level.creator }}</option>
+                                {% endfor %}
+                            </optgroup>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="progress" class="form-label">Progress (%)</label>
+                        <input type="number" class="form-control" id="progress" name="progress" min="50" max="100" required>
+                        <div class="form-text">Minimum progress required is 50%.</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="video_url" class="form-label">Video URL</label>
+                        <input type="url" class="form-control" id="video_url" name="video_url" placeholder="https://www.youtube.com/watch?v=..." required>
+                        <div class="form-text">Link to a YouTube video showing your gameplay.</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="comments" class="form-label">Comments (Optional)</label>
+                        <textarea class="form-control" id="comments" name="comments" rows="3"></textarea>
+                        <div class="form-text">Any additional information you want to share with the moderators.</div>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="confirm" required>
+                        <label class="form-check-label" for="confirm">I confirm this is my own gameplay and no cheats were used</label>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">Submit Record</button>
+                    </div>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card shadow mt-4">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">Submission Guidelines</h4>
+            </div>
+            <div class="card-body">
+                <h5>Requirements</h5>
+                <ul>
+                    <li>Your video must clearly show your gameplay</li>
+                    <li>The video must include your username or other identifying information</li>
+                    <li>The minimum progress required is 50%</li>
+                    <li>For levels on the main list, 100% completion is required to be listed on the leaderboards</li>
+                    <li>No speedhacks, noclip, or other cheats are allowed</li>
+                </ul>
+                
+                <h5>Review Process</h5>
+                <p>All submissions are reviewed by our moderators. This process typically takes 1-3 days. You can check the status of your submission on your profile page.</p>
+                
+                <h5>Points System</h5>
+                <p>Points are awarded based on the level's position in the list and your progress:</p>
+                <ul>
+                    <li>100% completion: Full points</li>
+                    <li>Partial completion: Proportional points based on your percentage</li>
+                </ul>
+                <p>Only levels on the main list award points for the leaderboard.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Validate progress based on selected level
+    document.getElementById('level_id').addEventListener('change', function() {
+        const levelOption = this.options[this.selectedIndex];
+        const isLegacy = levelOption.parentElement.label === 'Legacy List';
+        const progressInput = document.getElementById('progress');
+        
+        if (isLegacy) {
+            progressInput.min = 50;
+            progressInput.title = "Minimum progress for legacy levels is 50%";
+        } else {
+            progressInput.min = 50;
+            progressInput.title = "Minimum progress for main list levels is 50%";
+        }
+    });
+</script>
+{% endblock %}

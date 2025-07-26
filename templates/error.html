@@ -1,0 +1,29 @@
+{% extends "layout.html" %}
+
+{% block title %}Error - Geometry Dash Demon List{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-danger text-white">
+                <h2 class="mb-0">Error</h2>
+            </div>
+            <div class="card-body">
+                <p>An error occurred while loading the page:</p>
+                <div class="alert alert-danger">
+                    {{ error }}
+                </div>
+                <p>Please try the following:</p>
+                <ul>
+                    <li>Refresh the page</li>
+                    <li>Clear your browser cache</li>
+                    <li>Try again later</li>
+                </ul>
+                <p>If the problem persists, please contact the administrator.</p>
+                <a href="{{ url_for('index') }}" class="btn btn-primary">Return to Home</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
