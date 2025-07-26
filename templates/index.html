@@ -1,0 +1,96 @@
+{% extends "layout.html" %}
+
+{% block title %}Main List - Geometry Dash Demon List{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h2 class="mb-0">The Geometry Dash Recent Tab List</h2>
+            </div>
+            <div class="card-body p-0">
+                <div class="level-grid">
+                    {% for level in levels %}
+                    <div class="level-card" data-level-id="{{ level.id if level is not mapping else level['id'] }}">
+                        <div class="level-thumbnail">
+                            {% set video_url = level.video_url if level is not mapping else level['video_url'] %}
+                            {% if video_url and 'youtube.com' in video_url %}
+                                {% set video_id = video_url.split('v=')[1].split('&')[0] %}
+                                <img src="https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg" alt="{{ level.name if level is not mapping else level['name'] }}">
+                            {% elif video_url and 'youtu.be' in video_url %}
+                                {% set video_id = video_url.split('/')[-1] %}
+                                <img src="https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg" alt="{{ level.name if level is not mapping else level['name'] }}">
+                            {% else %}
+                                <div class="no-thumbnail">No Video</div>
+                            {% endif %}
+                            <div class="level-position">{{ level.position if level is not mapping else level['position'] }}</div>
+                            {% set difficulty = level.difficulty|round|int if level is not mapping else level['difficulty']|round|int %}
+                            <div class="level-difficulty-indicator level-difficulty-{{ difficulty }}"></div>
+                        </div>
+                        <div class="level-info">
+                            <h5 class="level-title">{{ level.name if level is not mapping else level['name'] }}</h5>
+                            <div class="level-meta">
+                                <span class="level-creator">By {{ level.creator if level is not mapping else level['creator'] }}</span>
+                                <span class="level-verifier">Verified by {{ level.verifier if level is not mapping else level['verifier'] }}</span>
+                            </div>
+                            {% set position = level.position if level is not mapping else level['position'] %}
+                            {% set points = level.points if level is not mapping else level['points'] %}
+                            <div class="level-points">{{ points or ((100 - position + 1) / 10)|round(2) }} Points</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h4 class="mb-0">About</h4>
+            </div>
+            <div class="card-body">
+                <p>Welcome to the Geometry Dash Demon List! This is a community-driven list of the hardest demon levels in Geometry Dash, ranked by difficulty.</p>
+                <p>Click on any level to view more details, including records and information about the level.</p>
+            </div>
+        </div>
+        
+        <div class="card shadow-sm">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">Top Players (by Points)</h4>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    {% for player in top_players %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ loop.index }}. {{ player.username }}
+                        <div>
+                            <span class="badge bg-primary rounded-pill me-1">
+                                {% if player is mapping %}
+                                    {{ player.points|round(2) }} pts
+                                {% else %}
+                                    {{ player[2] }} records
+                                {% endif %}
+                            </span>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Add click event to level rows
+    document.querySelectorAll('.level-row').forEach(row => {
+        row.addEventListener('click', function() {
+            const levelId = this.getAttribute('data-level-id');
+            window.location = '/level/' + levelId;
+        });
+    });
+</script>
+{% endblock %}

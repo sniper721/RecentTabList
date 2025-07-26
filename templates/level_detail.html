@@ -1,0 +1,211 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ level.name }} - Geometry Dash Demon List{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-dark text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h2 class="mb-0">
+                        {% set difficulty = level.difficulty|round|int if level is not mapping else level['difficulty']|round|int %}
+                        {% set position = level.position if level is not mapping else level['position'] %}
+                        <span class="badge level-difficulty-badge level-difficulty-{{ difficulty }}">{{ position }}</span>
+                        {{ level.name if level is not mapping else level['name'] }}
+                    </h2>
+                    {% set is_legacy = level.is_legacy if level is not mapping else level['is_legacy'] %}
+                    {% if is_legacy %}
+                    <span class="badge bg-secondary">Legacy</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <p><strong>Creator:</strong> {{ level.creator if level is not mapping else level['creator'] }}</p>
+                        <p><strong>Verifier:</strong> {{ level.verifier if level is not mapping else level['verifier'] }}</p>
+                        {% set level_id = level.level_id if level is not mapping else level['level_id'] %}
+                        <p><strong>Level ID:</strong> {{ level_id or 'N/A' }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        {% set date_added = level.date_added if level is not mapping else level['date_added'] %}
+                        <p><strong>Added:</strong> {{ date_added.strftime('%Y-%m-%d') if date_added is not string else date_added }}</p>
+                        <p><strong>Difficulty Rating:</strong> {{ level.difficulty if level is not mapping else level['difficulty'] }}</p>
+                        
+                        {% set position = level.position if level is not mapping else level['position'] %}
+                        {% set points = level.points if level is not mapping else level['points'] %}
+                        <p><strong>Points:</strong> {{ points or ((100 - position + 1) / 10)|round(2) }}</p>
+                        
+                        {% set min_percentage = level.min_percentage if level is not mapping else level['min_percentage'] %}
+                        <p><strong>Minimum Percentage:</strong> {{ min_percentage }}%</p>
+                        
+                        {% set video_url = level.video_url if level is not mapping else level['video_url'] %}
+                        {% if video_url %}
+                        <p>
+                            <a href="{{ video_url }}" target="_blank" class="btn btn-danger">
+                                <i class="fab fa-youtube"></i> Watch Verification Video
+                            </a>
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                {% set description = level.description if level is not mapping else level['description'] %}
+                {% if description %}
+                <div class="mb-4">
+                    <h4>Description</h4>
+                    <p>{{ description }}</p>
+                </div>
+                {% endif %}
+                
+                <div class="ratio ratio-16x9 mb-4">
+                    {% set video_url = level.video_url if level is not mapping else level['video_url'] %}
+                    {% set name = level.name if level is not mapping else level['name'] %}
+                    {% if video_url and 'youtube.com' in video_url %}
+                        {% set video_id = video_url.split('v=')[1].split('&')[0] %}
+                        <iframe src="https://www.youtube.com/embed/{{ video_id }}" title="{{ name }}" allowfullscreen></iframe>
+                    {% elif video_url and 'youtu.be' in video_url %}
+                        {% set video_id = video_url.split('/')[-1] %}
+                        <iframe src="https://www.youtube.com/embed/{{ video_id }}" title="{{ name }}" allowfullscreen></iframe>
+                    {% else %}
+                        <div class="d-flex justify-content-center align-items-center bg-light">
+                            <p class="text-muted">No video available</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h3 class="mb-0">Records</h3>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-striped mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>#</th>
+                                <th>Player</th>
+                                <th>Progress</th>
+                                <th>Video</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for record in records %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                {% if record is not mapping %}
+                                <td>{{ record.user.username }}</td>
+                                {% else %}
+                                <td>{{ record['user']['username'] if record['user'] is mapping else record.user.username }}</td>
+                                {% endif %}
+                                <td>
+                                    {% set progress = record.progress if record is not mapping else record['progress'] %}
+                                    {% if progress == 100 %}
+                                    <span class="badge bg-success">100%</span>
+                                    {% else %}
+                                    <span class="badge bg-warning">{{ progress }}%</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% set video_url = record.video_url if record is not mapping else record['video_url'] %}
+                                    {% if video_url %}
+                                    <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-danger">
+                                        <i class="fab fa-youtube"></i>
+                                    </a>
+                                    {% endif %}
+                                </td>
+                                {% set date_submitted = record.date_submitted if record is not mapping else record['date_submitted'] %}
+                                <td>{{ date_submitted.strftime('%Y-%m-%d') if date_submitted is not string else date_submitted }}</td>
+                            </tr>
+                            {% endfor %}
+                            
+                            {% if not records %}
+                            <tr>
+                                <td colspan="5" class="text-center py-3">No records yet. Be the first to submit!</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer">
+                <a href="{{ url_for('submit_record') }}" class="btn btn-primary">Submit Record</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">Requirements</h4>
+            </div>
+            <div class="card-body">
+                <p>To submit a record for this level, you need:</p>
+                <ul>
+                    <li>A video showing your gameplay with a progress of at least 50%</li>
+                    <li>Clear evidence that it's your own gameplay</li>
+                    <li>No speedhacks or other cheats</li>
+                </ul>
+                <p>Records will be reviewed by moderators before being approved.</p>
+            </div>
+        </div>
+        
+        {% set is_legacy = level.is_legacy if level is not mapping else level['is_legacy'] %}
+        {% if is_legacy == False %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h4 class="mb-0">Points</h4>
+            </div>
+            <div class="card-body">
+                <p>Completing this level (100%) will award you:</p>
+                {% set position = level.position if level is not mapping else level['position'] %}
+                {% set points = level.points if level is not mapping else level['points'] %}
+                <h3 class="text-center">{{ points or ((100 - position + 1) / 10)|round(2) }} Points</h3>
+                
+                {% set min_percentage = level.min_percentage if level is not mapping else level['min_percentage'] %}
+                {% if min_percentage < 100 %}
+                <hr>
+                <p>Partial completion (minimum {{ min_percentage }}%) will award proportional points:</p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Progress</th>
+                                <th>Points</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for progress in [min_percentage, (min_percentage + 100) // 2, 100] %}
+                            <tr>
+                                <td>{{ progress }}%</td>
+                                <td>{{ (points or ((100 - position + 1) / 10)) * (progress / 100) | round(2) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+                
+                <p class="text-muted small">Points are awarded based on your progress percentage.</p>
+            </div>
+        </div>
+        
+        <div class="card shadow-sm">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">Position History</h4>
+            </div>
+            <div class="card-body">
+                <p class="text-center">
+                    <strong>Current Position:</strong> #{{ position }}
+                </p>
+                <p class="text-muted text-center small">Position history tracking will be implemented in a future update.</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

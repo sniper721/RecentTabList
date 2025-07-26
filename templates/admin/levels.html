@@ -1,0 +1,409 @@
+{% extends "layout.html" %}
+
+{% block title %}Manage Levels - Admin - Geometry Dash Demon List{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <h2 class="mb-0">Manage Levels</h2>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addLevelModal">
+                    <i class="fas fa-plus"></i> Add New Level
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <ul class="nav nav-tabs" id="levelTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="main-tab" data-bs-toggle="tab" data-bs-target="#main" type="button" role="tab" aria-controls="main" aria-selected="true">Main List</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="legacy-tab" data-bs-toggle="tab" data-bs-target="#legacy" type="button" role="tab" aria-controls="legacy" aria-selected="false">Legacy List</button>
+                    </li>
+                </ul>
+                <div class="tab-content" id="levelTabsContent">
+                    <div class="tab-pane fade show active" id="main" role="tabpanel" aria-labelledby="main-tab">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover mb-0">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Name</th>
+                                        <th>Creator</th>
+                                        <th>Verifier</th>
+                                        <th>Difficulty</th>
+                                        <th>Points</th>
+                                        <th>Min %</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mainListBody">
+                                    {% for level in levels if not level.is_legacy %}
+                                    <tr>
+                                        <td>{{ level.position }}</td>
+                                        <td>{{ level.name }}</td>
+                                        <td>{{ level.creator }}</td>
+                                        <td>{{ level.verifier }}</td>
+                                        <td>{{ level.difficulty }}</td>
+                                        <td>{{ level.points or ((100 - level.position + 1) / 10)|round(2) }}</td>
+                                        <td>{{ level.min_percentage }}%</td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editLevelModal"
+                                                        data-level-id="{{ level.id }}" data-level-name="{{ level.name }}"
+                                                        data-level-creator="{{ level.creator }}" data-level-verifier="{{ level.verifier }}"
+                                                        data-level-difficulty="{{ level.difficulty }}" data-level-position="{{ level.position }}"
+                                                        data-level-video="{{ level.video_url }}" data-level-description="{{ level.description }}"
+                                                        data-level-id="{{ level.level_id }}" data-level-points="{{ level.points }}"
+                                                        data-level-min-percentage="{{ level.min_percentage }}">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-warning ms-1" data-bs-toggle="modal" data-bs-target="#moveLegacyModal" data-level-id="{{ level.id }}">
+                                                    <i class="fas fa-archive"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-danger ms-1" data-bs-toggle="modal" data-bs-target="#deleteLevelModal" data-level-id="{{ level.id }}">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center py-3">No levels in the main list.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="legacy" role="tabpanel" aria-labelledby="legacy-tab">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover mb-0">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Name</th>
+                                        <th>Creator</th>
+                                        <th>Verifier</th>
+                                        <th>Difficulty</th>
+                                        <th>Points</th>
+                                        <th>Min %</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="legacyListBody">
+                                    {% for level in levels if level.is_legacy %}
+                                    <tr>
+                                        <td>{{ level.position }}</td>
+                                        <td>{{ level.name }}</td>
+                                        <td>{{ level.creator }}</td>
+                                        <td>{{ level.verifier }}</td>
+                                        <td>{{ level.difficulty }}</td>
+                                        <td>{{ level.points or 0 }}</td>
+                                        <td>{{ level.min_percentage }}%</td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editLevelModal"
+                                                        data-level-id="{{ level.id }}" data-level-name="{{ level.name }}"
+                                                        data-level-creator="{{ level.creator }}" data-level-verifier="{{ level.verifier }}"
+                                                        data-level-difficulty="{{ level.difficulty }}" data-level-position="{{ level.position }}"
+                                                        data-level-video="{{ level.video_url }}" data-level-description="{{ level.description }}"
+                                                        data-level-id="{{ level.level_id }}" data-level-points="{{ level.points }}"
+                                                        data-level-min-percentage="{{ level.min_percentage }}">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-info ms-1" data-bs-toggle="modal" data-bs-target="#moveMainModal" data-level-id="{{ level.id }}">
+                                                    <i class="fas fa-arrow-up"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-danger ms-1" data-bs-toggle="modal" data-bs-target="#deleteLevelModal" data-level-id="{{ level.id }}">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center py-3">No levels in the legacy list.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Level Modal -->
+<div class="modal fade" id="addLevelModal" tabindex="-1" aria-labelledby="addLevelModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addLevelModalLabel">Add New Level</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin_levels') }}">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="name" class="form-label">Level Name</label>
+                                <input type="text" class="form-control" id="name" name="name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="creator" class="form-label">Creator</label>
+                                <input type="text" class="form-control" id="creator" name="creator" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="verifier" class="form-label">Verifier</label>
+                                <input type="text" class="form-control" id="verifier" name="verifier" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="level_id" class="form-label">Level ID (Optional)</label>
+                                <input type="text" class="form-control" id="level_id" name="level_id">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="difficulty" class="form-label">Difficulty Rating (1-10)</label>
+                                <input type="number" class="form-control" id="difficulty" name="difficulty" min="1" max="10" step="0.1" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="position" class="form-label">Position in List</label>
+                                <input type="number" class="form-control" id="position" name="position" min="1" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="points" class="form-label">Points (leave empty for auto-calculation)</label>
+                                <input type="number" class="form-control" id="points" name="points" min="0" step="0.1">
+                                <small class="form-text text-muted">If left empty, points will be calculated based on position</small>
+                            </div>
+                            <div class="mb-3">
+                                <label for="min_percentage" class="form-label">Minimum Percentage for Points</label>
+                                <input type="number" class="form-control" id="min_percentage" name="min_percentage" min="1" max="100" value="100">
+                                <small class="form-text text-muted">Players must achieve at least this percentage for points</small>
+                            </div>
+                            <div class="mb-3">
+                                <label for="video_url" class="form-label">Video URL</label>
+                                <input type="url" class="form-control" id="video_url" name="video_url" required>
+                            </div>
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="is_legacy" name="is_legacy">
+                                <label class="form-check-label" for="is_legacy">Add to Legacy List</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description (Optional)</label>
+                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add Level</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Level Modal -->
+<div class="modal fade" id="editLevelModal" tabindex="-1" aria-labelledby="editLevelModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="editLevelModalLabel">Edit Level</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin_edit_level') }}">
+                <input type="hidden" id="edit_level_id" name="level_id">
+                <div class="modal-body">
+                    <!-- Same form fields as Add Level Modal -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="edit_name" class="form-label">Level Name</label>
+                                <input type="text" class="form-control" id="edit_name" name="name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="edit_creator" class="form-label">Creator</label>
+                                <input type="text" class="form-control" id="edit_creator" name="creator" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="edit_verifier" class="form-label">Verifier</label>
+                                <input type="text" class="form-control" id="edit_verifier" name="verifier" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="edit_level_id" class="form-label">Level ID (Optional)</label>
+                                <input type="text" class="form-control" id="edit_level_id" name="level_id">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="edit_difficulty" class="form-label">Difficulty Rating (1-10)</label>
+                                <input type="number" class="form-control" id="edit_difficulty" name="difficulty" min="1" max="10" step="0.1" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="edit_position" class="form-label">Position in List</label>
+                                <input type="number" class="form-control" id="edit_position" name="position" min="1" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="edit_points" class="form-label">Points (leave empty for auto-calculation)</label>
+                                <input type="number" class="form-control" id="edit_points" name="points" min="0" step="0.1">
+                                <small class="form-text text-muted">If left empty, points will be calculated based on position</small>
+                            </div>
+                            <div class="mb-3">
+                                <label for="edit_min_percentage" class="form-label">Minimum Percentage for Points</label>
+                                <input type="number" class="form-control" id="edit_min_percentage" name="min_percentage" min="1" max="100">
+                                <small class="form-text text-muted">Players must achieve at least this percentage for points</small>
+                            </div>
+                            <div class="mb-3">
+                                <label for="edit_video_url" class="form-label">Video URL</label>
+                                <input type="url" class="form-control" id="edit_video_url" name="video_url" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_description" class="form-label">Description (Optional)</label>
+                        <textarea class="form-control" id="edit_description" name="description" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Move to Legacy Modal -->
+<div class="modal fade" id="moveLegacyModal" tabindex="-1" aria-labelledby="moveLegacyModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="moveLegacyModalLabel">Move to Legacy List</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin_move_to_legacy') }}">
+                <input type="hidden" id="legacy_level_id" name="level_id">
+                <div class="modal-body">
+                    <p>Are you sure you want to move this level to the Legacy List?</p>
+                    <p>This will adjust the positions of other levels in both lists.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">Move to Legacy</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Move to Main List Modal -->
+<div class="modal fade" id="moveMainModal" tabindex="-1" aria-labelledby="moveMainModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-info">
+                <h5 class="modal-title" id="moveMainModalLabel">Move to Main List</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin_move_to_main') }}">
+                <input type="hidden" id="main_level_id" name="level_id">
+                <div class="modal-body">
+                    <p>Are you sure you want to move this level back to the Main List?</p>
+                    <div class="mb-3">
+                        <label for="main_position" class="form-label">New Position in Main List</label>
+                        <input type="number" class="form-control" id="main_position" name="position" min="1" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-info">Move to Main List</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Level Modal -->
+<div class="modal fade" id="deleteLevelModal" tabindex="-1" aria-labelledby="deleteLevelModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteLevelModalLabel">Delete Level</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin_delete_level') }}">
+                <input type="hidden" id="delete_level_id" name="level_id">
+                <div class="modal-body">
+                    <p>Are you sure you want to delete this level?</p>
+                    <p class="text-danger"><strong>Warning:</strong> This action cannot be undone and will also delete all associated records.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Delete Level</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Populate edit modal with level data
+    document.querySelectorAll('[data-bs-target="#editLevelModal"]').forEach(button => {
+        button.addEventListener('click', function() {
+            const levelId = this.getAttribute('data-level-id');
+            const levelName = this.getAttribute('data-level-name');
+            const levelCreator = this.getAttribute('data-level-creator');
+            const levelVerifier = this.getAttribute('data-level-verifier');
+            const levelDifficulty = this.getAttribute('data-level-difficulty');
+            const levelPosition = this.getAttribute('data-level-position');
+            const levelVideo = this.getAttribute('data-level-video');
+            const levelDescription = this.getAttribute('data-level-description');
+            const levelGameId = this.getAttribute('data-level-id');
+            const levelPoints = this.getAttribute('data-level-points');
+            const levelMinPercentage = this.getAttribute('data-level-min-percentage');
+            
+            document.getElementById('edit_level_id').value = levelId;
+            document.getElementById('edit_name').value = levelName;
+            document.getElementById('edit_creator').value = levelCreator;
+            document.getElementById('edit_verifier').value = levelVerifier;
+            document.getElementById('edit_difficulty').value = levelDifficulty;
+            document.getElementById('edit_position').value = levelPosition;
+            document.getElementById('edit_video_url').value = levelVideo || '';
+            document.getElementById('edit_description').value = levelDescription || '';
+            document.getElementById('edit_level_id').value = levelGameId || '';
+            document.getElementById('edit_points').value = levelPoints || '';
+            document.getElementById('edit_min_percentage').value = levelMinPercentage || '100';
+        });
+    });
+    
+    // Set level ID for move to legacy modal
+    document.querySelectorAll('[data-bs-target="#moveLegacyModal"]').forEach(button => {
+        button.addEventListener('click', function() {
+            const levelId = this.getAttribute('data-level-id');
+            document.getElementById('legacy_level_id').value = levelId;
+        });
+    });
+    
+    // Set level ID for move to main modal
+    document.querySelectorAll('[data-bs-target="#moveMainModal"]').forEach(button => {
+        button.addEventListener('click', function() {
+            const levelId = this.getAttribute('data-level-id');
+            document.getElementById('main_level_id').value = levelId;
+        });
+    });
+    
+    // Set level ID for delete modal
+    document.querySelectorAll('[data-bs-target="#deleteLevelModal"]').forEach(button => {
+        button.addEventListener('click', function() {
+            const levelId = this.getAttribute('data-level-id');
+            document.getElementById('delete_level_id').value = levelId;
+        });
+    });
+</script>
+{% endblock %}
