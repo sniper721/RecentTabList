@@ -521,7 +521,10 @@ def admin():
         flash('Please log in to access admin panel', 'warning')
         return redirect(url_for('login'))
     
-    # Allow any logged-in user to access the admin panel
+    if not session.get('is_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('index'))
+    
     pending_records = Record.query.filter_by(status='pending').all()
     return render_template('admin/index.html', pending_records=pending_records)
 
@@ -531,7 +534,9 @@ def admin_levels():
         flash('Please log in to access admin panel', 'warning')
         return redirect(url_for('login'))
     
-    # Allow any logged-in user to access the admin levels page
+    if not session.get('is_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('index'))
     
     if request.method == 'POST':
         name = request.form.get('name')
@@ -583,6 +588,10 @@ def admin_edit_level():
         flash('Please log in to access admin panel', 'warning')
         return redirect(url_for('login'))
     
+    if not session.get('is_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('index'))
+    
     level_id = request.form.get('level_id')
     level = Level.query.get_or_404(level_id)
     
@@ -621,6 +630,10 @@ def admin_delete_level():
     if 'user_id' not in session:
         flash('Please log in to access admin panel', 'warning')
         return redirect(url_for('login'))
+    
+    if not session.get('is_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('index'))
     
     level_id = request.form.get('level_id')
     
@@ -690,6 +703,10 @@ def admin_move_to_legacy():
         flash('Please log in to access admin panel', 'warning')
         return redirect(url_for('login'))
     
+    if not session.get('is_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('index'))
+    
     level_id = request.form.get('level_id')
     from list import move_to_legacy
     
@@ -705,6 +722,10 @@ def admin_move_to_main():
     if 'user_id' not in session:
         flash('Please log in to access admin panel', 'warning')
         return redirect(url_for('login'))
+    
+    if not session.get('is_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('index'))
     
     level_id = request.form.get('level_id')
     position = int(request.form.get('position'))
@@ -734,6 +755,10 @@ def admin_approve_record(record_id):
         flash('Please log in to access admin panel', 'warning')
         return redirect(url_for('login'))
     
+    if not session.get('is_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('index'))
+    
     record = Record.query.get_or_404(record_id)
     record.status = 'approved'
     
@@ -755,12 +780,60 @@ def admin_reject_record(record_id):
         flash('Please log in to access admin panel', 'warning')
         return redirect(url_for('login'))
     
+    if not session.get('is_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('index'))
+    
     record = Record.query.get_or_404(record_id)
     record.status = 'rejected'
     db.session.commit()
     
     flash('Record rejected!', 'warning')
     return redirect(url_for('admin'))
+
+@app.route('/admin/users', methods=['GET', 'POST'])
+def admin_users():
+    if 'user_id' not in session:
+        flash('Please log in to access admin panel', 'warning')
+        return redirect(url_for('login'))
+    
+    if not session.get('is_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        is_admin = 'is_admin' in request.form
+        
+        if User.query.filter_by(username=username).first():
+            flash('Username already exists', 'danger')
+        elif User.query.filter_by(email=email).first():
+            flash('Email already exists', 'danger')
+        else:
+            new_user = User(username=username, email=email, is_admin=is_admin)
+            new_user.set_password(password)
+            db.session.add(new_user)
+            db.session.commit()
+            flash('User created successfully!', 'success')
+    
+    users = User.query.all()
+    return render_template('admin/users.html', users=users)
+
+@app.route('/admin/toggle_admin/<int:user_id>', methods=['POST'])
+def admin_toggle_admin(user_id):
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    user = User.query.get_or_404(user_id)
+    user.is_admin = not user.is_admin
+    db.session.commit()
+    
+    status = 'granted' if user.is_admin else 'revoked'
+    flash(f'Admin privileges {status} for {user.username}', 'success')
+    return redirect(url_for('admin_users'))
 
 # Initialize database
 with app.app_context():

@@ -30,7 +30,7 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('submit_record') }}">Submit Record</a>
                     </li>
-                    {% if 'user_id' in session %}
+                    {% if session.get('is_admin') %}
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('admin') }}">Admin Panel</a>
                     </li>
