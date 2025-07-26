@@ -1,0 +1,74 @@
+[
+  {
+    "_id": 1,
+    "name": "DeimonX",
+    "creator": "hyusgdmain",
+    "verifier": "Insanel",
+    "level_id": "1",
+    "video_url": "https://www.youtube.com/watch?v=s1d8lnxfzRQ",
+    "thumbnail_url": "/static/uploads/deimonx.png",
+    "description": "",
+    "difficulty": 10.0,
+    "position": 1,
+    "is_legacy": false,
+    "date_added": {
+      "$date": "2025-07-26 09:53:13.480455"
+    },
+    "points": 500.0,
+    "min_percentage": 49
+  },
+  {
+    "_id": 2,
+    "name": "Level",
+    "creator": "Mixalox1",
+    "verifier": "Miifin",
+    "level_id": "2",
+    "video_url": "https://www.youtube.com/watch?v=PJbfroH0sok",
+    "thumbnail_url": "",
+    "description": "",
+    "difficulty": 2.0,
+    "position": 100,
+    "is_legacy": false,
+    "date_added": {
+      "$date": "2025-07-26 10:13:01.035387"
+    },
+    "points": 20.0,
+    "min_percentage": 50
+  },
+  {
+    "_id": 3,
+    "name": "Challenge",
+    "creator": "sunsetfriscool",
+    "verifier": "Miifin",
+    "level_id": "3",
+    "video_url": "https://www.youtube.com/watch?v=iHf2nanWjvE",
+    "thumbnail_url": null,
+    "description": "",
+    "difficulty": 2.0,
+    "position": 99,
+    "is_legacy": false,
+    "date_added": {
+      "$date": "2025-07-26 10:14:44.312820"
+    },
+    "points": 22.0,
+    "min_percentage": 50
+  },
+  {
+    "_id": 4,
+    "name": "Monsters Atack 6",
+    "creator": "DuckstepRUTUBE",
+    "verifier": "Gunnar",
+    "level_id": "4",
+    "video_url": "https://www.youtube.com/watch?v=tBpEPXGhQug",
+    "thumbnail_url": null,
+    "description": "",
+    "difficulty": 2.0,
+    "position": 98,
+    "is_legacy": false,
+    "date_added": {
+      "$date": "2025-07-26 10:16:44.511550"
+    },
+    "points": 24.0,
+    "min_percentage": 100
+  }
+]

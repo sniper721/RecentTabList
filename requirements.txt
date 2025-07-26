@@ -4,3 +4,5 @@ Werkzeug==2.3.7
 Authlib==1.2.1
 requests==2.31.0
 python-dotenv==1.0.0
+pymongo==4.6.1
+Flask-PyMongo==2.3.0

@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session
-from pymongo import MongoClient
+from flask_pymongo import PyMongo
 from werkzeug.security import generate_password_hash, check_password_hash
 from authlib.integrations.flask_client import OAuth
 import os
@@ -16,24 +16,14 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here-change-in-production')
 
 # MongoDB configuration
-mongodb_uri = os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/')
-mongodb_db = os.environ.get('MONGODB_DB', 'rtl_database')
+app.config['MONGO_URI'] = os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/rtl_database')
 
 # Google OAuth configuration
 app.config['GOOGLE_CLIENT_ID'] = os.environ.get('GOOGLE_CLIENT_ID')
 app.config['GOOGLE_CLIENT_SECRET'] = os.environ.get('GOOGLE_CLIENT_SECRET')
 
 # Initialize MongoDB and OAuth
-try:
-    mongo_client = MongoClient(mongodb_uri)
-    mongo_db = mongo_client[mongodb_db]
-    # Test connection
-    mongo_client.admin.command('ping')
-    print("✓ MongoDB initialized successfully")
-except Exception as e:
-    print(f"MongoDB initialization error: {e}")
-    raise e
-    
+mongo = PyMongo(app)
 oauth = OAuth(app)
 
 # Configure Google OAuth only if credentials are provided
@@ -67,7 +57,7 @@ def utility_processor():
     
     def get_top_players(limit=5):
         """Get top players for sidebar"""
-        users = list(mongo_db.users.find({"points": {"$gt": 0}}).sort("points", -1).limit(limit))
+        users = list(mongo.db.users.find({"points": {"$gt": 0}}).sort("points", -1).limit(limit))
         return users
     
     return dict(
@@ -100,15 +90,15 @@ def calculate_record_points(record, level):
 
 def update_user_points(user_id):
     """Recalculate and update user's total points"""
-    records = list(mongo_db.records.find({"user_id": user_id, "status": "approved"}))
+    records = list(mongo.db.records.find({"user_id": user_id, "status": "approved"}))
     total_points = 0
     
     for record in records:
-        level = mongo_db.levels.find_one({"_id": record['level_id']})
+        level = mongo.db.levels.find_one({"_id": record['level_id']})
         if level:
             total_points += calculate_record_points(record, level)
     
-    mongo_db.users.update_one(
+    mongo.db.users.update_one(
         {"_id": user_id},
         {"$set": {"points": total_points}}
     )
@@ -117,24 +107,24 @@ def update_user_points(user_id):
 # Routes
 @app.route('/')
 def index():
-    main_list = list(mongo_db.levels.find({"is_legacy": False}).sort("position", 1))
+    main_list = list(mongo.db.levels.find({"is_legacy": False}).sort("position", 1))
     return render_template('index.html', levels=main_list)
 
 @app.route('/legacy')
 def legacy():
-    legacy_list = list(mongo_db.levels.find({"is_legacy": True}).sort("position", 1))
+    legacy_list = list(mongo.db.levels.find({"is_legacy": True}).sort("position", 1))
     return render_template('legacy.html', levels=legacy_list)
 
 @app.route('/level/<level_id>')
 def level_detail(level_id):
     try:
-        level = mongo_db.levels.find_one({"_id": int(level_id)})
+        level = mongo.db.levels.find_one({"_id": int(level_id)})
         if not level:
             flash('Level not found', 'danger')
             return redirect(url_for('index'))
         
         # Get approved records with user info
-        records = list(mongo_db.records.aggregate([
+        records = list(mongo.db.records.aggregate([
             {"$match": {"level_id": int(level_id), "status": "approved"}},
             {"$lookup": {
                 "from": "users",
@@ -156,7 +146,7 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
         
-        user = mongo_db.users.find_one({"username": username})
+        user = mongo.db.users.find_one({"username": username})
         
         if user and check_password_hash(user['password_hash'], password):
             session['user_id'] = user['_id']
@@ -176,16 +166,16 @@ def register():
         password = request.form.get('password')
         
         # Check if username or email already exists
-        if mongo_db.users.find_one({"username": username}):
+        if mongo.db.users.find_one({"username": username}):
             flash('Username already exists', 'danger')
             return render_template('register.html')
         
-        if mongo_db.users.find_one({"email": email}):
+        if mongo.db.users.find_one({"email": email}):
             flash('Email already exists', 'danger')
             return render_template('register.html')
         
         # Get next user ID
-        last_user = mongo_db.users.find_one(sort=[("_id", -1)])
+        last_user = mongo.db.users.find_one(sort=[("_id", -1)])
         next_id = (last_user['_id'] + 1) if last_user else 1
         
         # Create new user
@@ -200,7 +190,7 @@ def register():
             "google_id": None
         }
         
-        mongo_db.users.insert_one(new_user)
+        mongo.db.users.insert_one(new_user)
         flash('Registration successful! You can now log in.', 'success')
         return redirect(url_for('login'))
     
@@ -237,14 +227,14 @@ def google_callback():
         name = user_info.get('name', email.split('@')[0])
         
         # Check if user exists with this Google ID
-        user = mongo_db.users.find_one({"google_id": google_id})
+        user = mongo.db.users.find_one({"google_id": google_id})
         
         if not user:
             # Check if user exists with this email
-            user = mongo_db.users.find_one({"email": email})
+            user = mongo.db.users.find_one({"email": email})
             if user:
                 # Link Google account to existing user
-                mongo_db.users.update_one(
+                mongo.db.users.update_one(
                     {"_id": user['_id']},
                     {"$set": {"google_id": google_id}}
                 )
@@ -252,12 +242,12 @@ def google_callback():
                 # Create new user
                 username = name
                 counter = 1
-                while mongo_db.users.find_one({"username": username}):
+                while mongo.db.users.find_one({"username": username}):
                     username = f"{name}{counter}"
                     counter += 1
                 
                 # Get next user ID
-                last_user = mongo_db.users.find_one(sort=[("_id", -1)])
+                last_user = mongo.db.users.find_one(sort=[("_id", -1)])
                 next_id = (last_user['_id'] + 1) if last_user else 1
                 
                 user = {
@@ -270,7 +260,7 @@ def google_callback():
                     "points": 0,
                     "date_joined": datetime.utcnow()
                 }
-                mongo_db.users.insert_one(user)
+                mongo.db.users.insert_one(user)
         
         # Log in the user
         session['user_id'] = user['_id']
@@ -288,8 +278,8 @@ def profile():
         flash('Please log in to view your profile', 'warning')
         return redirect(url_for('login'))
     
-    user = mongo_db.users.find_one({"_id": session['user_id']})
-    user_records = list(mongo_db.records.aggregate([
+    user = mongo.db.users.find_one({"_id": session['user_id']})
+    user_records = list(mongo.db.records.aggregate([
         {"$match": {"user_id": session['user_id']}},
         {"$lookup": {
             "from": "levels",
@@ -314,7 +304,7 @@ def submit_record():
         video_url = request.form.get('video_url')
         
         # Get next record ID
-        last_record = mongo_db.records.find_one(sort=[("_id", -1)])
+        last_record = mongo.db.records.find_one(sort=[("_id", -1)])
         next_id = (last_record['_id'] + 1) if last_record else 1
         
         new_record = {
@@ -327,11 +317,11 @@ def submit_record():
             "date_submitted": datetime.utcnow()
         }
         
-        mongo_db.records.insert_one(new_record)
+        mongo.db.records.insert_one(new_record)
         flash('Record submitted successfully! It will be reviewed by moderators.', 'success')
         return redirect(url_for('profile'))
     
-    levels = list(mongo_db.levels.find().sort("position", 1))
+    levels = list(mongo.db.levels.find().sort("position", 1))
     return render_template('submit_record.html', levels=levels)
 
 # Admin routes
@@ -345,7 +335,7 @@ def admin():
         flash('Access denied. Admin privileges required.', 'danger')
         return redirect(url_for('index'))
     
-    pending_records = list(mongo_db.records.aggregate([
+    pending_records = list(mongo.db.records.aggregate([
         {"$match": {"status": "pending"}},
         {"$lookup": {
             "from": "users",
@@ -373,7 +363,7 @@ def admin_levels():
     
     if request.method == 'POST':
         # Get next level ID
-        last_level = mongo_db.levels.find_one(sort=[("_id", -1)])
+        last_level = mongo.db.levels.find_one(sort=[("_id", -1)])
         next_id = (last_level['_id'] + 1) if last_level else 1
         
         name = request.form.get('name')
@@ -430,11 +420,11 @@ def admin_levels():
             "min_percentage": min_percentage
         }
         
-        mongo_db.levels.insert_one(new_level)
+        mongo.db.levels.insert_one(new_level)
         flash('Level added successfully!', 'success')
         return redirect(url_for('admin_levels'))
     
-    levels = list(mongo_db.levels.find().sort([("is_legacy", 1), ("position", 1)]))
+    levels = list(mongo.db.levels.find().sort([("is_legacy", 1), ("position", 1)]))
     return render_template('admin/levels.html', levels=levels)
 
 @app.route('/admin/edit_level', methods=['POST'])
@@ -488,7 +478,7 @@ def admin_edit_level():
         "min_percentage": min_percentage
     }
     
-    mongo_db.levels.update_one({"_id": level_id}, {"$set": update_data})
+    mongo.db.levels.update_one({"_id": level_id}, {"$set": update_data})
     flash('Level updated successfully!', 'success')
     return redirect(url_for('admin_levels'))
 
@@ -501,10 +491,10 @@ def admin_delete_level():
     level_id = int(request.form.get('level_id'))
     
     # Delete associated records
-    mongo_db.records.delete_many({"level_id": level_id})
+    mongo.db.records.delete_many({"level_id": level_id})
     
     # Delete the level
-    mongo_db.levels.delete_one({"_id": level_id})
+    mongo.db.levels.delete_one({"_id": level_id})
     
     flash('Level deleted successfully!', 'success')
     return redirect(url_for('admin_levels'))
@@ -515,9 +505,9 @@ def admin_approve_record(record_id):
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
     
-    record = mongo_db.records.find_one({"_id": record_id})
+    record = mongo.db.records.find_one({"_id": record_id})
     if record:
-        mongo_db.records.update_one(
+        mongo.db.records.update_one(
             {"_id": record_id},
             {"$set": {"status": "approved"}}
         )
@@ -535,7 +525,7 @@ def admin_reject_record(record_id):
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
     
-    mongo_db.records.update_one(
+    mongo.db.records.update_one(
         {"_id": record_id},
         {"$set": {"status": "rejected"}}
     )
@@ -555,13 +545,13 @@ def admin_users():
         password = request.form.get('password')
         is_admin = 'is_admin' in request.form
         
-        if mongo_db.users.find_one({"username": username}):
+        if mongo.db.users.find_one({"username": username}):
             flash('Username already exists', 'danger')
-        elif mongo_db.users.find_one({"email": email}):
+        elif mongo.db.users.find_one({"email": email}):
             flash('Email already exists', 'danger')
         else:
             # Get next user ID
-            last_user = mongo_db.users.find_one(sort=[("_id", -1)])
+            last_user = mongo.db.users.find_one(sort=[("_id", -1)])
             next_id = (last_user['_id'] + 1) if last_user else 1
             
             new_user = {
@@ -575,10 +565,10 @@ def admin_users():
                 "google_id": None
             }
             
-            mongo_db.users.insert_one(new_user)
+            mongo.db.users.insert_one(new_user)
             flash('User created successfully!', 'success')
     
-    users = list(mongo_db.users.find().sort("date_joined", -1))
+    users = list(mongo.db.users.find().sort("date_joined", -1))
     return render_template('admin/users.html', users=users)
 
 @app.route('/admin/toggle_admin/<int:user_id>', methods=['POST'])
@@ -587,10 +577,10 @@ def admin_toggle_admin(user_id):
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
     
-    user = mongo_db.users.find_one({"_id": user_id})
+    user = mongo.db.users.find_one({"_id": user_id})
     if user:
         new_admin_status = not user.get('is_admin', False)
-        mongo_db.users.update_one(
+        mongo.db.users.update_one(
             {"_id": user_id},
             {"$set": {"is_admin": new_admin_status}}
         )
