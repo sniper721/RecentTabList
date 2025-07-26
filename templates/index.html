@@ -11,39 +11,36 @@
             </div>
             <div class="card-body p-0">
                 {% for level in levels %}
-                <div class="level-row" data-level-id="{{ level.id if level is not mapping else level['id'] }}" style="cursor: pointer; position: relative; height: 100px; margin-bottom: 8px; border-radius: 12px; overflow: hidden; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(0,0,0,0.25)'" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)'">
-                    {% set thumbnail_url = level.thumbnail_url if level is not mapping else level.get('thumbnail_url') %}
-                    {% set video_url = level.video_url if level is not mapping else level['video_url'] %}
-                    {% if thumbnail_url %}
-                        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('{{ thumbnail_url }}'); background-size: cover; background-position: center; z-index: 1;"></div>
-                    {% elif video_url and 'youtube.com' in video_url %}
-                        {% set video_id = video_url.split('v=')[1].split('&')[0] %}
-                        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('https://img.youtube.com/vi/{{ video_id }}/maxresdefault.jpg'); background-size: cover; background-position: center; z-index: 1;"></div>
-                    {% elif video_url and 'youtu.be' in video_url %}
-                        {% set video_id = video_url.split('/')[-1] %}
-                        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: url('https://img.youtube.com/vi/{{ video_id }}/maxresdefault.jpg'); background-size: cover; background-position: center; z-index: 1;"></div>
-                    {% else %}
-                        <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); z-index: 1;"></div>
-                    {% endif %}
-                    
-                    <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(90deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 60%, rgba(0,0,0,0.1) 100%); z-index: 2;"></div>
-                    
-                    <div class="d-flex align-items-center h-100 p-3 text-white" style="position: relative; z-index: 3;">
-                        <div class="me-3">
-                            <div style="background: rgba(255,255,255,0.2); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 8px 12px; border-radius: 8px; font-size: 1.1rem; font-weight: bold; min-width: 45px; text-align: center;">
+                <div class="d-flex align-items-center p-3 border-bottom level-row" data-level-id="{{ level.id if level is not mapping else level['id'] }}" style="cursor: pointer;">
+                    <div class="me-3">
+                        <div class="position-relative" style="width: 80px; height: 80px;">
+                            {% set thumbnail_url = level.thumbnail_url if level is not mapping else level.get('thumbnail_url') %}
+                            {% set video_url = level.video_url if level is not mapping else level['video_url'] %}
+                            {% if thumbnail_url %}
+                                <img src="{{ thumbnail_url }}" alt="{{ level.name if level is not mapping else level['name'] }}" class="img-fluid" style="width: 80px; height: 80px; object-fit: cover;">
+                            {% elif video_url and 'youtube.com' in video_url %}
+                                {% set video_id = video_url.split('v=')[1].split('&')[0] %}
+                                <img src="https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg" alt="{{ level.name if level is not mapping else level['name'] }}" class="img-fluid" style="width: 80px; height: 80px; object-fit: cover;">
+                            {% elif video_url and 'youtu.be' in video_url %}
+                                {% set video_id = video_url.split('/')[-1] %}
+                                <img src="https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg" alt="{{ level.name if level is not mapping else level['name'] }}" class="img-fluid" style="width: 80px; height: 80px; object-fit: cover;">
+                            {% else %}
+                                <div class="bg-secondary d-flex align-items-center justify-content-center text-white" style="width: 80px; height: 80px;">No Image</div>
+                            {% endif %}
+                            <div class="position-absolute top-0 start-0 bg-dark text-white px-2 py-1" style="font-size: 0.8rem; font-weight: bold;">
                                 {{ level.position if level is not mapping else level['position'] }}
                             </div>
                         </div>
-                        <div class="flex-grow-1">
-                            <h5 class="mb-1 text-white" style="text-shadow: 2px 2px 8px rgba(0,0,0,0.9); font-weight: 600;">{{ level.name if level is not mapping else level['name'] }}</h5>
-                            <p class="mb-1" style="text-shadow: 1px 1px 4px rgba(0,0,0,0.8); opacity: 0.9; font-size: 0.9rem;">By {{ level.creator if level is not mapping else level['creator'] }} • Verified by {{ level.verifier if level is not mapping else level['verifier'] }}</p>
-                            <div class="d-flex align-items-center">
-                                {% set difficulty = level.difficulty|round|int if level is not mapping else level['difficulty']|round|int %}
-                                <span class="badge me-2" style="background-color: {{ get_difficulty_color(difficulty) }}; border-radius: 6px; padding: 4px 8px; font-weight: 500;">{{ difficulty }}/10</span>
-                                {% set position = level.position if level is not mapping else level['position'] %}
-                                {% set points = level.points if level is not mapping else level['points'] %}
-                                <small style="text-shadow: 1px 1px 4px rgba(0,0,0,0.8); opacity: 0.8;">{{ points or ((100 - position + 1) / 10)|round(2) }} Points</small>
-                            </div>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h5 class="mb-1">{{ level.name if level is not mapping else level['name'] }}</h5>
+                        <p class="mb-1 text-muted">By {{ level.creator if level is not mapping else level['creator'] }} • Verified by {{ level.verifier if level is not mapping else level['verifier'] }}</p>
+                        <div class="d-flex align-items-center">
+                            {% set difficulty = level.difficulty|round|int if level is not mapping else level['difficulty']|round|int %}
+                            <span class="badge me-2" style="background-color: {{ get_difficulty_color(difficulty) }};">{{ difficulty }}/10</span>
+                            {% set position = level.position if level is not mapping else level['position'] %}
+                            {% set points = level.points if level is not mapping else level['points'] %}
+                            <small class="text-muted">{{ points or ((100 - position + 1) / 10)|round(2) }} Points</small>
                         </div>
                     </div>
                 </div>
