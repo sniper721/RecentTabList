@@ -186,7 +186,8 @@
                             </div>
                             <div class="mb-3">
                                 <label for="video_url" class="form-label">Video URL</label>
-                                <input type="url" class="form-control" id="video_url" name="video_url">
+                                <input type="url" class="form-control" id="video_url" name="video_url" placeholder="YouTube, Streamable, or TikTok URL">
+                                <small class="form-text text-muted">Supported platforms: YouTube, Streamable, TikTok</small>
                             </div>
                             <div class="mb-3">
                                 <label for="thumbnail_url" class="form-label">Custom Thumbnail (Optional)</label>
@@ -266,7 +267,8 @@
                             </div>
                             <div class="mb-3">
                                 <label for="edit_video_url" class="form-label">Video URL</label>
-                                <input type="url" class="form-control" id="edit_video_url" name="video_url">
+                                <input type="url" class="form-control" id="edit_video_url" name="video_url" placeholder="YouTube, Streamable, or TikTok URL">
+                                <small class="form-text text-muted">Supported platforms: YouTube, Streamable, TikTok</small>
                             </div>
                             <div class="mb-3">
                                 <label for="edit_thumbnail_url" class="form-label">Custom Thumbnail (Optional)</label>
@@ -390,6 +392,14 @@
             document.getElementById('edit_video_url').value = levelVideo || '';
             document.getElementById('edit_description').value = levelDescription || '';
             document.getElementById('edit_game_level_id').value = levelGameId || '';
+            
+            // Auto-save current values to form fields
+            setTimeout(() => {
+                const currentValue = document.getElementById('edit_game_level_id').value;
+                if (currentValue) {
+                    console.log('Auto-populated Level ID:', currentValue);
+                }
+            }, 100);
             document.getElementById('edit_thumbnail_url').value = this.getAttribute('data-level-thumbnail') || '';
             document.getElementById('edit_points').value = levelPoints || '';
             document.getElementById('edit_min_percentage').value = levelMinPercentage || '100';
