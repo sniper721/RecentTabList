@@ -432,7 +432,7 @@ def admin_levels():
             "name": name,
             "creator": creator,
             "verifier": verifier,
-            "level_id": level_id,
+            "level_id": level_id or None,
             "video_url": video_url,
             "thumbnail_url": thumbnail_url,
             "description": description,
@@ -449,6 +449,10 @@ def admin_levels():
         return redirect(url_for('admin_levels'))
     
     levels = list(mongo_db.levels.find().sort([("is_legacy", 1), ("position", 1)]))
+    # Debug: Check what's in database for the level you're testing
+    for level in levels:
+        if level.get('name') == 'deimonx':  # Replace with your test level name
+            print(f"Admin levels - Level {level['name']} has level_id: '{level.get('level_id')}'")
     return render_template('admin/levels.html', levels=levels)
 
 @app.route('/admin/edit_level', methods=['POST'])
@@ -457,10 +461,14 @@ def admin_edit_level():
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
     
-    level_id = int(request.form.get('level_id'))
+    db_level_id = int(request.form.get('level_id'))
+    game_level_id = request.form.get('game_level_id')
+
     
-    level = mongo_db.levels.find_one({"_id": level_id})
+    level = mongo_db.levels.find_one({"_id": db_level_id})
     thumbnail_url = request.form.get('thumbnail_url') or level.get('thumbnail_url', '')
+    
+
     
     # Handle file upload
     if 'thumbnail_file' in request.files:
@@ -497,7 +505,7 @@ def admin_edit_level():
         "name": request.form.get('name'),
         "creator": request.form.get('creator'),
         "verifier": request.form.get('verifier'),
-        "level_id": request.form.get('level_id'),
+        "level_id": game_level_id if game_level_id and game_level_id.strip() else None,
         "video_url": request.form.get('video_url'),
         "thumbnail_url": thumbnail_url,
         "description": request.form.get('description'),
@@ -507,9 +515,9 @@ def admin_edit_level():
         "min_percentage": min_percentage
     }
     
-    mongo_db.levels.update_one({"_id": level_id}, {"$set": update_data})
+    mongo_db.levels.update_one({"_id": db_level_id}, {"$set": update_data})
     flash('Level updated successfully!', 'success')
-    return redirect(url_for('admin_levels'))
+    return redirect(url_for('admin_levels') + '?updated=' + str(db_level_id))
 
 @app.route('/admin/delete_level', methods=['POST'])
 def admin_delete_level():
