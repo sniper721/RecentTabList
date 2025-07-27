@@ -54,7 +54,7 @@
                                                         data-level-creator="{{ level.creator }}" data-level-verifier="{{ level.verifier }}"
                                                         data-level-difficulty="{{ level.difficulty }}" data-level-position="{{ level.position }}"
                                                         data-level-video="{{ level.video_url }}" data-level-description="{{ level.description }}"
-                                                        data-level-game-id="{{ level.level_id }}" data-level-points="{{ level.points }}"
+                                                        data-level-game-id="{{ level.level_id }}" data-level-points="{{ level.points }}" data-level-thumbnail="{{ level.thumbnail_url or '' }}"
                                                         data-level-min-percentage="{{ level.min_percentage }}">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
@@ -108,7 +108,7 @@
                                                         data-level-creator="{{ level.creator }}" data-level-verifier="{{ level.verifier }}"
                                                         data-level-difficulty="{{ level.difficulty }}" data-level-position="{{ level.position }}"
                                                         data-level-video="{{ level.video_url }}" data-level-description="{{ level.description }}"
-                                                        data-level-game-id="{{ level.level_id }}" data-level-points="{{ level.points }}"
+                                                        data-level-game-id="{{ level.level_id }}" data-level-points="{{ level.points }}" data-level-thumbnail="{{ level.thumbnail_url or '' }}"
                                                         data-level-min-percentage="{{ level.min_percentage }}">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
@@ -389,6 +389,7 @@
             document.getElementById('edit_video_url').value = levelVideo || '';
             document.getElementById('edit_description').value = levelDescription || '';
             document.getElementById('edit_level_id').value = levelGameId || '';
+            document.getElementById('edit_thumbnail_url').value = this.getAttribute('data-level-thumbnail') || '';
             document.getElementById('edit_points').value = levelPoints || '';
             document.getElementById('edit_min_percentage').value = levelMinPercentage || '100';
         });
