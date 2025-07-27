@@ -73,11 +73,16 @@
                                 </td>
                                 <td>{{ user.date_joined.strftime('%Y-%m-%d') }}</td>
                                 <td>
-                                    <form method="POST" action="{{ url_for('admin_toggle_admin', user_id=user._id) }}" style="display: inline;">
-                                        <button type="submit" class="btn btn-sm {% if user.is_admin %}btn-warning{% else %}btn-success{% endif %}">
-                                            {% if user.is_admin %}Remove Admin{% else %}Make Admin{% endif %}
-                                        </button>
-                                    </form>
+                                    {% if not user.is_admin %}
+                                        <form method="POST" action="{{ url_for('admin_toggle_admin', user_id=user._id) }}" style="display: inline;">
+                                            <button type="submit" class="btn btn-sm btn-success me-1">Make Admin</button>
+                                        </form>
+                                        <form method="POST" action="{{ url_for('admin_ban_user', user_id=user._id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to ban this user? This will permanently delete their account and all records.');">
+                                            <button type="submit" class="btn btn-sm btn-danger">Ban User</button>
+                                        </form>
+                                    {% else %}
+                                        <span class="text-muted">Protected Admin</span>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}
