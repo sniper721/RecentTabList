@@ -82,10 +82,54 @@ def utility_processor():
     
     return dict(
         get_difficulty_color=get_difficulty_color,
-        top_players=get_top_players()
+        top_players=get_top_players(),
+        get_video_embed_info=get_video_embed_info
     )
 
 # Helper functions
+def get_video_embed_info(video_url):
+    """Extract video platform and embed information from URL"""
+    if not video_url:
+        return None
+    
+    # YouTube support
+    if 'youtube.com' in video_url or 'youtu.be' in video_url:
+        if 'youtube.com' in video_url and 'v=' in video_url:
+            video_id = video_url.split('v=')[1].split('&')[0]
+        elif 'youtu.be' in video_url:
+            video_id = video_url.split('/')[-1].split('?')[0]
+        else:
+            return None
+        return {
+            'platform': 'youtube',
+            'embed_url': f'https://www.youtube.com/embed/{video_id}',
+            'video_id': video_id
+        }
+    
+    # Streamable support
+    elif 'streamable.com' in video_url:
+        video_id = video_url.split('/')[-1]
+        return {
+            'platform': 'streamable',
+            'embed_url': f'https://streamable.com/e/{video_id}',
+            'video_id': video_id
+        }
+    
+    # TikTok support
+    elif 'tiktok.com' in video_url:
+        # Extract video ID from TikTok URL
+        if '/video/' in video_url:
+            video_id = video_url.split('/video/')[1].split('?')[0]
+        else:
+            return None
+        return {
+            'platform': 'tiktok',
+            'embed_url': f'https://www.tiktok.com/embed/v2/{video_id}',
+            'video_id': video_id
+        }
+    
+    return None
+
 def calculate_level_points(position, is_legacy=False):
     """Calculate points based on position"""
     if is_legacy:
@@ -393,31 +437,39 @@ def admin_levels():
         video_url = request.form.get('video_url')
         thumbnail_url = request.form.get('thumbnail_url')
         
-        # Handle file upload
+        # Handle file upload - save to JSON and convert to base64
         if 'thumbnail_file' in request.files:
             file = request.files['thumbnail_file']
             if file and file.filename:
-                import os
+                import base64
+                import json
                 import time
-                from werkzeug.utils import secure_filename
+                file_data = file.read()
+                file_ext = file.filename.split('.')[-1].lower()
+                mime_type = f'image/{file_ext}' if file_ext in ['png', 'jpg', 'jpeg', 'gif', 'webp'] else 'image/png'
+                base64_data = base64.b64encode(file_data).decode('utf-8')
+                thumbnail_url = f'data:{mime_type};base64,{base64_data}'
                 
-                upload_folder = os.path.join('static', 'uploads')
-                os.makedirs(upload_folder, exist_ok=True)
+                # Save to JSON file
+                json_file = 'thumbnails.json'
+                try:
+                    with open(json_file, 'r') as f:
+                        thumbnails = json.load(f)
+                except:
+                    thumbnails = {}
                 
-                # Create .gitkeep to ensure folder persists
-                gitkeep_path = os.path.join(upload_folder, '.gitkeep')
-                if not os.path.exists(gitkeep_path):
-                    with open(gitkeep_path, 'w') as f:
-                        f.write('')
+                thumbnails[name] = {
+                    'base64': base64_data,
+                    'mime_type': mime_type,
+                    'filename': file.filename,
+                    'timestamp': int(time.time())
+                }
                 
-                # Create unique filename with timestamp
-                filename = secure_filename(file.filename)
-                name, ext = os.path.splitext(filename)
-                unique_filename = f"{name}_{int(time.time())}{ext}"
-                file_path = os.path.join(upload_folder, unique_filename)
-                file.save(file_path)
-                
-                thumbnail_url = f'/static/uploads/{unique_filename}'
+                with open(json_file, 'w') as f:
+                    json.dump(thumbnails, f, indent=2)
+                    
+                print(f"Thumbnail uploaded: {mime_type}, size: {len(base64_data)} chars")
+                print(f"Thumbnail URL: {thumbnail_url[:100]}...")
         
         description = request.form.get('description')
         difficulty = float(request.form.get('difficulty'))
@@ -485,25 +537,37 @@ def admin_edit_level():
     
 
     
-    # Handle file upload
+    # Handle file upload - save to JSON and convert to base64
     if 'thumbnail_file' in request.files:
         file = request.files['thumbnail_file']
         if file and file.filename:
-            import os
+            import base64
+            import json
             import time
-            from werkzeug.utils import secure_filename
+            file_data = file.read()
+            file_ext = file.filename.split('.')[-1].lower()
+            mime_type = f'image/{file_ext}' if file_ext in ['png', 'jpg', 'jpeg', 'gif', 'webp'] else 'image/png'
+            base64_data = base64.b64encode(file_data).decode('utf-8')
+            thumbnail_url = f'data:{mime_type};base64,{base64_data}'
             
-            upload_folder = os.path.join('static', 'uploads')
-            os.makedirs(upload_folder, exist_ok=True)
+            # Save to JSON file
+            json_file = 'thumbnails.json'
+            level_name = request.form.get('name', 'unknown')
+            try:
+                with open(json_file, 'r') as f:
+                    thumbnails = json.load(f)
+            except:
+                thumbnails = {}
             
-            # Create unique filename with timestamp
-            filename = secure_filename(file.filename)
-            name, ext = os.path.splitext(filename)
-            unique_filename = f"{name}_{int(time.time())}{ext}"
-            file_path = os.path.join(upload_folder, unique_filename)
-            file.save(file_path)
+            thumbnails[level_name] = {
+                'base64': base64_data,
+                'mime_type': mime_type,
+                'filename': file.filename,
+                'timestamp': int(time.time())
+            }
             
-            thumbnail_url = f'/static/uploads/{unique_filename}'
+            with open(json_file, 'w') as f:
+                json.dump(thumbnails, f, indent=2)
     
     points_str = request.form.get('points')
     min_percentage = int(request.form.get('min_percentage', '100'))

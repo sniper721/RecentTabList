@@ -94,9 +94,26 @@
                                         <td>{{ record.date_submitted.strftime('%Y-%m-%d') }}</td>
                                         <td>
                                             {% if record.video_url %}
-                                            <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-danger">
-                                                <i class="fab fa-youtube"></i>
-                                            </a>
+                                                {% set video_info = get_video_embed_info(record.video_url) %}
+                                                {% if video_info %}
+                                                    {% if video_info.platform == 'youtube' %}
+                                                        <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-danger" title="YouTube">
+                                                            <i class="fab fa-youtube"></i>
+                                                        </a>
+                                                    {% elif video_info.platform == 'streamable' %}
+                                                        <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-primary" title="Streamable">
+                                                            <i class="fas fa-play"></i>
+                                                        </a>
+                                                    {% elif video_info.platform == 'tiktok' %}
+                                                        <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-dark" title="TikTok">
+                                                            <i class="fab fa-tiktok"></i>
+                                                        </a>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-secondary" title="Video">
+                                                        <i class="fas fa-external-link-alt"></i>
+                                                    </a>
+                                                {% endif %}
                                             {% endif %}
                                         </td>
                                     </tr>
@@ -143,9 +160,26 @@
                                         <td>{{ record.date_submitted.strftime('%Y-%m-%d') }}</td>
                                         <td>
                                             {% if record.video_url %}
-                                            <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-danger">
-                                                <i class="fab fa-youtube"></i>
-                                            </a>
+                                                {% set video_info = get_video_embed_info(record.video_url) %}
+                                                {% if video_info %}
+                                                    {% if video_info.platform == 'youtube' %}
+                                                        <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-danger" title="YouTube">
+                                                            <i class="fab fa-youtube"></i>
+                                                        </a>
+                                                    {% elif video_info.platform == 'streamable' %}
+                                                        <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-primary" title="Streamable">
+                                                            <i class="fas fa-play"></i>
+                                                        </a>
+                                                    {% elif video_info.platform == 'tiktok' %}
+                                                        <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-dark" title="TikTok">
+                                                            <i class="fab fa-tiktok"></i>
+                                                        </a>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-secondary" title="Video">
+                                                        <i class="fas fa-external-link-alt"></i>
+                                                    </a>
+                                                {% endif %}
                                             {% endif %}
                                         </td>
                                     </tr>

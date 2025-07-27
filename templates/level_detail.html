@@ -55,12 +55,15 @@
                 <div class="ratio ratio-16x9 mb-4">
                     {% set video_url = level.video_url if level is not mapping else level['video_url'] %}
                     {% set name = level.name if level is not mapping else level['name'] %}
-                    {% if video_url and 'youtube.com' in video_url %}
-                        {% set video_id = video_url.split('v=')[1].split('&')[0] %}
-                        <iframe src="https://www.youtube.com/embed/{{ video_id }}" title="{{ name }}" allowfullscreen></iframe>
-                    {% elif video_url and 'youtu.be' in video_url %}
-                        {% set video_id = video_url.split('/')[-1] %}
-                        <iframe src="https://www.youtube.com/embed/{{ video_id }}" title="{{ name }}" allowfullscreen></iframe>
+                    {% set video_info = get_video_embed_info(video_url) %}
+                    {% if video_info %}
+                        {% if video_info.platform == 'youtube' %}
+                            <iframe src="{{ video_info.embed_url }}" title="{{ name }}" allowfullscreen></iframe>
+                        {% elif video_info.platform == 'streamable' %}
+                            <iframe src="{{ video_info.embed_url }}" title="{{ name }}" allowfullscreen></iframe>
+                        {% elif video_info.platform == 'tiktok' %}
+                            <iframe src="{{ video_info.embed_url }}" title="{{ name }}" allowfullscreen></iframe>
+                        {% endif %}
                     {% else %}
                         <div class="d-flex justify-content-center align-items-center bg-light">
                             <p class="text-muted">No video available</p>
@@ -106,9 +109,26 @@
                                 <td>
                                     {% set video_url = record.video_url if record is not mapping else record['video_url'] %}
                                     {% if video_url %}
-                                    <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-danger">
-                                        <i class="fab fa-youtube"></i>
-                                    </a>
+                                        {% set video_info = get_video_embed_info(video_url) %}
+                                        {% if video_info %}
+                                            {% if video_info.platform == 'youtube' %}
+                                                <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-danger" title="YouTube">
+                                                    <i class="fab fa-youtube"></i>
+                                                </a>
+                                            {% elif video_info.platform == 'streamable' %}
+                                                <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-primary" title="Streamable">
+                                                    <i class="fas fa-play"></i>
+                                                </a>
+                                            {% elif video_info.platform == 'tiktok' %}
+                                                <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-dark" title="TikTok">
+                                                    <i class="fab fa-tiktok"></i>
+                                                </a>
+                                            {% endif %}
+                                        {% else %}
+                                            <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-secondary" title="Video">
+                                                <i class="fas fa-external-link-alt"></i>
+                                            </a>
+                                        {% endif %}
                                     {% endif %}
                                 </td>
                                 {% set date_submitted = record.date_submitted if record is not mapping else record['date_submitted'] %}
