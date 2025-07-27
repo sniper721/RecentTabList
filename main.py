@@ -398,16 +398,20 @@ def admin_levels():
             file = request.files['thumbnail_file']
             if file and file.filename:
                 import os
+                import time
                 from werkzeug.utils import secure_filename
                 
                 upload_folder = os.path.join('static', 'uploads')
                 os.makedirs(upload_folder, exist_ok=True)
                 
+                # Create unique filename with timestamp
                 filename = secure_filename(file.filename)
-                file_path = os.path.join(upload_folder, filename)
+                name, ext = os.path.splitext(filename)
+                unique_filename = f"{name}_{int(time.time())}{ext}"
+                file_path = os.path.join(upload_folder, unique_filename)
                 file.save(file_path)
                 
-                thumbnail_url = f'/static/uploads/{filename}'
+                thumbnail_url = f'/static/uploads/{unique_filename}'
         
         description = request.form.get('description')
         difficulty = float(request.form.get('difficulty'))
@@ -463,16 +467,20 @@ def admin_edit_level():
         file = request.files['thumbnail_file']
         if file and file.filename:
             import os
+            import time
             from werkzeug.utils import secure_filename
             
             upload_folder = os.path.join('static', 'uploads')
             os.makedirs(upload_folder, exist_ok=True)
             
+            # Create unique filename with timestamp
             filename = secure_filename(file.filename)
-            file_path = os.path.join(upload_folder, filename)
+            name, ext = os.path.splitext(filename)
+            unique_filename = f"{name}_{int(time.time())}{ext}"
+            file_path = os.path.join(upload_folder, unique_filename)
             file.save(file_path)
             
-            thumbnail_url = f'/static/uploads/{filename}'
+            thumbnail_url = f'/static/uploads/{unique_filename}'
     
     points_str = request.form.get('points')
     min_percentage = int(request.form.get('min_percentage', '100'))
