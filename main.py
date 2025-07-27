@@ -634,14 +634,41 @@ def admin_toggle_admin(user_id):
     
     user = mongo_db.users.find_one({"_id": user_id})
     if user:
-        new_admin_status = not user.get('is_admin', False)
+        # Prevent admins from removing admin status from other admins
+        if user.get('is_admin', False):
+            flash('Cannot remove admin privileges from another admin', 'danger')
+            return redirect(url_for('admin_users'))
+        
+        # Only grant admin status (cannot revoke)
         mongo_db.users.update_one(
             {"_id": user_id},
-            {"$set": {"is_admin": new_admin_status}}
+            {"$set": {"is_admin": True}}
         )
         
-        status = 'granted' if new_admin_status else 'revoked'
-        flash(f'Admin privileges {status} for {user["username"]}', 'success')
+        flash(f'Admin privileges granted to {user["username"]}', 'success')
+    
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/ban_user/<int:user_id>', methods=['POST'])
+def admin_ban_user(user_id):
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    user = mongo_db.users.find_one({"_id": user_id})
+    if user:
+        # Prevent banning other admins
+        if user.get('is_admin', False):
+            flash('Cannot ban another admin', 'danger')
+            return redirect(url_for('admin_users'))
+        
+        # Delete user's records
+        mongo_db.records.delete_many({"user_id": user_id})
+        
+        # Delete the user
+        mongo_db.users.delete_one({"_id": user_id})
+        
+        flash(f'User {user["username"]} has been banned and deleted', 'success')
     
     return redirect(url_for('admin_users'))
 
