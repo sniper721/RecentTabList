@@ -241,8 +241,8 @@
                                 <input type="text" class="form-control" id="edit_verifier" name="verifier" required>
                             </div>
                             <div class="mb-3">
-                                <label for="edit_level_id" class="form-label">Level ID (Optional)</label>
-                                <input type="text" class="form-control" id="edit_level_id" name="level_id">
+                                <label for="edit_game_level_id" class="form-label">Level ID (Optional)</label>
+                                <input type="text" class="form-control" id="edit_game_level_id" name="game_level_id" placeholder="Enter Geometry Dash level ID">
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -368,7 +368,7 @@
     // Populate edit modal with level data
     document.querySelectorAll('[data-bs-target="#editLevelModal"]').forEach(button => {
         button.addEventListener('click', function() {
-            const levelId = this.getAttribute('data-level-game-id');
+            const levelId = this.getAttribute('data-level-id') || this.getAttribute('data-level-game-id');
             const levelName = this.getAttribute('data-level-name');
             const levelCreator = this.getAttribute('data-level-creator');
             const levelVerifier = this.getAttribute('data-level-verifier');
@@ -377,6 +377,7 @@
             const levelVideo = this.getAttribute('data-level-video');
             const levelDescription = this.getAttribute('data-level-description');
             const levelGameId = this.getAttribute('data-level-game-id');
+            console.log('Level game ID from button:', levelGameId);
             const levelPoints = this.getAttribute('data-level-points');
             const levelMinPercentage = this.getAttribute('data-level-min-percentage');
             
@@ -388,7 +389,7 @@
             document.getElementById('edit_position').value = levelPosition;
             document.getElementById('edit_video_url').value = levelVideo || '';
             document.getElementById('edit_description').value = levelDescription || '';
-            document.getElementById('edit_level_id').value = levelGameId || '';
+            document.getElementById('edit_game_level_id').value = levelGameId || '';
             document.getElementById('edit_thumbnail_url').value = this.getAttribute('data-level-thumbnail') || '';
             document.getElementById('edit_points').value = levelPoints || '';
             document.getElementById('edit_min_percentage').value = levelMinPercentage || '100';
