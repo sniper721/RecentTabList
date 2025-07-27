@@ -455,7 +455,8 @@ def admin_edit_level():
     
     level_id = int(request.form.get('level_id'))
     
-    thumbnail_url = request.form.get('thumbnail_url')
+    level = mongo_db.levels.find_one({"_id": level_id})
+    thumbnail_url = request.form.get('thumbnail_url') or level.get('thumbnail_url', '')
     
     # Handle file upload
     if 'thumbnail_file' in request.files:
