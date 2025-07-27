@@ -14,7 +14,8 @@
                             {% set thumbnail_url = level.thumbnail_url if level is not mapping else level.get('thumbnail_url') %}
                             {% set video_url = level.video_url if level is not mapping else level['video_url'] %}
                             {% if thumbnail_url %}
-                                <img src="{{ thumbnail_url }}" alt="{{ level.name if level is not mapping else level['name'] }}" style="width: 206px; height: 116px; object-fit: cover; border-radius: 4px;">
+                                <img src="{{ thumbnail_url }}" alt="{{ level.name if level is not mapping else level['name'] }}" style="width: 206px; height: 116px; object-fit: cover; border-radius: 4px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                                <img src="{% if video_url and 'youtube.com' in video_url %}https://img.youtube.com/vi/{{ video_url.split('v=')[1].split('&')[0] }}/maxresdefault.jpg{% elif video_url and 'youtu.be' in video_url %}https://img.youtube.com/vi/{{ video_url.split('/')[-1] }}/maxresdefault.jpg{% endif %}" alt="{{ level.name if level is not mapping else level['name'] }}" style="width: 206px; height: 116px; object-fit: cover; border-radius: 4px; display: none;">
                             {% elif video_url and 'youtube.com' in video_url %}
                                 {% set video_id = video_url.split('v=')[1].split('&')[0] %}
                                 <img src="https://img.youtube.com/vi/{{ video_id }}/maxresdefault.jpg" alt="{{ level.name if level is not mapping else level['name'] }}" style="width: 206px; height: 116px; object-fit: cover; border-radius: 4px;">
@@ -22,7 +23,7 @@
                                 {% set video_id = video_url.split('/')[-1] %}
                                 <img src="https://img.youtube.com/vi/{{ video_id }}/maxresdefault.jpg" alt="{{ level.name if level is not mapping else level['name'] }}" style="width: 206px; height: 116px; object-fit: cover; border-radius: 4px;">
                             {% else %}
-                                <div style="width: 206px; height: 116px; background-color: #6c757d; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white; font-size: 16px;">No Image</div>
+                                <div style="width: 206px; height: 116px; background-color: #6c757d; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white; font-size: 16px;">{{ level.position if level is not mapping else level['position'] }}</div>
                             {% endif %}
                             <div class="position-absolute" style="top: 6px; left: 6px; background-color: rgba(0,0,0,0.8); color: white; padding: 6px 10px; border-radius: 4px; font-size: 16px; font-weight: bold;">
                                 {{ level.position if level is not mapping else level['position'] }}
