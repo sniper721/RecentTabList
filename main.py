@@ -519,6 +519,41 @@ def admin_delete_level():
     flash('Level deleted successfully!', 'success')
     return redirect(url_for('admin_levels'))
 
+@app.route('/admin/move_to_legacy', methods=['POST'])
+def admin_move_to_legacy():
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    level_id = int(request.form.get('level_id'))
+    
+    # Move level to legacy
+    mongo_db.levels.update_one(
+        {"_id": level_id},
+        {"$set": {"is_legacy": True}}
+    )
+    
+    flash('Level moved to legacy list successfully!', 'success')
+    return redirect(url_for('admin_levels'))
+
+@app.route('/admin/move_to_main', methods=['POST'])
+def admin_move_to_main():
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    level_id = int(request.form.get('level_id'))
+    position = int(request.form.get('position'))
+    
+    # Move level to main list
+    mongo_db.levels.update_one(
+        {"_id": level_id},
+        {"$set": {"is_legacy": False, "position": position}}
+    )
+    
+    flash('Level moved to main list successfully!', 'success')
+    return redirect(url_for('admin_levels'))
+
 @app.route('/admin/approve_record/<int:record_id>', methods=['POST'])
 def admin_approve_record(record_id):
     if 'user_id' not in session or not session.get('is_admin'):
