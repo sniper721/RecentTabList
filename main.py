@@ -404,6 +404,12 @@ def admin_levels():
                 upload_folder = os.path.join('static', 'uploads')
                 os.makedirs(upload_folder, exist_ok=True)
                 
+                # Create .gitkeep to ensure folder persists
+                gitkeep_path = os.path.join(upload_folder, '.gitkeep')
+                if not os.path.exists(gitkeep_path):
+                    with open(gitkeep_path, 'w') as f:
+                        f.write('')
+                
                 # Create unique filename with timestamp
                 filename = secure_filename(file.filename)
                 name, ext = os.path.splitext(filename)
@@ -449,10 +455,19 @@ def admin_levels():
         return redirect(url_for('admin_levels'))
     
     levels = list(mongo_db.levels.find().sort([("is_legacy", 1), ("position", 1)]))
-    # Debug: Check what's in database for the level you're testing
+    
+    # Debug: Check thumbnail URLs and file existence
+    import os
     for level in levels:
-        if level.get('name') == 'deimonx':  # Replace with your test level name
-            print(f"Admin levels - Level {level['name']} has level_id: '{level.get('level_id')}'")
+        thumb = level.get('thumbnail_url', '')
+        if thumb:
+            if thumb.startswith('/static/uploads/'):
+                file_path = thumb[1:]  # Remove leading slash
+                exists = os.path.exists(file_path)
+                print(f"Level {level['name']}: FILE {file_path} - {'EXISTS' if exists else 'MISSING'}")
+            else:
+                print(f"Level {level['name']}: URL {thumb}")
+    
     return render_template('admin/levels.html', levels=levels)
 
 @app.route('/admin/edit_level', methods=['POST'])
