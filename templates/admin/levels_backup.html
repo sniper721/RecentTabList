@@ -55,7 +55,7 @@
                                                         data-level-difficulty="{{ level.difficulty }}" data-level-position="{{ level.position }}"
                                                         data-level-video="{{ level.video_url }}" data-level-description="{{ level.description }}"
                                                         data-level-game-id="{{ level.level_id or '' }}" data-level-points="{{ level.points }}" data-level-thumbnail="{{ level.thumbnail_url or '' }}"
-                                                        data-level-min-percentage="{{ level.min_percentage }}">
+                                                        data-level-min-percentage="{{ level.min_percentage }}" data-level-type="{{ level.level_type or 'Level' }}">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
                                                 <button class="btn btn-sm btn-warning ms-1" data-bs-toggle="modal" data-bs-target="#moveLegacyModal" data-level-game-id="{{ level._id }}">
@@ -109,7 +109,7 @@
                                                         data-level-difficulty="{{ level.difficulty }}" data-level-position="{{ level.position }}"
                                                         data-level-video="{{ level.video_url }}" data-level-description="{{ level.description }}"
                                                         data-level-game-id="{{ level.level_id or '' }}" data-level-points="{{ level.points }}" data-level-thumbnail="{{ level.thumbnail_url or '' }}"
-                                                        data-level-min-percentage="{{ level.min_percentage }}">
+                                                        data-level-min-percentage="{{ level.min_percentage }}" data-level-type="{{ level.level_type or 'Level' }}">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
                                                 <button class="btn btn-sm btn-info ms-1" data-bs-toggle="modal" data-bs-target="#moveMainModal" data-level-game-id="{{ level._id }}">
@@ -145,7 +145,6 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="POST" action="{{ url_for('admin_levels') }}" enctype="multipart/form-data">
-                <input type="hidden" name="level_type" value="Level">
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-md-6">
@@ -174,6 +173,14 @@
                             <div class="mb-3">
                                 <label for="position" class="form-label">Position in List</label>
                                 <input type="number" class="form-control" id="position" name="position" min="1" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="level_type" class="form-label">Level Type</label>
+                                <select class="form-control" id="level_type" name="level_type">
+                                    <option value="Level">Level (1x points)</option>
+                                    <option value="Challenge">Challenge (3x points)</option>
+                                    <option value="Monsters attack 6">Monsters attack 6 (4x points)</option>
+                                </select>
                             </div>
                             <div class="mb-3">
                                 <label for="points" class="form-label">Points (leave empty for auto-calculation)</label>
@@ -226,8 +233,8 @@
             </div>
             <form method="POST" action="{{ url_for('admin_edit_level') }}" enctype="multipart/form-data">
                 <input type="hidden" id="edit_level_id" name="level_id">
-                <input type="hidden" name="level_type" value="Level">
                 <div class="modal-body">
+                    <!-- Same form fields as Add Level Modal -->
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
@@ -255,6 +262,14 @@
                             <div class="mb-3">
                                 <label for="edit_position" class="form-label">Position in List</label>
                                 <input type="number" class="form-control" id="edit_position" name="position" min="1" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="edit_level_type" class="form-label">Level Type</label>
+                                <select class="form-control" id="edit_level_type" name="level_type">
+                                    <option value="Level">Level (1x points)</option>
+                                    <option value="Challenge">Challenge (3x points)</option>
+                                    <option value="Monsters attack 6">Monsters attack 6 (4x points)</option>
+                                </select>
                             </div>
                             <div class="mb-3">
                                 <label for="edit_points" class="form-label">Points (leave empty for auto-calculation)</label>
@@ -382,6 +397,7 @@
             const levelGameId = this.getAttribute('data-level-game-id');
             const levelPoints = this.getAttribute('data-level-points');
             const levelMinPercentage = this.getAttribute('data-level-min-percentage');
+            const levelType = this.getAttribute('data-level-type') || 'Level';
             
             document.getElementById('edit_level_id').value = levelId;
             document.getElementById('edit_name').value = levelName;
@@ -395,6 +411,7 @@
             document.getElementById('edit_thumbnail_url').value = this.getAttribute('data-level-thumbnail') || '';
             document.getElementById('edit_points').value = levelPoints || '';
             document.getElementById('edit_min_percentage').value = levelMinPercentage || '100';
+            document.getElementById('edit_level_type').value = levelType;
         });
     });
     
