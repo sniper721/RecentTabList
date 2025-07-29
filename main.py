@@ -80,10 +80,16 @@ def utility_processor():
         users = list(mongo_db.users.find({"points": {"$gt": 0}}).sort("points", -1).limit(limit))
         return users
     
+    def format_points(points):
+        """Format points as whole number"""
+        return int(points) if points else 0
+    
     return dict(
         get_difficulty_color=get_difficulty_color,
         top_players=get_top_players(),
-        get_video_embed_info=get_video_embed_info
+        get_video_embed_info=get_video_embed_info,
+        current_theme=session.get('theme', 'light'),
+        format_points=format_points
     )
 
 # Helper functions
@@ -130,25 +136,34 @@ def get_video_embed_info(video_url):
     
     return None
 
-def calculate_level_points(position, is_legacy=False):
-    """Calculate points based on position"""
+def calculate_level_points(position, is_legacy=False, level_type="Level"):
+    """Calculate points based on position using demonlist formula"""
     if is_legacy:
         return 0
-    return (100 - position + 1) / 10
+    
+    if position == 1:
+        return 400
+    elif position <= 20:
+        # Linear decrease from 360 to 40
+        return int((90 - (position - 2) * (80 / 18)) * 4)
+    elif position <= 100:
+        # Exponential decay from 40 to 5.2
+        return max(5.2, 10 * (0.95 ** (position - 20)) * 4)
+    else:
+        return 5.2
 
 def calculate_record_points(record, level):
     """Calculate points earned from a record"""
-    if record['status'] != 'approved' or level['is_legacy']:
+    if record['status'] != 'approved' or level.get('is_legacy', False):
         return 0
     
     # Full completion
     if record['progress'] == 100:
         return level['points']
     
-    # Partial completion
+    # List% completion (10% of full points for any progress >= min_percentage)
     if record['progress'] >= level.get('min_percentage', 100):
-        percentage_factor = record['progress'] / 100
-        return level['points'] * percentage_factor
+        return level['points'] * 0.1
     
     return 0
 
@@ -178,6 +193,24 @@ def index():
 def legacy():
     legacy_list = list(mongo_db.levels.find({"is_legacy": True}).sort("position", 1))
     return render_template('legacy.html', levels=legacy_list)
+
+@app.route('/timemachine')
+def timemachine():
+    selected_date = request.args.get('date')
+    levels = []
+    
+    if selected_date:
+        try:
+            target_date = datetime.strptime(selected_date, '%Y-%m-%d')
+            # Get levels that existed on or before the selected date
+            levels = list(mongo_db.levels.find({
+                "date_added": {"$lte": target_date},
+                "is_legacy": False
+            }).sort("position", 1))
+        except ValueError:
+            flash('Invalid date format', 'danger')
+    
+    return render_template('timemachine.html', levels=levels, selected_date=selected_date)
 
 @app.route('/level/<level_id>')
 def level_detail(level_id):
@@ -266,6 +299,12 @@ def logout():
     session.pop('is_admin', None)
     flash('You have been logged out', 'info')
     return redirect(url_for('index'))
+
+@app.route('/toggle_theme')
+def toggle_theme():
+    current_theme = session.get('theme', 'light')
+    session['theme'] = 'dark' if current_theme == 'light' else 'light'
+    return redirect(request.referrer or url_for('index'))
 
 @app.route('/auth/google')
 def google_login():
@@ -483,7 +522,8 @@ def admin_levels():
         if points_str and points_str.strip():
             points = float(points_str)
         else:
-            points = calculate_level_points(position, is_legacy)
+            level_type = request.form.get('level_type', 'Level')
+            points = calculate_level_points(position, is_legacy, level_type)
         
         new_level = {
             "_id": next_id,
@@ -497,12 +537,23 @@ def admin_levels():
             "difficulty": difficulty,
             "position": position,
             "is_legacy": is_legacy,
+            "level_type": request.form.get('level_type', 'Level'),
             "date_added": datetime.utcnow(),
             "points": points,
             "min_percentage": min_percentage
         }
         
         mongo_db.levels.insert_one(new_level)
+        
+        # Save history
+        history_entry = {
+            "level_id": next_id,
+            "action": "added",
+            "new_data": new_level,
+            "timestamp": datetime.utcnow()
+        }
+        mongo_db.level_history.insert_one(history_entry)
+        
         flash('Level added successfully!', 'success')
         return redirect(url_for('admin_levels'))
     
@@ -578,7 +629,8 @@ def admin_edit_level():
         points = float(points_str)
     else:
         is_legacy = 'is_legacy' in request.form
-        points = calculate_level_points(position, is_legacy)
+        level_type = request.form.get('level_type', level.get('level_type', 'Level'))
+        points = calculate_level_points(position, is_legacy, level_type)
     
     update_data = {
         "name": request.form.get('name'),
@@ -590,9 +642,20 @@ def admin_edit_level():
         "description": request.form.get('description'),
         "difficulty": float(request.form.get('difficulty')),
         "position": position,
+        "level_type": request.form.get('level_type', 'Level'),
         "points": points,
         "min_percentage": min_percentage
     }
+    
+    # Save history before updating
+    history_entry = {
+        "level_id": db_level_id,
+        "action": "updated",
+        "old_data": level,
+        "new_data": update_data,
+        "timestamp": datetime.utcnow()
+    }
+    mongo_db.level_history.insert_one(history_entry)
     
     mongo_db.levels.update_one({"_id": db_level_id}, {"$set": update_data})
     flash('Level updated successfully!', 'success')
@@ -608,6 +671,17 @@ def admin_delete_level():
     
     # Delete associated records
     mongo_db.records.delete_many({"level_id": level_id})
+    
+    # Save history before deleting
+    level = mongo_db.levels.find_one({"_id": level_id})
+    if level:
+        history_entry = {
+            "level_id": level_id,
+            "action": "deleted",
+            "old_data": level,
+            "timestamp": datetime.utcnow()
+        }
+        mongo_db.level_history.insert_one(history_entry)
     
     # Delete the level
     mongo_db.levels.delete_one({"_id": level_id})

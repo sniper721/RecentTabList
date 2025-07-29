@@ -134,4 +134,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    
+    // Smooth theme transition
+    document.body.style.transition = 'background-color 0.3s ease, color 0.3s ease';
 });

@@ -42,7 +42,7 @@
                         <div class="text-muted"><strong>{{ difficulty }}/10</strong></div>
                         {% set position = level.position if level is not mapping else level['position'] %}
                         {% set points = level.points if level is not mapping else level['points'] %}
-                        <small class="text-muted">{{ points or ((100 - position + 1) / 10)|round(2) }} pts</small>
+                        <small class="text-muted">{{ format_points(points or ((100 - position + 1) / 10)|round(2)) }} points</small>
                     </div>
                 </div>
                 {% endfor %}
@@ -73,7 +73,7 @@
                         <div>
                             <span class="badge bg-primary rounded-pill me-1">
                                 {% if player is mapping %}
-                                    {{ player.points|round(2) }} pts
+                                    {{ format_points(player.points) }} points
                                 {% else %}
                                     {{ player[2] }} records
                                 {% endif %}

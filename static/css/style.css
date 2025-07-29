@@ -4,15 +4,41 @@
  */
 
 :root {
-    /* Custom color variables - Teal/Turquoise Theme with Light Background */
-    --primary-color: #00bcd4;    /* Teal/Turquoise */
-    --secondary-color: #006064;  /* Dark Teal */
-    --accent-color: #1de9b6;     /* Light Turquoise */
-    --background-color: #ffffff; /* White background */
-    --card-bg: #f8f9fa;          /* Light gray card background */
-    --text-color: #212529;       /* Dark text (almost black) */
-    --text-muted: #6c757d;       /* Gray text for less important content */
-    --border-color: #dee2e6;     /* Light gray border */
+    /* Light theme variables */
+    --primary-color: #00bcd4;
+    --secondary-color: #006064;
+    --accent-color: #1de9b6;
+    --background-color: #ffffff;
+    --card-bg: #f8f9fa;
+    --text-color: #212529;
+    --text-muted: #6c757d;
+    --border-color: #dee2e6;
+}
+
+[data-bs-theme="dark"] {
+    /* Dark theme variables */
+    --primary-color: #26c6da;
+    --secondary-color: #004d5c;
+    --accent-color: #1de9b6;
+    --background-color: #121212;
+    --card-bg: #1e1e1e;
+    --text-color: #ffffff;
+    --text-muted: #adb5bd;
+    --border-color: #495057;
+}
+
+[data-bs-theme="dark"] .form-control,
+[data-bs-theme="dark"] .form-select {
+    background-color: #2d2d2d;
+    border-color: #495057;
+    color: #ffffff;
+}
+
+[data-bs-theme="dark"] .form-control:focus,
+[data-bs-theme="dark"] .form-select:focus {
+    background-color: #2d2d2d;
+    color: #ffffff;
+    border-color: var(--primary-color);
 }
 
 /* Base styles */
@@ -84,15 +110,28 @@ body {
     margin-bottom: 0;
 }
 
-/* Form styling override for light theme */
+/* Form styling */
 .form-control {
-    background-color: #fff;
+    background-color: var(--card-bg);
     border: 1px solid var(--border-color);
     color: var(--text-color);
 }
 
 .form-control:focus {
-    background-color: #fff;
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.25rem rgba(0, 188, 212, 0.25);
+}
+
+.form-select {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+
+.form-select:focus {
+    background-color: var(--card-bg);
     color: var(--text-color);
     border-color: var(--primary-color);
     box-shadow: 0 0 0 0.25rem rgba(0, 188, 212, 0.25);
