@@ -137,20 +137,12 @@ def get_video_embed_info(video_url):
     return None
 
 def calculate_level_points(position, is_legacy=False, level_type="Level"):
-    """Calculate points based on position using demonlist formula"""
+    """Calculate points based on position using exponential formula"""
     if is_legacy:
         return 0
-    
-    if position == 1:
-        return 400
-    elif position <= 20:
-        # Linear decrease from 360 to 40
-        return int((90 - (position - 2) * (80 / 18)) * 4)
-    elif position <= 100:
-        # Exponential decay from 40 to 5.2
-        return max(5.2, 10 * (0.95 ** (position - 20)) * 4)
-    else:
-        return 5.2
+    # p = 250(0.9475)^(position-1)
+    # Position 1 = exponent 0, Position 2 = exponent 1, etc.
+    return 250 * (0.9475 ** (position - 1))
 
 def calculate_record_points(record, level):
     """Calculate points earned from a record"""
@@ -841,6 +833,33 @@ def admin_ban_user(user_id):
         flash(f'User {user["username"]} has been banned and deleted', 'success')
     
     return redirect(url_for('admin_users'))
+
+@app.route('/admin/update_points', methods=['POST'])
+def admin_update_points():
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    # Update all level points based on current positions
+    levels = list(mongo_db.levels.find())
+    updated_count = 0
+    
+    for level in levels:
+        new_points = calculate_level_points(level['position'], level.get('is_legacy', False))
+        if level.get('points') != new_points:
+            mongo_db.levels.update_one(
+                {"_id": level['_id']},
+                {"$set": {"points": new_points}}
+            )
+            updated_count += 1
+    
+    # Recalculate all user points
+    users = list(mongo_db.users.find())
+    for user in users:
+        update_user_points(user['_id'])
+    
+    flash(f'Updated {updated_count} levels and recalculated all user points!', 'success')
+    return redirect(url_for('admin_levels'))
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
