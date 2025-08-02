@@ -24,18 +24,29 @@ app.config['GOOGLE_CLIENT_ID'] = os.environ.get('GOOGLE_CLIENT_ID')
 app.config['GOOGLE_CLIENT_SECRET'] = os.environ.get('GOOGLE_CLIENT_SECRET')
 
 # Initialize MongoDB and OAuth
+print("Initializing MongoDB connection...")
 try:
+    print(f"MongoDB URI: {mongodb_uri[:50]}...")
+    print(f"MongoDB DB: {mongodb_db}")
     mongo_client = MongoClient(
         mongodb_uri,
         tls=True,
         tlsAllowInvalidCertificates=True,
         tlsAllowInvalidHostnames=True,
-        serverSelectionTimeoutMS=5000
+        serverSelectionTimeoutMS=2000,
+        socketTimeoutMS=2000,
+        connectTimeoutMS=2000
     )
     mongo_db = mongo_client[mongodb_db]
     # Test connection
     mongo_client.admin.command('ping')
     print("✓ MongoDB initialized successfully")
+    # Create indexes for better performance
+    try:
+        mongo_db.levels.create_index([("is_legacy", 1), ("position", 1)])
+        print("✓ Database indexes created")
+    except Exception as e:
+        print(f"Index creation warning: {e}")
 except Exception as e:
     print(f"MongoDB initialization error: {e}")
     print("Falling back to SQLite...")
@@ -44,11 +55,14 @@ except Exception as e:
     subprocess.run(['python', 'main_sqlite_backup.py'])
     exit()
     
+print("Initializing OAuth...")
 oauth = OAuth(app)
 
 # Configure Google OAuth only if credentials are provided
+print("Configuring Google OAuth...")
 google = None
 if app.config['GOOGLE_CLIENT_ID'] and app.config['GOOGLE_CLIENT_SECRET']:
+    print("Google OAuth credentials found, registering...")
     google = oauth.register(
         name='google',
         client_id=app.config['GOOGLE_CLIENT_ID'],
@@ -58,39 +72,33 @@ if app.config['GOOGLE_CLIENT_ID'] and app.config['GOOGLE_CLIENT_SECRET']:
             'scope': 'openid email profile'
         }
     )
+    print("✓ Google OAuth configured")
+else:
+    print("No Google OAuth credentials found, skipping...")
 
-# Context processors
-@app.context_processor
-def utility_processor():
-    def get_difficulty_color(difficulty):
-        """Convert difficulty value to a color"""
-        if difficulty >= 9.5:
-            return "#ff0000"  # Extreme
-        elif difficulty >= 8.0:
-            return "#ff5500"  # Insane
-        elif difficulty >= 6.5:
-            return "#ffaa00"  # Hard
-        elif difficulty >= 5.0:
-            return "#ffff00"  # Medium
-        else:
-            return "#00ff00"  # Easy
-    
-    def get_top_players(limit=5):
-        """Get top players for sidebar"""
-        users = list(mongo_db.users.find({"points": {"$gt": 0}}).sort("points", -1).limit(limit))
-        return users
-    
-    def format_points(points):
-        """Format points as whole number"""
-        return int(points) if points else 0
-    
-    return dict(
-        get_difficulty_color=get_difficulty_color,
-        top_players=get_top_players(),
-        get_video_embed_info=get_video_embed_info,
-        current_theme=session.get('theme', 'light'),
-        format_points=format_points
-    )
+print("Setting up routes...")
+
+@app.route('/test')
+def test():
+    return "<h1>Test route works!</h1>"
+
+@app.route('/')
+def index():
+    print("Index route accessed")
+    try:
+        print("Querying database...")
+        # Quick test query first
+        mongo_db.levels.find_one()
+        print("Database responsive")
+        main_list = []
+        print(f"Found {len(main_list)} levels")
+        print("Rendering template...")
+        result = render_template('index.html', levels=main_list)
+        print("Template rendered successfully")
+        return result
+    except Exception as e:
+        print(f"Error in index: {e}")
+        return render_template('index.html', levels=[])
 
 # Helper functions
 def get_video_embed_info(video_url):
@@ -175,11 +183,16 @@ def update_user_points(user_id):
     )
     return total_points
 
+
+
+# Context processor
+@app.context_processor
+def utility_processor():
+    def format_points(points):
+        return int(points) if points else 0
+    return dict(format_points=format_points)
+
 # Routes
-@app.route('/')
-def index():
-    main_list = list(mongo_db.levels.find({"is_legacy": False}).sort("position", 1))
-    return render_template('index.html', levels=main_list)
 
 @app.route('/legacy')
 def legacy():
@@ -275,8 +288,7 @@ def register():
             "password_hash": generate_password_hash(password),
             "is_admin": False,
             "points": 0,
-            "date_joined": datetime.utcnow(),
-            "google_id": None
+            "date_joined": datetime.utcnow()
         }
         
         mongo_db.users.insert_one(new_user)
@@ -778,8 +790,7 @@ def admin_users():
                 "password_hash": generate_password_hash(password),
                 "is_admin": is_admin,
                 "points": 0,
-                "date_joined": datetime.utcnow(),
-                "google_id": None
+                "date_joined": datetime.utcnow()
             }
             
             mongo_db.users.insert_one(new_user)
@@ -862,5 +873,14 @@ def admin_update_points():
     return redirect(url_for('admin_levels'))
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))
-    app.run(debug=True, host='0.0.0.0', port=port)
+    try:
+        print("Starting Flask application...")
+        port = 10000
+        print(f"Port: {port}")
+        print("Debug mode: ON")
+        print(f"Starting server on http://127.0.0.1:{port}")
+        app.run(debug=True, host='127.0.0.1', port=port, use_reloader=False, threaded=True)
+    except Exception as e:
+        print(f"Error starting Flask app: {e}")
+        import traceback
+        traceback.print_exc()
