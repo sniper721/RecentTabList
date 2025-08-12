@@ -1009,15 +1009,5 @@ def admin_update_points():
     flash(f'Updated {updated_count} levels and recalculated all user points!', 'success')
     return redirect(url_for('admin_levels'))
 
-if __name__ == '__main__':
-    try:
-        print("Starting Flask application...")
-        port = 10000
-        print(f"Port: {port}")
-        print("Debug mode: ON")
-        print(f"Starting server on http://127.0.0.1:{port}")
-        app.run(debug=True, host='127.0.0.1', port=port, use_reloader=False, threaded=True)
-    except Exception as e:
-        print(f"Error starting Flask app: {e}")
-        import traceback
-        traceback.print_exc()
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000, debug=True)
