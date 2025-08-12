@@ -76,30 +76,6 @@ if app.config['GOOGLE_CLIENT_ID'] and app.config['GOOGLE_CLIENT_SECRET']:
 else:
     print("No Google OAuth credentials found, skipping...")
 
-print("Setting up routes...")
-
-@app.route('/test')
-def test():
-    return "<h1>Test route works!</h1>"
-
-@app.route('/')
-def index():
-    print("Index route accessed")
-    try:
-        print("Querying database...")
-        # Quick test query first
-        mongo_db.levels.find_one()
-        print("Database responsive")
-        main_list = []
-        print(f"Found {len(main_list)} levels")
-        print("Rendering template...")
-        result = render_template('index.html', levels=main_list)
-        print("Template rendered successfully")
-        return result
-    except Exception as e:
-        print(f"Error in index: {e}")
-        return render_template('index.html', levels=[])
-
 # Helper functions
 def get_video_embed_info(video_url):
     """Extract video platform and embed information from URL"""
@@ -144,13 +120,28 @@ def get_video_embed_info(video_url):
     
     return None
 
+# Context processor
+@app.context_processor
+def utility_processor():
+    def format_points(points):
+        return int(points) if points else 0
+    
+    # Get current theme from session
+    current_theme = session.get('theme', 'light')
+    
+    return dict(
+        format_points=format_points, 
+        get_video_embed_info=get_video_embed_info,
+        current_theme=current_theme
+    )
+
 def calculate_level_points(position, is_legacy=False, level_type="Level"):
     """Calculate points based on position using exponential formula"""
     if is_legacy:
         return 0
     # p = 250(0.9475)^(position-1)
     # Position 1 = exponent 0, Position 2 = exponent 1, etc.
-    return 250 * (0.9475 ** (position - 1))
+    return int(250 * (0.9475 ** (position - 1)))
 
 def calculate_record_points(record, level):
     """Calculate points earned from a record"""
@@ -183,14 +174,47 @@ def update_user_points(user_id):
     )
     return total_points
 
+def shift_level_positions(position, is_legacy=False, direction=1):
+    """Shift level positions up or down from a given position"""
+    mongo_db.levels.update_many(
+        {"position": {"$gte": position}, "is_legacy": is_legacy},
+        {"$inc": {"position": direction}}
+    )
 
+def recalculate_all_points():
+    """Recalculate points for all levels based on their current positions"""
+    levels = list(mongo_db.levels.find())
+    for level in levels:
+        new_points = calculate_level_points(level['position'], level.get('is_legacy', False))
+        if level.get('points') != new_points:
+            mongo_db.levels.update_one(
+                {"_id": level['_id']},
+                {"$set": {"points": new_points}}
+            )
 
-# Context processor
-@app.context_processor
-def utility_processor():
-    def format_points(points):
-        return int(points) if points else 0
-    return dict(format_points=format_points)
+print("Setting up routes...")
+
+@app.route('/test')
+def test():
+    return "<h1>Test route works!</h1>"
+
+@app.route('/')
+def index():
+    print("Index route accessed")
+    try:
+        print("Querying database...")
+        # Quick test query first
+        mongo_db.levels.find_one()
+        print("Database responsive")
+        main_list = list(mongo_db.levels.find({"is_legacy": False}).sort("position", 1))
+        print(f"Found {len(main_list)} levels")
+        print("Rendering template...")
+        result = render_template('index.html', levels=main_list)
+        print("Template rendered successfully")
+        return result
+    except Exception as e:
+        print(f"Error in index: {e}")
+        return render_template('index.html', levels=[])
 
 # Routes
 
@@ -307,7 +331,13 @@ def logout():
 @app.route('/toggle_theme')
 def toggle_theme():
     current_theme = session.get('theme', 'light')
-    session['theme'] = 'dark' if current_theme == 'light' else 'light'
+    new_theme = 'dark' if current_theme == 'light' else 'light'
+    session['theme'] = new_theme
+    
+    # Handle AJAX requests
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return {'theme': new_theme, 'status': 'success'}
+    
     return redirect(request.referrer or url_for('index'))
 
 @app.route('/auth/google')
@@ -524,10 +554,13 @@ def admin_levels():
         
         # Calculate points
         if points_str and points_str.strip():
-            points = float(points_str)
+            points = int(float(points_str))
         else:
             level_type = request.form.get('level_type', 'Level')
             points = calculate_level_points(position, is_legacy, level_type)
+        
+        # Shift existing levels at this position and below
+        shift_level_positions(position, is_legacy, 1)
         
         new_level = {
             "_id": next_id,
@@ -548,6 +581,9 @@ def admin_levels():
         }
         
         mongo_db.levels.insert_one(new_level)
+        
+        # Recalculate points for all levels after position changes
+        recalculate_all_points()
         
         # Save history
         history_entry = {
@@ -590,6 +626,10 @@ def admin_edit_level():
     level = mongo_db.levels.find_one({"_id": db_level_id})
     thumbnail_url = request.form.get('thumbnail_url') or level.get('thumbnail_url', '')
     
+    # Handle position changes
+    old_position = level['position']
+    old_is_legacy = level.get('is_legacy', False)
+    
 
     
     # Handle file upload - save to JSON and convert to base64
@@ -627,12 +667,41 @@ def admin_edit_level():
     points_str = request.form.get('points')
     min_percentage = int(request.form.get('min_percentage', '100'))
     position = int(request.form.get('position'))
+    is_legacy = 'is_legacy' in request.form
+    
+    # Handle position shifting if position changed
+    if position != old_position or is_legacy != old_is_legacy:
+        if is_legacy == old_is_legacy:
+            # Same list, just moving position
+            if old_position < position:
+                # Moving down: shift levels between old and new position up
+                mongo_db.levels.update_many(
+                    {"position": {"$gt": old_position, "$lte": position}, "is_legacy": is_legacy},
+                    {"$inc": {"position": -1}}
+                )
+            elif old_position > position:
+                # Moving up: shift levels between new and old position down
+                mongo_db.levels.update_many(
+                    {"position": {"$gte": position, "$lt": old_position}, "is_legacy": is_legacy},
+                    {"$inc": {"position": 1}}
+                )
+        else:
+            # Moving between lists
+            # Remove from old list (shift positions down)
+            mongo_db.levels.update_many(
+                {"position": {"$gt": old_position}, "is_legacy": old_is_legacy},
+                {"$inc": {"position": -1}}
+            )
+            # Add to new list (shift positions up)
+            mongo_db.levels.update_many(
+                {"position": {"$gte": position}, "is_legacy": is_legacy},
+                {"$inc": {"position": 1}}
+            )
     
     # Calculate points
     if points_str and points_str.strip():
-        points = float(points_str)
+        points = int(float(points_str))
     else:
-        is_legacy = 'is_legacy' in request.form
         level_type = request.form.get('level_type', level.get('level_type', 'Level'))
         points = calculate_level_points(position, is_legacy, level_type)
     
@@ -646,6 +715,7 @@ def admin_edit_level():
         "description": request.form.get('description'),
         "difficulty": float(request.form.get('difficulty')),
         "position": position,
+        "is_legacy": is_legacy,
         "level_type": request.form.get('level_type', 'Level'),
         "points": points,
         "min_percentage": min_percentage
@@ -662,6 +732,10 @@ def admin_edit_level():
     mongo_db.level_history.insert_one(history_entry)
     
     mongo_db.levels.update_one({"_id": db_level_id}, {"$set": update_data})
+    
+    # Recalculate points for all levels after position changes
+    recalculate_all_points()
+    
     flash('Level updated successfully!', 'success')
     return redirect(url_for('admin_levels') + '?updated=' + str(db_level_id))
 
@@ -673,22 +747,38 @@ def admin_delete_level():
     
     level_id = int(request.form.get('level_id'))
     
+    # Get level info before deletion
+    level = mongo_db.levels.find_one({"_id": level_id})
+    if not level:
+        flash('Level not found', 'danger')
+        return redirect(url_for('admin_levels'))
+    
+    level_position = level['position']
+    is_legacy = level.get('is_legacy', False)
+    
     # Delete associated records
     mongo_db.records.delete_many({"level_id": level_id})
     
     # Save history before deleting
-    level = mongo_db.levels.find_one({"_id": level_id})
-    if level:
-        history_entry = {
-            "level_id": level_id,
-            "action": "deleted",
-            "old_data": level,
-            "timestamp": datetime.utcnow()
-        }
-        mongo_db.level_history.insert_one(history_entry)
+    history_entry = {
+        "level_id": level_id,
+        "action": "deleted",
+        "old_data": level,
+        "timestamp": datetime.utcnow()
+    }
+    mongo_db.level_history.insert_one(history_entry)
     
     # Delete the level
     mongo_db.levels.delete_one({"_id": level_id})
+    
+    # Shift positions of levels that were below the deleted level
+    mongo_db.levels.update_many(
+        {"position": {"$gt": level_position}, "is_legacy": is_legacy},
+        {"$inc": {"position": -1}}
+    )
+    
+    # Recalculate points for all levels after position changes
+    recalculate_all_points()
     
     flash('Level deleted successfully!', 'success')
     return redirect(url_for('admin_levels'))
@@ -701,11 +791,35 @@ def admin_move_to_legacy():
     
     level_id = int(request.form.get('level_id'))
     
+    # Get level info before moving
+    level = mongo_db.levels.find_one({"_id": level_id})
+    if not level or level.get('is_legacy', False):
+        flash('Level not found or already in legacy', 'danger')
+        return redirect(url_for('admin_levels'))
+    
+    old_position = level['position']
+    
+    # Find the highest position in the legacy list
+    highest_legacy = mongo_db.levels.find_one(
+        {"is_legacy": True}, 
+        sort=[("position", -1)]
+    )
+    new_position = 1 if not highest_legacy else highest_legacy['position'] + 1
+    
     # Move level to legacy
     mongo_db.levels.update_one(
         {"_id": level_id},
-        {"$set": {"is_legacy": True}}
+        {"$set": {"is_legacy": True, "position": new_position}}
     )
+    
+    # Shift positions in the main list
+    mongo_db.levels.update_many(
+        {"position": {"$gt": old_position}, "is_legacy": False},
+        {"$inc": {"position": -1}}
+    )
+    
+    # Recalculate points for all levels after position changes
+    recalculate_all_points()
     
     flash('Level moved to legacy list successfully!', 'success')
     return redirect(url_for('admin_levels'))
@@ -719,11 +833,34 @@ def admin_move_to_main():
     level_id = int(request.form.get('level_id'))
     position = int(request.form.get('position'))
     
+    # Get level info before moving
+    level = mongo_db.levels.find_one({"_id": level_id})
+    if not level or not level.get('is_legacy', False):
+        flash('Level not found or already in main list', 'danger')
+        return redirect(url_for('admin_levels'))
+    
+    old_position = level['position']
+    
+    # Shift positions in the legacy list
+    mongo_db.levels.update_many(
+        {"position": {"$gt": old_position}, "is_legacy": True},
+        {"$inc": {"position": -1}}
+    )
+    
+    # Shift positions in the main list
+    mongo_db.levels.update_many(
+        {"position": {"$gte": position}, "is_legacy": False},
+        {"$inc": {"position": 1}}
+    )
+    
     # Move level to main list
     mongo_db.levels.update_one(
         {"_id": level_id},
         {"$set": {"is_legacy": False, "position": position}}
     )
+    
+    # Recalculate points for all levels after position changes
+    recalculate_all_points()
     
     flash('Level moved to main list successfully!', 'success')
     return redirect(url_for('admin_levels'))

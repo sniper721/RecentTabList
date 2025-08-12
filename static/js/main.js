@@ -135,6 +135,70 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Smooth theme transition
+    // Theme handling
+    initializeTheme();
+    
+    // Handle theme toggle clicks
+    const themeToggle = document.querySelector('a[href*="toggle_theme"]');
+    if (themeToggle) {
+        themeToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            toggleTheme();
+        });
+    }
+});
+
+/**
+ * Initialize theme on page load
+ */
+function initializeTheme() {
+    const currentTheme = document.body.getAttribute('data-bs-theme') || 'light';
+    updateThemeIcon(currentTheme);
+    
+    // Add smooth transitions
     document.body.style.transition = 'background-color 0.3s ease, color 0.3s ease';
+    
+    // Apply transitions to all theme-sensitive elements
+    const elements = document.querySelectorAll('.card, .navbar, .btn, .form-control, .form-select, .dropdown-menu, .alert');
+    elements.forEach(el => {
+        el.style.transition = 'background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease';
+    });
+}
+
+/**
+ * Toggle between light and dark themes
+ */
+function toggleTheme() {
+    const currentTheme = document.body.getAttribute('data-bs-theme') || 'light';
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+    
+    // Update the theme
+    document.body.setAttribute('data-bs-theme', newTheme);
+    updateThemeIcon(newTheme);
+    
+    // Send request to server to save theme preference
+    fetch('/toggle_theme', {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    }).catch(error => {
+        console.error('Error saving theme preference:', error);
+    });
+}
+
+/**
+ * Update the theme toggle icon
+ */
+function updateThemeIcon(theme) {
+    const themeIcon = document.querySelector('a[href*="toggle_theme"] i');
+    if (themeIcon) {
+        if (theme === 'dark') {
+            themeIcon.className = 'fas fa-sun';
+            themeIcon.parentElement.title = 'Switch to Light Mode';
+        } else {
+            themeIcon.className = 'fas fa-moon';
+            themeIcon.parentElement.title = 'Switch to Dark Mode';
+        }
+    }
 });
