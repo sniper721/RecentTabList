@@ -353,16 +353,150 @@ p {
     }
 }
 
-/* Dark mode support (optional) */
-@media (prefers-color-scheme: dark) {
-    :root {
-        --background-color: #0f172a;
-        --surface-color: #1e293b;
-        --card-color: #1e293b;
-        --text-primary: #f1f5f9;
-        --text-secondary: #cbd5e1;
-        --text-muted: #64748b;
-        --border-color: #334155;
-        --border-light: #475569;
-    }
+/* Dark Theme */
+[data-bs-theme="dark"] {
+    --primary-color: #60a5fa;
+    --primary-hover: #3b82f6;
+    --secondary-color: #64748b;
+    --success-color: #34d399;
+    --danger-color: #f87171;
+    --warning-color: #fbbf24;
+    --info-color: #22d3ee;
+    --background-color: #0f172a;
+    --surface-color: #1e293b;
+    --card-color: #1e293b;
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-muted: #64748b;
+    --border-color: #334155;
+    --border-light: #475569;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+}
+
+/* Light Theme (default) */
+[data-bs-theme="light"] {
+    --primary-color: #3b82f6;
+    --primary-hover: #2563eb;
+    --secondary-color: #64748b;
+    --success-color: #10b981;
+    --danger-color: #ef4444;
+    --warning-color: #f59e0b;
+    --info-color: #06b6d4;
+    --background-color: #ffffff;
+    --surface-color: #f8fafc;
+    --card-color: #ffffff;
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --text-muted: #94a3b8;
+    --border-color: #e2e8f0;
+    --border-light: #f1f5f9;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+/* Dark mode navbar adjustments */
+[data-bs-theme="dark"] .navbar {
+    background-color: var(--card-color);
+    border-bottom-color: var(--border-color);
+}
+
+[data-bs-theme="dark"] .navbar-brand {
+    color: var(--primary-color) !important;
+}
+
+/* Dark mode alert adjustments */
+[data-bs-theme="dark"] .alert-success {
+    background-color: rgb(52 211 153 / 0.15);
+    color: #6ee7b7;
+}
+
+[data-bs-theme="dark"] .alert-danger {
+    background-color: rgb(248 113 113 / 0.15);
+    color: #fca5a5;
+}
+
+[data-bs-theme="dark"] .alert-warning {
+    background-color: rgb(251 191 36 / 0.15);
+    color: #fcd34d;
+}
+
+[data-bs-theme="dark"] .alert-info {
+    background-color: rgb(34 211 238 / 0.15);
+    color: #67e8f9;
+}
+
+/* Theme transition */
+body, .card, .navbar, .btn, .form-control, .form-select, .dropdown-menu, .alert, .table, .badge {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Level difficulty badges */
+.level-difficulty-badge {
+    font-weight: 700;
+    font-size: 0.875rem;
+    padding: 0.375rem 0.75rem;
+    border-radius: var(--radius-md);
+    margin-right: 0.5rem;
+}
+
+.level-difficulty-1, .level-difficulty-2, .level-difficulty-3 { 
+    background-color: var(--success-color); 
+    color: white; 
+}
+
+.level-difficulty-4, .level-difficulty-5, .level-difficulty-6 { 
+    background-color: var(--warning-color); 
+    color: white; 
+}
+
+.level-difficulty-7, .level-difficulty-8, .level-difficulty-9 { 
+    background-color: var(--danger-color); 
+    color: white; 
+}
+
+.level-difficulty-10 { 
+    background-color: #8b5cf6; 
+    color: white; 
+}
+
+/* Theme toggle button styling */
+.nav-link[href*="toggle_theme"] {
+    font-size: 1.1rem;
+    padding: 0.5rem 0.75rem !important;
+}
+
+.nav-link[href*="toggle_theme"]:hover {
+    transform: scale(1.1);
+}
+
+/* Dark mode specific adjustments */
+[data-bs-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) > td {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-bs-theme="dark"] .table-hover > tbody > tr:hover > td {
+    background-color: rgba(255, 255, 255, 0.075);
+}
+
+[data-bs-theme="dark"] .form-control:focus,
+[data-bs-theme="dark"] .form-select:focus {
+    box-shadow: 0 0 0 3px rgb(96 165 250 / 0.25);
+}
+
+/* Smooth hover effects */
+.level-card, .card {
+    transition: all 0.3s ease;
+}
+
+.level-card:hover, .card:hover {
+    transform: translateY(-2px);
+}
+
+/* Loading animation for theme switch */
+.theme-switching {
+    pointer-events: none;
+    opacity: 0.7;
 }

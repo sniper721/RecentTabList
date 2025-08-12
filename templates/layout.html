@@ -40,7 +40,7 @@
                 </ul>
                 <ul class="navbar-nav">
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('toggle_theme') }}" title="Toggle Theme">
+                        <a class="nav-link" href="{{ url_for('toggle_theme') }}" title="{% if current_theme == 'dark' %}Switch to Light Mode{% else %}Switch to Dark Mode{% endif %}">
                             {% if current_theme == 'dark' %}
                                 <i class="fas fa-sun"></i>
                             {% else %}
