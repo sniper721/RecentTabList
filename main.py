@@ -3,7 +3,7 @@ from pymongo import MongoClient
 from werkzeug.security import generate_password_hash, check_password_hash
 from authlib.integrations.flask_client import OAuth
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
@@ -312,7 +312,7 @@ def register():
             "password_hash": generate_password_hash(password),
             "is_admin": False,
             "points": 0,
-            "date_joined": datetime.utcnow()
+            "date_joined": datetime.now(timezone.utc)
         }
         
         mongo_db.users.insert_one(new_user)
@@ -395,7 +395,7 @@ def google_callback():
                     "google_id": google_id,
                     "is_admin": False,
                     "points": 0,
-                    "date_joined": datetime.utcnow()
+                    "date_joined": datetime.now(timezone.utc)
                 }
                 mongo_db.users.insert_one(user)
         
@@ -436,9 +436,55 @@ def submit_record():
         return redirect(url_for('login'))
     
     if request.method == 'POST':
-        level_id = int(request.form.get('level_id'))
-        progress = int(request.form.get('progress'))
-        video_url = request.form.get('video_url')
+        # Validate form data
+        level_id_str = request.form.get('level_id', '').strip()
+        progress_str = request.form.get('progress', '').strip()
+        video_url = request.form.get('video_url', '').strip()
+        
+        # Check for empty fields
+        if not level_id_str:
+            flash('Please select a level', 'danger')
+            levels = list(mongo_db.levels.find({"is_legacy": {"$ne": True}}).sort("position", 1))
+            return render_template('submit_record.html', levels=levels)
+            
+        if not progress_str:
+            flash('Please enter your progress percentage', 'danger')
+            levels = list(mongo_db.levels.find({"is_legacy": {"$ne": True}}).sort("position", 1))
+            return render_template('submit_record.html', levels=levels)
+            
+        if not video_url:
+            flash('Please provide a video URL', 'danger')
+            levels = list(mongo_db.levels.find({"is_legacy": {"$ne": True}}).sort("position", 1))
+            return render_template('submit_record.html', levels=levels)
+        
+        # Convert to integers
+        try:
+            level_id = int(level_id_str)
+            progress = int(progress_str)
+        except ValueError:
+            flash('Invalid level ID or progress value', 'danger')
+            levels = list(mongo_db.levels.find({"is_legacy": {"$ne": True}}).sort("position", 1))
+            return render_template('submit_record.html', levels=levels)
+        
+        # Validate progress range
+        if progress < 1 or progress > 100:
+            flash('Progress must be between 1 and 100', 'danger')
+            levels = list(mongo_db.levels.find({"is_legacy": {"$ne": True}}).sort("position", 1))
+            return render_template('submit_record.html', levels=levels)
+        
+        # Check if level exists
+        level = mongo_db.levels.find_one({"_id": level_id})
+        if not level:
+            flash('Selected level does not exist', 'danger')
+            levels = list(mongo_db.levels.find({"is_legacy": {"$ne": True}}).sort("position", 1))
+            return render_template('submit_record.html', levels=levels)
+        
+        # Check minimum progress requirement
+        min_progress = level.get('min_percentage', 100)
+        if progress < min_progress:
+            flash(f'This level requires at least {min_progress}% progress', 'danger')
+            levels = list(mongo_db.levels.find({"is_legacy": {"$ne": True}}).sort("position", 1))
+            return render_template('submit_record.html', levels=levels)
         
         # Get next record ID
         last_record = mongo_db.records.find_one(sort=[("_id", -1)])
@@ -451,14 +497,14 @@ def submit_record():
             "progress": progress,
             "video_url": video_url,
             "status": "pending",
-            "date_submitted": datetime.utcnow()
+            "date_submitted": datetime.now(timezone.utc)
         }
         
         mongo_db.records.insert_one(new_record)
         flash('Record submitted successfully! It will be reviewed by moderators.', 'success')
         return redirect(url_for('profile'))
     
-    levels = list(mongo_db.levels.find().sort("position", 1))
+    levels = list(mongo_db.levels.find({"is_legacy": {"$ne": True}}).sort("position", 1))
     return render_template('submit_record.html', levels=levels)
 
 # Admin routes
@@ -575,7 +621,7 @@ def admin_levels():
             "position": position,
             "is_legacy": is_legacy,
             "level_type": request.form.get('level_type', 'Level'),
-            "date_added": datetime.utcnow(),
+            "date_added": datetime.now(timezone.utc),
             "points": points,
             "min_percentage": min_percentage
         }
@@ -590,7 +636,7 @@ def admin_levels():
             "level_id": next_id,
             "action": "added",
             "new_data": new_level,
-            "timestamp": datetime.utcnow()
+            "timestamp": datetime.now(timezone.utc)
         }
         mongo_db.level_history.insert_one(history_entry)
         
@@ -727,7 +773,7 @@ def admin_edit_level():
         "action": "updated",
         "old_data": level,
         "new_data": update_data,
-        "timestamp": datetime.utcnow()
+        "timestamp": datetime.now(timezone.utc)
     }
     mongo_db.level_history.insert_one(history_entry)
     
@@ -764,7 +810,7 @@ def admin_delete_level():
         "level_id": level_id,
         "action": "deleted",
         "old_data": level,
-        "timestamp": datetime.utcnow()
+        "timestamp": datetime.now(timezone.utc)
     }
     mongo_db.level_history.insert_one(history_entry)
     
@@ -927,7 +973,7 @@ def admin_users():
                 "password_hash": generate_password_hash(password),
                 "is_admin": is_admin,
                 "points": 0,
-                "date_joined": datetime.utcnow()
+                "date_joined": datetime.now(timezone.utc)
             }
             
             mongo_db.users.insert_one(new_user)

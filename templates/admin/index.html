@@ -62,7 +62,7 @@
                             <tr>
                                 <td>{{ record.user.username }}</td>
                                 <td>
-                                    <a href="{{ url_for('level_detail', level_id=record.level.id) }}">
+                                    <a href="{{ url_for('level_detail', level_id=record.level._id) }}">
                                         {{ record.level.name }}
                                     </a>
                                 </td>
@@ -100,12 +100,12 @@
                                 </td>
                                 <td>
                                     <div class="btn-group" role="group">
-                                        <form method="POST" action="{{ url_for('admin_approve_record', record_id=record.id) }}" class="d-inline">
+                                        <form method="POST" action="{{ url_for('admin_approve_record', record_id=record._id) }}" class="d-inline">
                                             <button type="submit" class="btn btn-sm btn-success">
                                                 <i class="fas fa-check"></i> Approve
                                             </button>
                                         </form>
-                                        <form method="POST" action="{{ url_for('admin_reject_record', record_id=record.id) }}" class="d-inline ms-1">
+                                        <form method="POST" action="{{ url_for('admin_reject_record', record_id=record._id) }}" class="d-inline ms-1">
                                             <button type="submit" class="btn btn-sm btn-danger">
                                                 <i class="fas fa-times"></i> Reject
                                             </button>

@@ -21,16 +21,11 @@
                         <label for="level_id" class="form-label">Level</label>
                         <select class="form-select" id="level_id" name="level_id" required>
                             <option value="" selected disabled>Select a level</option>
-                            <optgroup label="Main List">
-                                {% for level in levels if not level.is_legacy %}
-                                <option value="{{ level.id }}">{{ level.position }}. {{ level.name }} by {{ level.creator }}</option>
-                                {% endfor %}
-                            </optgroup>
-                            <optgroup label="Legacy List">
-                                {% for level in levels if level.is_legacy %}
-                                <option value="{{ level.id }}">{{ level.position }}. {{ level.name }} by {{ level.creator }}</option>
-                                {% endfor %}
-                            </optgroup>
+                            {% for level in levels %}
+                                {% if not level.get('is_legacy', False) %}
+                                <option value="{{ level._id }}">{{ level.position }}. {{ level.name }} by {{ level.verifier }}</option>
+                                {% endif %}
+                            {% endfor %}
                         </select>
                     </div>
                     
