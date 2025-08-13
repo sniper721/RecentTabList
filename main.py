@@ -4,6 +4,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from authlib.integrations.flask_client import OAuth
 import os
 from datetime import datetime, timezone
+from discord_integration import notify_record_submitted, notify_record_approved, notify_record_rejected
 from dotenv import load_dotenv
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
@@ -501,6 +502,15 @@ def submit_record():
         }
         
         mongo_db.records.insert_one(new_record)
+        
+        # Send Discord notification
+        try:
+            user = mongo_db.users.find_one({"_id": session['user_id']})
+            username = user['username'] if user else 'Unknown'
+            notify_record_submitted(username, level['name'], progress, video_url)
+        except Exception as e:
+            print(f"Discord notification error: {e}")
+        
         flash('Record submitted successfully! It will be reviewed by moderators.', 'success')
         return redirect(url_for('profile'))
     
@@ -927,6 +937,21 @@ def admin_approve_record(record_id):
         # Update user points
         update_user_points(record['user_id'])
         
+        # Send Discord notification
+        try:
+            user = mongo_db.users.find_one({"_id": record['user_id']})
+            level = mongo_db.levels.find_one({"_id": record['level_id']})
+            if user and level:
+                points_earned = calculate_record_points(record, level)
+                notify_record_approved(
+                    user['username'], 
+                    level['name'], 
+                    record['progress'], 
+                    points_earned
+                )
+        except Exception as e:
+            print(f"Discord notification error: {e}")
+        
         flash('Record approved successfully!', 'success')
     
     return redirect(url_for('admin'))
@@ -937,10 +962,27 @@ def admin_reject_record(record_id):
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
     
+    # Get record info before rejecting for Discord notification
+    record = mongo_db.records.find_one({"_id": record_id})
+    
     mongo_db.records.update_one(
         {"_id": record_id},
         {"$set": {"status": "rejected"}}
     )
+    
+    # Send Discord notification
+    if record:
+        try:
+            user = mongo_db.users.find_one({"_id": record['user_id']})
+            level = mongo_db.levels.find_one({"_id": record['level_id']})
+            if user and level:
+                notify_record_rejected(
+                    user['username'], 
+                    level['name'], 
+                    record['progress']
+                )
+        except Exception as e:
+            print(f"Discord notification error: {e}")
     
     flash('Record rejected!', 'warning')
     return redirect(url_for('admin'))
