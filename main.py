@@ -4,7 +4,22 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from authlib.integrations.flask_client import OAuth
 import os
 from datetime import datetime, timezone
-from discord_integration import notify_record_submitted, notify_record_approved, notify_record_rejected
+
+# Try to import Discord integration, but don't fail if it's missing
+try:
+    from discord_integration import notify_record_submitted, notify_record_approved, notify_record_rejected
+    DISCORD_AVAILABLE = True
+    print("✅ Discord integration loaded successfully")
+except ImportError as e:
+    print(f"❌ Discord integration failed to load: {e}")
+    DISCORD_AVAILABLE = False
+    # Create dummy functions so the app doesn't crash
+    def notify_record_submitted(*args, **kwargs):
+        print("❌ Discord integration not available - notify_record_submitted")
+    def notify_record_approved(*args, **kwargs):
+        print("❌ Discord integration not available - notify_record_approved")  
+    def notify_record_rejected(*args, **kwargs):
+        print("❌ Discord integration not available - notify_record_rejected")
 from dotenv import load_dotenv
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
@@ -193,6 +208,66 @@ def recalculate_all_points():
                 {"$set": {"points": new_points}}
             )
 
+def send_discord_notification_direct(username, level_name, progress, video_url):
+    """Direct Discord notification without external file"""
+    import requests
+    import os
+    
+    webhook_url = os.environ.get('DISCORD_WEBHOOK_URL')
+    website_url = os.environ.get('WEBSITE_URL', 'http://localhost:10000')
+    
+    if not webhook_url:
+        print("❌ No Discord webhook URL configured")
+        return
+    
+    print(f"🔔 Sending direct Discord notification for {username}")
+    
+    embed = {
+        "title": "📝 New Record Submission",
+        "description": "A new record has been submitted for review",
+        "color": 16766020,  # Yellow color
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "fields": [
+            {"name": "👤 Player", "value": username, "inline": True},
+            {"name": "🎮 Level", "value": level_name, "inline": True},
+            {"name": "📊 Progress", "value": f"{progress}%", "inline": True},
+        ],
+        "footer": {"text": "RTL Admin Notification System"}
+    }
+    
+    if video_url:
+        embed["fields"].append({
+            "name": "🎥 Video",
+            "value": f"[Watch Video]({video_url})",
+            "inline": False
+        })
+    
+    embed["fields"].append({
+        "name": "⚙️ Admin Panel",
+        "value": f"[Review Submission]({website_url}/admin)",
+        "inline": False
+    })
+    
+    try:
+        response = requests.post(
+            webhook_url,
+            json={"embeds": [embed]},
+            headers={"Content-Type": "application/json"},
+            timeout=10
+        )
+        
+        print(f"📡 Discord API response: {response.status_code}")
+        
+        if response.status_code == 204:
+            print("✅ Direct Discord notification sent successfully")
+        else:
+            print(f"❌ Discord webhook failed: {response.status_code} - {response.text}")
+            
+    except Exception as e:
+        print(f"❌ Direct Discord notification error: {e}")
+        import traceback
+        traceback.print_exc()
+
 print("Setting up routes...")
 
 @app.route('/test')
@@ -202,12 +277,34 @@ def test():
 @app.route('/test_discord')
 def test_discord():
     """Test route to check Discord integration"""
+    import os
+    
+    # Check environment variables
+    webhook_url = os.environ.get('DISCORD_WEBHOOK_URL')
+    website_url = os.environ.get('WEBSITE_URL')
+    
+    result = f"""
+    <h1>Discord Integration Test</h1>
+    <p><strong>Discord Available:</strong> {DISCORD_AVAILABLE}</p>
+    <p><strong>Webhook URL:</strong> {'✅ Set' if webhook_url else '❌ Missing'}</p>
+    <p><strong>Website URL:</strong> {website_url or '❌ Missing'}</p>
+    """
+    
+    if webhook_url:
+        result += f"<p><strong>Webhook (first 50 chars):</strong> {webhook_url[:50]}...</p>"
+    
     try:
-        from discord_integration import notify_record_submitted
-        notify_record_submitted('TestUser', 'Test Level', 99, 'https://youtube.com/test')
-        return "<h1>✅ Discord test sent! Check your Discord channel.</h1>"
+        if DISCORD_AVAILABLE:
+            notify_record_submitted('TestUser', 'Test Level', 99, 'https://youtube.com/test')
+            result += "<p>✅ Discord test notification sent!</p>"
+        else:
+            result += "<p>❌ Discord integration not available</p>"
     except Exception as e:
-        return f"<h1>❌ Discord test failed: {str(e)}</h1>"
+        result += f"<p>❌ Discord test failed: {str(e)}</p>"
+        import traceback
+        result += f"<pre>{traceback.format_exc()}</pre>"
+    
+    return result
 
 @app.route('/')
 def index():
@@ -518,7 +615,14 @@ def submit_record():
             user = mongo_db.users.find_one({"_id": session['user_id']})
             username = user['username'] if user else 'Unknown'
             print(f"🔔 Sending Discord notification for {username} - {level['name']} - {progress}%")
-            notify_record_submitted(username, level['name'], progress, video_url)
+            
+            # Try the imported function first
+            if DISCORD_AVAILABLE:
+                notify_record_submitted(username, level['name'], progress, video_url)
+            else:
+                # Fallback: send Discord notification directly
+                send_discord_notification_direct(username, level['name'], progress, video_url)
+            
             print(f"✅ Discord notification sent successfully")
         except Exception as e:
             print(f"❌ Discord notification error: {e}")
