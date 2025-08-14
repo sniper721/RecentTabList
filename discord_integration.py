@@ -4,8 +4,7 @@ Discord integration for Flask app
 Sends notifications without blocking the main app
 """
 
-import asyncio
-import aiohttp
+import requests
 import os
 from dotenv import load_dotenv
 import json
@@ -22,29 +21,30 @@ class DiscordNotifier:
     def __init__(self):
         self.webhook_url = DISCORD_WEBHOOK_URL
         
-    async def send_webhook(self, embed_data):
+    def send_webhook(self, embed_data):
         """Send webhook notification to Discord"""
         if not self.webhook_url:
             print("❌ No Discord webhook URL configured")
             return False
             
         try:
-            async with aiohttp.ClientSession() as session:
-                payload = {
-                    "embeds": [embed_data]
-                }
-                
-                async with session.post(
-                    self.webhook_url,
-                    json=payload,
-                    headers={"Content-Type": "application/json"}
-                ) as response:
-                    if response.status == 204:
-                        print("✅ Discord notification sent successfully")
-                        return True
-                    else:
-                        print(f"❌ Discord webhook failed with status {response.status}")
-                        return False
+            payload = {
+                "embeds": [embed_data]
+            }
+            
+            response = requests.post(
+                self.webhook_url,
+                json=payload,
+                headers={"Content-Type": "application/json"},
+                timeout=10
+            )
+            
+            if response.status_code == 204:
+                print("✅ Discord notification sent successfully")
+                return True
+            else:
+                print(f"❌ Discord webhook failed with status {response.status_code}")
+                return False
                         
         except Exception as e:
             print(f"❌ Error sending Discord webhook: {e}")
@@ -95,14 +95,11 @@ class DiscordNotifier:
             "inline": False
         })
         
-        # Run async function in thread
+        # Send webhook directly (no async needed)
         try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(self.send_webhook(embed))
-            loop.close()
+            self.send_webhook(embed)
         except Exception as e:
-            print(f"❌ Error in Discord notification thread: {e}")
+            print(f"❌ Error in Discord notification: {e}")
     
     def send_record_approved_notification(self, record_data):
         """Send notification for approved record (non-blocking)"""
@@ -138,12 +135,9 @@ class DiscordNotifier:
             }
         }
         
-        # Run async function in thread
+        # Send webhook directly (no async needed)
         try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(self.send_webhook(embed))
-            loop.close()
+            self.send_webhook(embed)
         except Exception as e:
             print(f"❌ Error in Discord approval notification: {e}")
     
@@ -183,12 +177,9 @@ class DiscordNotifier:
                 "inline": False
             })
         
-        # Run async function in thread
+        # Send webhook directly (no async needed)
         try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(self.send_webhook(embed))
-            loop.close()
+            self.send_webhook(embed)
         except Exception as e:
             print(f"❌ Error in Discord rejection notification: {e}")
 
