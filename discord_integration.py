@@ -27,6 +27,9 @@ class DiscordNotifier:
             print("❌ No Discord webhook URL configured")
             return False
             
+        print(f"🔔 Sending Discord webhook to: {self.webhook_url[:50]}...")
+        print(f"📝 Embed title: {embed_data.get('title', 'No title')}")
+            
         try:
             payload = {
                 "embeds": [embed_data]
@@ -39,15 +42,20 @@ class DiscordNotifier:
                 timeout=10
             )
             
+            print(f"📡 Discord API response: {response.status_code}")
+            
             if response.status_code == 204:
                 print("✅ Discord notification sent successfully")
                 return True
             else:
                 print(f"❌ Discord webhook failed with status {response.status_code}")
+                print(f"Response text: {response.text}")
                 return False
                         
         except Exception as e:
             print(f"❌ Error sending Discord webhook: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def send_record_notification(self, record_data):

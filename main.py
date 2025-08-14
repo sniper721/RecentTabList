@@ -507,9 +507,13 @@ def submit_record():
         try:
             user = mongo_db.users.find_one({"_id": session['user_id']})
             username = user['username'] if user else 'Unknown'
+            print(f"🔔 Sending Discord notification for {username} - {level['name']} - {progress}%")
             notify_record_submitted(username, level['name'], progress, video_url)
+            print(f"✅ Discord notification sent successfully")
         except Exception as e:
-            print(f"Discord notification error: {e}")
+            print(f"❌ Discord notification error: {e}")
+            import traceback
+            traceback.print_exc()
         
         flash('Record submitted successfully! It will be reviewed by moderators.', 'success')
         return redirect(url_for('profile'))
