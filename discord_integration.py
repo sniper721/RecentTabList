@@ -203,14 +203,15 @@ def notify_record_submitted(username, level_name, progress, video_url):
         'video_url': video_url
     }
     
-    # Run in background thread to avoid blocking Flask
-    import threading
-    thread = threading.Thread(
-        target=discord_notifier.send_record_notification,
-        args=(record_data,)
-    )
-    thread.daemon = True
-    thread.start()
+    print(f"🔔 notify_record_submitted called for {username}")
+    
+    # Send directly instead of using threads (more reliable)
+    try:
+        discord_notifier.send_record_notification(record_data)
+    except Exception as e:
+        print(f"❌ Error in notify_record_submitted: {e}")
+        import traceback
+        traceback.print_exc()
 
 def notify_record_approved(username, level_name, progress, points_earned):
     """Convenience function to notify about approved record"""
@@ -221,14 +222,15 @@ def notify_record_approved(username, level_name, progress, points_earned):
         'points_earned': points_earned
     }
     
-    # Run in background thread to avoid blocking Flask
-    import threading
-    thread = threading.Thread(
-        target=discord_notifier.send_record_approved_notification,
-        args=(record_data,)
-    )
-    thread.daemon = True
-    thread.start()
+    print(f"🔔 notify_record_approved called for {username}")
+    
+    # Send directly instead of using threads (more reliable)
+    try:
+        discord_notifier.send_record_approved_notification(record_data)
+    except Exception as e:
+        print(f"❌ Error in notify_record_approved: {e}")
+        import traceback
+        traceback.print_exc()
 
 def notify_record_rejected(username, level_name, progress, reason=None):
     """Convenience function to notify about rejected record"""
@@ -238,11 +240,12 @@ def notify_record_rejected(username, level_name, progress, reason=None):
         'progress': progress
     }
     
-    # Run in background thread to avoid blocking Flask
-    import threading
-    thread = threading.Thread(
-        target=discord_notifier.send_record_rejected_notification,
-        args=(record_data, reason)
-    )
-    thread.daemon = True
-    thread.start()
+    print(f"🔔 notify_record_rejected called for {username}")
+    
+    # Send directly instead of using threads (more reliable)
+    try:
+        discord_notifier.send_record_rejected_notification(record_data, reason)
+    except Exception as e:
+        print(f"❌ Error in notify_record_rejected: {e}")
+        import traceback
+        traceback.print_exc()

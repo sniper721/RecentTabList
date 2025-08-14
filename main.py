@@ -199,6 +199,16 @@ print("Setting up routes...")
 def test():
     return "<h1>Test route works!</h1>"
 
+@app.route('/test_discord')
+def test_discord():
+    """Test route to check Discord integration"""
+    try:
+        from discord_integration import notify_record_submitted
+        notify_record_submitted('TestUser', 'Test Level', 99, 'https://youtube.com/test')
+        return "<h1>✅ Discord test sent! Check your Discord channel.</h1>"
+    except Exception as e:
+        return f"<h1>❌ Discord test failed: {str(e)}</h1>"
+
 @app.route('/')
 def index():
     print("Index route accessed")
