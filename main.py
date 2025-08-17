@@ -2223,6 +2223,496 @@ def future_list():
     
     return render_template('future.html', levels=future_levels)
 
+@app.route('/changelog')
+def changelog():
+    """Website changelog page"""
+    # You can store changelog entries in database or just hardcode them
+    changelog_entries = [
+        {
+            "version": "v2.1.0",
+            "date": "2024-12-19",
+            "title": "🚀 Major Feature Update",
+            "changes": [
+                "✨ Added Future List system with admin controls",
+                "⚙️ Complete user settings overhaul with themes and preferences", 
+                "👤 Public profile pages with QR code sharing",
+                "📱 Real-time username availability checking",
+                "🎨 Enhanced admin settings panel with system monitoring",
+                "💾 User data export functionality",
+                "🔒 Privacy controls for profiles",
+                "📊 Advanced user statistics and completion tracking",
+                "🎯 Improved UI/UX with smooth animations",
+                "⚡ Performance optimizations and caching improvements"
+            ]
+        },
+        {
+            "version": "v2.0.0", 
+            "date": "2024-12-18",
+            "title": "🔥 Speed Revolution",
+            "changes": [
+                "⚡ Complete speed overhaul - 10x faster loading",
+                "💾 Smart caching system implementation",
+                "📄 Pagination for better performance (10 levels per page)",
+                "🖼️ Lazy loading for images",
+                "🗄️ Database query optimization",
+                "🚀 Virtual scrolling option for ultra-fast browsing",
+                "🔧 Admin tools for cache management",
+                "📈 Performance monitoring and debugging tools"
+            ]
+        },
+        {
+            "version": "v1.5.0",
+            "date": "2024-12-17", 
+            "title": "🎮 Enhanced User Experience",
+            "changes": [
+                "👥 User registration and authentication system",
+                "🏆 Record submission and approval workflow",
+                "📊 User profiles with points and statistics",
+                "🔐 Admin panel for level and user management",
+                "📱 Mobile-responsive design improvements",
+                "🎨 Dark/light theme toggle",
+                "🔍 Search and filtering capabilities"
+            ]
+        },
+        {
+            "version": "v1.0.0",
+            "date": "2024-12-15",
+            "title": "🎉 Initial Release", 
+            "changes": [
+                "📋 Basic level listing functionality",
+                "🗄️ MongoDB database integration",
+                "🎯 Level difficulty and points system",
+                "📜 Legacy list support",
+                "🕰️ Time machine feature",
+                "🎥 Video integration for levels",
+                "🖼️ Thumbnail support"
+            ]
+        }
+    ]
+    
+    return render_template('changelog.html', changelog=changelog_entries)
+
+@app.route('/stats')
+def stats_viewer():
+    """Comprehensive statistics page like demon list stats"""
+    try:
+        # Level Statistics
+        total_levels = mongo_db.levels.count_documents({})
+        main_levels = mongo_db.levels.count_documents({"is_legacy": False})
+        legacy_levels = mongo_db.levels.count_documents({"is_legacy": True})
+        
+        # User Statistics
+        total_users = mongo_db.users.count_documents({})
+        active_users = mongo_db.users.count_documents({"points": {"$gt": 0}})
+        admin_users = mongo_db.users.count_documents({"is_admin": True})
+        
+        # Record Statistics
+        total_records = mongo_db.records.count_documents({})
+        approved_records = mongo_db.records.count_documents({"status": "approved"})
+        pending_records = mongo_db.records.count_documents({"status": "pending"})
+        rejected_records = mongo_db.records.count_documents({"status": "rejected"})
+        
+        # Completion Statistics
+        completed_records = mongo_db.records.count_documents({"status": "approved", "progress": 100})
+        partial_records = mongo_db.records.count_documents({"status": "approved", "progress": {"$lt": 100}})
+        
+        # Top Players (by points)
+        top_players = list(mongo_db.users.find(
+            {"points": {"$gt": 0}},
+            {"username": 1, "points": 1, "nickname": 1}
+        ).sort("points", -1).limit(10))
+        
+        # Most Active Levels (by record count)
+        most_active_levels = list(mongo_db.records.aggregate([
+            {"$match": {"status": "approved"}},
+            {"$group": {"_id": "$level_id", "record_count": {"$sum": 1}}},
+            {"$lookup": {
+                "from": "levels",
+                "localField": "_id",
+                "foreignField": "_id",
+                "as": "level"
+            }},
+            {"$unwind": "$level"},
+            {"$sort": {"record_count": -1}},
+            {"$limit": 10}
+        ]))
+        
+        # Recent Activity (last 10 approved records)
+        recent_activity = list(mongo_db.records.aggregate([
+            {"$match": {"status": "approved"}},
+            {"$lookup": {
+                "from": "users",
+                "localField": "user_id",
+                "foreignField": "_id",
+                "as": "user"
+            }},
+            {"$lookup": {
+                "from": "levels",
+                "localField": "level_id",
+                "foreignField": "_id",
+                "as": "level"
+            }},
+            {"$unwind": "$user"},
+            {"$unwind": "$level"},
+            {"$sort": {"date_submitted": -1}},
+            {"$limit": 10}
+        ]))
+        
+        # Difficulty Distribution
+        difficulty_distribution = list(mongo_db.levels.aggregate([
+            {"$group": {
+                "_id": {"$round": "$difficulty"},
+                "count": {"$sum": 1}
+            }},
+            {"$sort": {"_id": 1}}
+        ]))
+        
+        # Monthly Registration Stats (last 6 months)
+        from datetime import datetime, timedelta
+        six_months_ago = datetime.now() - timedelta(days=180)
+        monthly_registrations = list(mongo_db.users.aggregate([
+            {"$match": {"date_joined": {"$gte": six_months_ago}}},
+            {"$group": {
+                "_id": {
+                    "year": {"$year": "$date_joined"},
+                    "month": {"$month": "$date_joined"}
+                },
+                "count": {"$sum": 1}
+            }},
+            {"$sort": {"_id.year": 1, "_id.month": 1}}
+        ]))
+        
+        # Calculate percentages
+        approval_rate = (approved_records / total_records * 100) if total_records > 0 else 0
+        completion_rate = (completed_records / approved_records * 100) if approved_records > 0 else 0
+        active_user_rate = (active_users / total_users * 100) if total_users > 0 else 0
+        
+        stats_data = {
+            'levels': {
+                'total': total_levels,
+                'main': main_levels,
+                'legacy': legacy_levels
+            },
+            'users': {
+                'total': total_users,
+                'active': active_users,
+                'admins': admin_users,
+                'active_rate': round(active_user_rate, 1)
+            },
+            'records': {
+                'total': total_records,
+                'approved': approved_records,
+                'pending': pending_records,
+                'rejected': rejected_records,
+                'completed': completed_records,
+                'partial': partial_records,
+                'approval_rate': round(approval_rate, 1),
+                'completion_rate': round(completion_rate, 1)
+            },
+            'top_players': top_players,
+            'most_active_levels': most_active_levels,
+            'recent_activity': recent_activity,
+            'difficulty_distribution': difficulty_distribution,
+            'monthly_registrations': monthly_registrations
+        }
+        
+        return render_template('stats.html', stats=stats_data)
+        
+    except Exception as e:
+        flash(f'Error loading statistics: {e}', 'danger')
+        return redirect(url_for('index'))
+
+@app.route('/stats/overview')
+def stats_overview():
+    """Overview statistics page"""
+    try:
+        # Basic counts
+        total_levels = mongo_db.levels.count_documents({})
+        main_levels = mongo_db.levels.count_documents({"is_legacy": False})
+        legacy_levels = mongo_db.levels.count_documents({"is_legacy": True})
+        total_users = mongo_db.users.count_documents({})
+        active_users = mongo_db.users.count_documents({"points": {"$gt": 0}})
+        total_records = mongo_db.records.count_documents({})
+        approved_records = mongo_db.records.count_documents({"status": "approved"})
+        
+        # Calculate rates
+        approval_rate = (approved_records / total_records * 100) if total_records > 0 else 0
+        active_user_rate = (active_users / total_users * 100) if total_users > 0 else 0
+        
+        # Monthly growth (last 6 months)
+        from datetime import datetime, timedelta
+        six_months_ago = datetime.now() - timedelta(days=180)
+        monthly_stats = list(mongo_db.users.aggregate([
+            {"$match": {"date_joined": {"$gte": six_months_ago}}},
+            {"$group": {
+                "_id": {
+                    "year": {"$year": "$date_joined"},
+                    "month": {"$month": "$date_joined"}
+                },
+                "users": {"$sum": 1}
+            }},
+            {"$sort": {"_id.year": 1, "_id.month": 1}}
+        ]))
+        
+        stats_data = {
+            'levels': {'total': total_levels, 'main': main_levels, 'legacy': legacy_levels},
+            'users': {'total': total_users, 'active': active_users, 'active_rate': round(active_user_rate, 1)},
+            'records': {'total': total_records, 'approved': approved_records, 'approval_rate': round(approval_rate, 1)},
+            'monthly_growth': monthly_stats
+        }
+        
+        return render_template('stats/overview.html', stats=stats_data)
+    except Exception as e:
+        flash(f'Error loading overview: {e}', 'danger')
+        return redirect(url_for('index'))
+
+@app.route('/stats/players')
+def stats_players():
+    """Player statistics page"""
+    try:
+        # Top players by points
+        top_players = list(mongo_db.users.find(
+            {"points": {"$gt": 0}},
+            {"username": 1, "points": 1, "nickname": 1, "date_joined": 1}
+        ).sort("points", -1).limit(50))
+        
+        # Most active players (by record count)
+        most_active = list(mongo_db.records.aggregate([
+            {"$match": {"status": "approved"}},
+            {"$group": {"_id": "$user_id", "record_count": {"$sum": 1}}},
+            {"$lookup": {
+                "from": "users",
+                "localField": "_id",
+                "foreignField": "_id",
+                "as": "user"
+            }},
+            {"$unwind": "$user"},
+            {"$sort": {"record_count": -1}},
+            {"$limit": 20}
+        ]))
+        
+        # Player distribution by points
+        point_ranges = [
+            {"range": "0", "min": 0, "max": 0},
+            {"range": "1-100", "min": 1, "max": 100},
+            {"range": "101-500", "min": 101, "max": 500},
+            {"range": "501-1000", "min": 501, "max": 1000},
+            {"range": "1000+", "min": 1001, "max": 999999}
+        ]
+        
+        for range_data in point_ranges:
+            if range_data["max"] == 0:
+                count = mongo_db.users.count_documents({"points": 0})
+            elif range_data["max"] == 999999:
+                count = mongo_db.users.count_documents({"points": {"$gte": range_data["min"]}})
+            else:
+                count = mongo_db.users.count_documents({
+                    "points": {"$gte": range_data["min"], "$lte": range_data["max"]}
+                })
+            range_data["count"] = count
+        
+        stats_data = {
+            'top_players': top_players,
+            'most_active': most_active,
+            'point_distribution': point_ranges
+        }
+        
+        return render_template('stats/players.html', stats=stats_data)
+    except Exception as e:
+        flash(f'Error loading player stats: {e}', 'danger')
+        return redirect(url_for('index'))
+
+@app.route('/stats/levels')
+def stats_levels():
+    """Level statistics page"""
+    try:
+        # Most popular levels (by record count)
+        popular_levels = list(mongo_db.records.aggregate([
+            {"$match": {"status": "approved"}},
+            {"$group": {"_id": "$level_id", "record_count": {"$sum": 1}}},
+            {"$lookup": {
+                "from": "levels",
+                "localField": "_id",
+                "foreignField": "_id",
+                "as": "level"
+            }},
+            {"$unwind": "$level"},
+            {"$sort": {"record_count": -1}},
+            {"$limit": 20}
+        ]))
+        
+        # Difficulty distribution
+        difficulty_stats = list(mongo_db.levels.aggregate([
+            {"$group": {
+                "_id": {"$round": "$difficulty"},
+                "count": {"$sum": 1},
+                "avg_points": {"$avg": "$points"}
+            }},
+            {"$sort": {"_id": 1}}
+        ]))
+        
+        # Creator statistics
+        creator_stats = list(mongo_db.levels.aggregate([
+            {"$group": {
+                "_id": "$creator",
+                "level_count": {"$sum": 1},
+                "total_points": {"$sum": "$points"}
+            }},
+            {"$sort": {"level_count": -1}},
+            {"$limit": 15}
+        ]))
+        
+        # Verifier statistics
+        verifier_stats = list(mongo_db.levels.aggregate([
+            {"$group": {
+                "_id": "$verifier",
+                "level_count": {"$sum": 1}
+            }},
+            {"$sort": {"level_count": -1}},
+            {"$limit": 15}
+        ]))
+        
+        stats_data = {
+            'popular_levels': popular_levels,
+            'difficulty_distribution': difficulty_stats,
+            'top_creators': creator_stats,
+            'top_verifiers': verifier_stats
+        }
+        
+        return render_template('stats/levels.html', stats=stats_data)
+    except Exception as e:
+        flash(f'Error loading level stats: {e}', 'danger')
+        return redirect(url_for('index'))
+
+@app.route('/stats/records')
+def stats_records():
+    """Record statistics page"""
+    try:
+        # Record status breakdown
+        total_records = mongo_db.records.count_documents({})
+        approved_records = mongo_db.records.count_documents({"status": "approved"})
+        pending_records = mongo_db.records.count_documents({"status": "pending"})
+        rejected_records = mongo_db.records.count_documents({"status": "rejected"})
+        
+        # Completion statistics
+        completed_records = mongo_db.records.count_documents({"status": "approved", "progress": 100})
+        partial_records = mongo_db.records.count_documents({"status": "approved", "progress": {"$lt": 100}})
+        
+        # Progress distribution
+        progress_ranges = [
+            {"range": "1-25%", "min": 1, "max": 25},
+            {"range": "26-50%", "min": 26, "max": 50},
+            {"range": "51-75%", "min": 51, "max": 75},
+            {"range": "76-99%", "min": 76, "max": 99},
+            {"range": "100%", "min": 100, "max": 100}
+        ]
+        
+        for range_data in progress_ranges:
+            count = mongo_db.records.count_documents({
+                "status": "approved",
+                "progress": {"$gte": range_data["min"], "$lte": range_data["max"]}
+            })
+            range_data["count"] = count
+        
+        # Daily submission trends (last 30 days)
+        from datetime import datetime, timedelta
+        thirty_days_ago = datetime.now() - timedelta(days=30)
+        daily_submissions = list(mongo_db.records.aggregate([
+            {"$match": {"date_submitted": {"$gte": thirty_days_ago}}},
+            {"$group": {
+                "_id": {
+                    "year": {"$year": "$date_submitted"},
+                    "month": {"$month": "$date_submitted"},
+                    "day": {"$dayOfMonth": "$date_submitted"}
+                },
+                "count": {"$sum": 1}
+            }},
+            {"$sort": {"_id.year": 1, "_id.month": 1, "_id.day": 1}}
+        ]))
+        
+        stats_data = {
+            'total': total_records,
+            'approved': approved_records,
+            'pending': pending_records,
+            'rejected': rejected_records,
+            'completed': completed_records,
+            'partial': partial_records,
+            'progress_distribution': progress_ranges,
+            'daily_submissions': daily_submissions,
+            'approval_rate': round((approved_records / total_records * 100) if total_records > 0 else 0, 1),
+            'completion_rate': round((completed_records / approved_records * 100) if approved_records > 0 else 0, 1)
+        }
+        
+        return render_template('stats/records.html', stats=stats_data)
+    except Exception as e:
+        flash(f'Error loading record stats: {e}', 'danger')
+        return redirect(url_for('index'))
+
+@app.route('/stats/activity')
+def stats_activity():
+    """Activity statistics page"""
+    try:
+        # Recent approved records
+        recent_approved = list(mongo_db.records.aggregate([
+            {"$match": {"status": "approved"}},
+            {"$lookup": {
+                "from": "users",
+                "localField": "user_id",
+                "foreignField": "_id",
+                "as": "user"
+            }},
+            {"$lookup": {
+                "from": "levels",
+                "localField": "level_id",
+                "foreignField": "_id",
+                "as": "level"
+            }},
+            {"$unwind": "$user"},
+            {"$unwind": "$level"},
+            {"$sort": {"date_submitted": -1}},
+            {"$limit": 50}
+        ]))
+        
+        # Recent registrations
+        recent_users = list(mongo_db.users.find(
+            {},
+            {"username": 1, "nickname": 1, "date_joined": 1, "points": 1}
+        ).sort("date_joined", -1).limit(20))
+        
+        # Pending records for admins
+        pending_records = []
+        if session.get('is_admin'):
+            pending_records = list(mongo_db.records.aggregate([
+                {"$match": {"status": "pending"}},
+                {"$lookup": {
+                    "from": "users",
+                    "localField": "user_id",
+                    "foreignField": "_id",
+                    "as": "user"
+                }},
+                {"$lookup": {
+                    "from": "levels",
+                    "localField": "level_id",
+                    "foreignField": "_id",
+                    "as": "level"
+                }},
+                {"$unwind": "$user"},
+                {"$unwind": "$level"},
+                {"$sort": {"date_submitted": -1}},
+                {"$limit": 20}
+            ]))
+        
+        stats_data = {
+            'recent_approved': recent_approved,
+            'recent_users': recent_users,
+            'pending_records': pending_records
+        }
+        
+        return render_template('stats/activity.html', stats=stats_data)
+    except Exception as e:
+        flash(f'Error loading activity stats: {e}', 'danger')
+        return redirect(url_for('index'))
+
 @app.route('/admin/toggle_admin/<int:user_id>', methods=['POST'])
 def admin_toggle_admin(user_id):
     if 'user_id' not in session or not session.get('is_admin'):

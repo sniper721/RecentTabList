@@ -1,0 +1,172 @@
+{% extends "layout.html" %}
+
+{% block title %}Records - Statistics{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>📋 Record Statistics</h1>
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('stats_overview') }}" class="btn btn-outline-secondary">📈 Overview</a>
+                    <a href="{{ url_for('stats_players') }}" class="btn btn-outline-primary">🏆 Players</a>
+                    <a href="{{ url_for('stats_levels') }}" class="btn btn-outline-success">🎮 Levels</a>
+                    <a href="{{ url_for('stats_activity') }}" class="btn btn-outline-warning">🕒 Activity</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overview Cards -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <div class="display-6 mb-2">{{ stats.approved }}</div>
+                    <h6>Approved Records</h6>
+                    <small>{{ stats.approval_rate }}% approval rate</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body text-center">
+                    <div class="display-6 mb-2">{{ stats.pending }}</div>
+                    <h6>Pending Records</h6>
+                    <small>Awaiting review</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center">
+                    <div class="display-6 mb-2">{{ stats.rejected }}</div>
+                    <h6>Rejected Records</h6>
+                    <small>Not approved</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <div class="display-6 mb-2">{{ stats.completed }}</div>
+                    <h6>100% Completions</h6>
+                    <small>{{ stats.completion_rate }}% completion rate</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Record Status Breakdown -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">📊 Status Breakdown</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>Approved</span>
+                            <span class="text-success"><strong>{{ stats.approved }}</strong></span>
+                        </div>
+                        <div class="progress mb-2">
+                            <div class="progress-bar bg-success" style="width: {{ (stats.approved / stats.total * 100) if stats.total > 0 else 0 }}%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>Pending</span>
+                            <span class="text-warning"><strong>{{ stats.pending }}</strong></span>
+                        </div>
+                        <div class="progress mb-2">
+                            <div class="progress-bar bg-warning" style="width: {{ (stats.pending / stats.total * 100) if stats.total > 0 else 0 }}%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>Rejected</span>
+                            <span class="text-danger"><strong>{{ stats.rejected }}</strong></span>
+                        </div>
+                        <div class="progress mb-2">
+                            <div class="progress-bar bg-danger" style="width: {{ (stats.rejected / stats.total * 100) if stats.total > 0 else 0 }}%"></div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    <div class="text-center">
+                        <strong>Total: {{ stats.total }} records</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Distribution -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">📈 Progress Distribution</h5>
+                </div>
+                <div class="card-body">
+                    {% if stats.progress_distribution %}
+                        {% for range in stats.progress_distribution %}
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between">
+                                <span>{{ range.range }}</span>
+                                <span><strong>{{ range.count }}</strong></span>
+                            </div>
+                            <div class="progress" style="height: 8px;">
+                                {% set max_count = stats.progress_distribution|map(attribute='count')|max %}
+                                <div class="progress-bar {% if range.range == '100%' %}bg-success{% else %}bg-info{% endif %}" 
+                                     style="width: {{ (range.count / max_count * 100) if max_count > 0 else 0 }}%"></div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <div class="text-muted">No progress data</div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Daily Submissions Chart -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-gradient text-white" style="background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);">
+                    <h5 class="mb-0">📅 Daily Submissions (Last 30 Days)</h5>
+                </div>
+                <div class="card-body">
+                    {% if stats.daily_submissions %}
+                        <div class="row">
+                            {% for day in stats.daily_submissions[-10:] %}
+                            <div class="col-md-2 col-sm-4 col-6 mb-3">
+                                <div class="text-center">
+                                    <div class="h5 text-primary">{{ day.count }}</div>
+                                    <small class="text-muted">{{ day._id.month }}/{{ day._id.day }}</small>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <div class="text-muted">No submission data available</div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center mt-4">
+        <a href="{{ url_for('stats_overview') }}" class="btn btn-primary">← Back to Overview</a>
+        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">🏠 Main List</a>
+    </div>
+</div>
+{% endblock %}
