@@ -1,0 +1,237 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ user.nickname or user.username }} - Profile{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <!-- Profile Header -->
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-auto">
+                            {% if user.avatar_url %}
+                                <img src="{{ user.avatar_url }}" alt="{{ user.username }}" 
+                                     class="rounded-circle" width="80" height="80" style="object-fit: cover;">
+                            {% else %}
+                                <div class="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center text-white" 
+                                     style="width: 80px; height: 80px; font-size: 32px;">
+                                    {{ user.username[0].upper() }}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="col">
+                            <h2 class="mb-1">{{ user.nickname or user.username }}</h2>
+                            <p class="text-muted mb-1">@{{ user.username }}</p>
+                            {% if user.bio %}
+                                <p class="mb-2">{{ user.bio }}</p>
+                            {% endif %}
+                            <div class="d-flex gap-3">
+                                <span class="badge bg-primary">{{ user.points or 0 }} Points</span>
+                                {% if user.is_admin %}
+                                    <span class="badge bg-success">Administrator</span>
+                                {% endif %}
+                                <small class="text-muted">Member since {{ user.date_joined.strftime('%B %Y') if user.date_joined else 'Unknown' }}</small>
+                            </div>
+                        </div>
+                        {% if user._id == session.get('user_id') %}
+                        <div class="col-auto">
+                            <a href="{{ url_for('user_settings') }}" class="btn btn-outline-primary">
+                                ⚙️ Edit Profile
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Records -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">🏆 Records ({{ records|length }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if records %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Level</th>
+                                        <th>Progress</th>
+                                        <th>Points</th>
+                                        <th>Date</th>
+                                        <th>Video</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for record in records %}
+                                    <tr>
+                                        <td>
+                                            <a href="{{ url_for('level_detail', level_id=record.level._id) }}" class="text-decoration-none">
+                                                <strong>{{ record.level.name }}</strong>
+                                            </a>
+                                            <br>
+                                            <small class="text-muted">by {{ record.level.creator }}</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-{% if record.progress == 100 %}success{% else %}warning{% endif %}">
+                                                {{ record.progress }}%
+                                            </span>
+                                        </td>
+                                        <td>
+                                            {% set points = (record.level.points * (record.progress / 100)) if record.progress < 100 else record.level.points %}
+                                            <strong>{{ points|round|int }}</strong>
+                                        </td>
+                                        <td>
+                                            <small>{{ record.date_submitted.strftime('%b %d, %Y') if record.date_submitted else 'Unknown' }}</small>
+                                        </td>
+                                        <td>
+                                            {% if record.video_url %}
+                                                <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                    📹 Watch
+                                                </a>
+                                            {% else %}
+                                                <span class="text-muted">No video</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <div class="mb-3" style="font-size: 3rem;">🎮</div>
+                            <h5>No Records Yet</h5>
+                            <p class="text-muted">{{ user.nickname or user.username }} hasn't submitted any records yet.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">📊 Statistics</h5>
+                </div>
+                <div class="card-body">
+                    {% set total_records = records|length %}
+                    {% set completed_records = records|selectattr('progress', 'equalto', 100)|list|length %}
+                    {% set total_points = user.points or 0 %}
+                    
+                    <div class="row text-center">
+                        <div class="col-6 mb-3">
+                            <div class="h4 text-primary">{{ total_records }}</div>
+                            <small class="text-muted">Total Records</small>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <div class="h4 text-success">{{ completed_records }}</div>
+                            <small class="text-muted">Completed</small>
+                        </div>
+                        <div class="col-12">
+                            <div class="h3 text-warning">{{ total_points }}</div>
+                            <small class="text-muted">Total Points</small>
+                        </div>
+                    </div>
+                    
+                    {% if total_records > 0 %}
+                    <hr>
+                    <div class="mb-2">
+                        <small class="text-muted">Completion Rate</small>
+                        <div class="progress">
+                            {% set completion_rate = (completed_records / total_records * 100)|round|int %}
+                            <div class="progress-bar bg-success" style="width: {{ completion_rate }}%">
+                                {{ completion_rate }}%
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">🔗 Share Profile</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-primary" onclick="copyProfileLink()">
+                            📋 Copy Link
+                        </button>
+                        <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#shareQRModal">
+                            📱 QR Code
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Share QR Modal -->
+<div class="modal fade" id="shareQRModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">📱 Share Profile</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div id="share-qr-container">
+                    <div class="spinner-border text-primary" role="status"></div>
+                </div>
+                <div class="mt-3">
+                    <small class="text-muted">{{ request.url }}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyProfileLink() {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url).then(() => {
+        // Show success feedback
+        const btn = event.target;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '✅ Copied!';
+        btn.classList.add('btn-success');
+        btn.classList.remove('btn-outline-primary');
+        
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline-primary');
+        }, 2000);
+    });
+}
+
+// Generate QR code for sharing
+document.getElementById('shareQRModal').addEventListener('show.bs.modal', function() {
+    const container = document.getElementById('share-qr-container');
+    const username = '{{ user.username }}';
+    
+    fetch(`/api/qr/${username}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                container.innerHTML = `<img src="${data.qr_code}" alt="Profile QR Code" class="img-fluid" style="max-width: 200px;">`;
+            } else {
+                container.innerHTML = `<div class="alert alert-danger">Error: ${data.error}</div>`;
+            }
+        })
+        .catch(error => {
+            container.innerHTML = '<div class="alert alert-danger">Failed to generate QR code</div>';
+        });
+});
+</script>
+{% endblock %}

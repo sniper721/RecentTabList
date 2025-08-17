@@ -27,6 +27,9 @@
                         <a class="nav-link {% if request.path == url_for('legacy') %}active{% endif %}" href="{{ url_for('legacy') }}">Legacy List</a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {% if request.path == url_for('future_list') %}active{% endif %}" href="{{ url_for('future_list') }}">🔮 Future</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link {% if request.path == url_for('timemachine') %}active{% endif %}" href="{{ url_for('timemachine') }}">Time Machine</a>
                     </li>
                     <li class="nav-item">
@@ -54,12 +57,14 @@
                             Account
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
-                            <li><a class="dropdown-item" href="{{ url_for('profile') }}">Profile</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('profile') }}">👤 Profile</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('user_settings') }}">⚙️ Settings</a></li>
                             {% if session.get('is_admin') %}
-                            <li><a class="dropdown-item" href="{{ url_for('admin') }}">Admin Panel</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin') }}">🔧 Admin Panel</a></li>
                             {% endif %}
                             <li><hr class="dropdown-divider"></li>
-                            <li><a class="dropdown-item" href="{{ url_for('logout') }}">Logout</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('logout') }}">🚪 Logout</a></li>
                         </ul>
                     </li>
                     {% else %}
