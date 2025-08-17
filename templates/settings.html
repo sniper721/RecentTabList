@@ -1,0 +1,516 @@
+{% extends "layout.html" %}
+
+{% block title %}Settings - {{ user.username }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>⚙️ Account Settings</h1>
+                <a href="{{ url_for('profile') }}" class="btn btn-secondary">← Back to Profile</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Profile Settings -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">👤 Profile Information</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('update_user_settings') }}">
+                        <input type="hidden" name="action" value="profile">
+                        
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="username" name="username" 
+                                   value="{{ user.username }}" required minlength="3">
+                            <div id="username-feedback" class="form-text">This is your unique identifier (3+ characters)</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="nickname" class="form-label">Display Name</label>
+                            <input type="text" class="form-control" id="nickname" name="nickname" 
+                                   value="{{ user.nickname or '' }}" placeholder="Optional display name">
+                            <div class="form-text">How others see your name (optional)</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" name="email" 
+                                   value="{{ user.email }}" required>
+                            <div class="form-text">Used for account recovery and notifications</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="bio" class="form-label">Bio</label>
+                            <textarea class="form-control" id="bio" name="bio" rows="3" 
+                                      placeholder="Tell us about yourself...">{{ user.bio or '' }}</textarea>
+                            <div class="form-text">Optional bio for your profile</div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary w-100">💾 Update Profile</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Avatar Settings -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">🖼️ Profile Picture</h5>
+                </div>
+                <div class="card-body text-center">
+                    <!-- Current Avatar -->
+                    <div class="mb-3">
+                        {% if user.avatar_url %}
+                            <img src="{{ user.avatar_url }}" alt="Current Avatar" 
+                                 class="rounded-circle" width="120" height="120" style="object-fit: cover;">
+                        {% else %}
+                            <div class="bg-secondary rounded-circle d-inline-flex align-items-center justify-content-center text-white" 
+                                 style="width: 120px; height: 120px; font-size: 48px;">
+                                {{ user.username[0].upper() }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <form method="POST" action="{{ url_for('update_user_settings') }}" enctype="multipart/form-data">
+                        <input type="hidden" name="action" value="avatar">
+                        
+                        <div class="mb-3">
+                            <label for="avatar" class="form-label">Upload New Picture</label>
+                            <input type="file" class="form-control" id="avatar" name="avatar" 
+                                   accept="image/*">
+                            <div class="form-text">JPG, PNG, GIF (max 5MB, will be resized to 200x200)</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="avatar_url" class="form-label">Or use URL</label>
+                            <input type="url" class="form-control" id="avatar_url" name="avatar_url" 
+                                   value="{{ user.avatar_url or '' }}" placeholder="https://example.com/image.jpg">
+                        </div>
+                        
+                        <button type="submit" class="btn btn-success w-100">📷 Update Picture</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Preferences -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">🎨 Preferences</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('update_user_settings') }}">
+                        <input type="hidden" name="action" value="preferences">
+                        
+                        <div class="mb-3">
+                            <label for="theme" class="form-label">Theme</label>
+                            <select class="form-select" id="theme" name="theme">
+                                <option value="light" {% if not user.theme or user.theme == 'light' %}selected{% endif %}>☀️ Light</option>
+                                <option value="dark" {% if user.theme == 'dark' %}selected{% endif %}>🌙 Dark</option>
+                                <option value="auto" {% if user.theme == 'auto' %}selected{% endif %}>🔄 Auto</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="timezone" class="form-label">Timezone</label>
+                            <select class="form-select" id="timezone" name="timezone">
+                                <option value="UTC" {% if not user.timezone or user.timezone == 'UTC' %}selected{% endif %}>UTC (Default)</option>
+                                <option value="US/Eastern" {% if user.timezone == 'US/Eastern' %}selected{% endif %}>Eastern Time</option>
+                                <option value="US/Central" {% if user.timezone == 'US/Central' %}selected{% endif %}>Central Time</option>
+                                <option value="US/Pacific" {% if user.timezone == 'US/Pacific' %}selected{% endif %}>Pacific Time</option>
+                                <option value="Europe/London" {% if user.timezone == 'Europe/London' %}selected{% endif %}>London</option>
+                                <option value="Europe/Berlin" {% if user.timezone == 'Europe/Berlin' %}selected{% endif %}>Berlin</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="email_notifications" 
+                                       name="email_notifications" {% if user.email_notifications %}checked{% endif %}>
+                                <label class="form-check-label" for="email_notifications">
+                                    📧 Email notifications for record updates
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="public_profile" 
+                                       name="public_profile" {% if user.public_profile != False %}checked{% endif %}>
+                                <label class="form-check-label" for="public_profile">
+                                    🌐 Make profile public
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-info w-100">💾 Save Preferences</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Password Settings -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">🔒 Change Password</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('update_user_settings') }}">
+                        <input type="hidden" name="action" value="password">
+                        
+                        <div class="mb-3">
+                            <label for="current_password" class="form-label">Current Password</label>
+                            <input type="password" class="form-control" id="current_password" 
+                                   name="current_password" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="new_password" class="form-label">New Password</label>
+                            <input type="password" class="form-control" id="new_password" 
+                                   name="new_password" required minlength="6">
+                            <div class="form-text">At least 6 characters</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="confirm_password" class="form-label">Confirm New Password</label>
+                            <input type="password" class="form-control" id="confirm_password" 
+                                   name="confirm_password" required minlength="6">
+                        </div>
+                        
+                        <button type="submit" class="btn btn-warning w-100">🔑 Change Password</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Account Actions -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">📊 Account Information</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Member since:</strong> {{ user.date_joined.strftime('%B %d, %Y') if user.date_joined else 'Unknown' }}</p>
+                    <p><strong>Total Points:</strong> {{ user.points or 0 }}</p>
+                    <p><strong>Admin Status:</strong> 
+                        {% if user.is_admin %}
+                            <span class="badge bg-success">Administrator</span>
+                        {% else %}
+                            <span class="badge bg-secondary">User</span>
+                        {% endif %}
+                    </p>
+                    
+                    <hr>
+                    
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('profile') }}" class="btn btn-outline-primary">
+                            👤 View Public Profile
+                        </a>
+                        
+                        <a href="{{ url_for('export_user_data') }}" class="btn btn-outline-info">
+                            📥 Export My Data
+                        </a>
+                        
+                        <button type="button" class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#qrModal">
+                            📱 Generate QR Code
+                        </button>
+                        
+                        <a href="/user/{{ user.username }}" class="btn btn-outline-primary" target="_blank">
+                            🔗 Public Profile Link
+                        </a>
+                        
+                        {% if user.google_id %}
+                        <div class="alert alert-info mb-2">
+                            <small>🔗 Account linked with Google</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">⚠️ Danger Zone</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h6>Delete Account</h6>
+                            <p class="text-muted">
+                                Permanently delete your account and all associated data. 
+                                This action cannot be undone.
+                            </p>
+                        </div>
+                        <div class="col-md-4">
+                            <button type="button" class="btn btn-danger w-100" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                                🗑️ Delete Account
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Account Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">⚠️ Delete Account</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <strong>This action cannot be undone!</strong>
+                </div>
+                <p>This will permanently delete:</p>
+                <ul>
+                    <li>Your account and profile</li>
+                    <li>All your submitted records</li>
+                    <li>Your points and achievements</li>
+                    <li>All associated data</li>
+                </ul>
+                
+                <form method="POST" action="{{ url_for('update_user_settings') }}">
+                    <input type="hidden" name="action" value="delete_account">
+                    
+                    <div class="mb-3">
+                        <label for="confirm_delete" class="form-label">
+                            Type <strong>"DELETE MY ACCOUNT"</strong> to confirm:
+                        </label>
+                        <input type="text" class="form-control" id="confirm_delete" 
+                               name="confirm_delete" required 
+                               placeholder="DELETE MY ACCOUNT">
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-danger">
+                            🗑️ Yes, Delete My Account
+                        </button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- QR Code Modal -->
+<div class="modal fade" id="qrModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">📱 Profile QR Code</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <p>Scan this QR code to quickly access your profile:</p>
+                <div id="qr-code-container">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Generating QR code...</span>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <small class="text-muted">{{ request.url_root }}user/{{ user.username }}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Real-time username availability checking
+let usernameTimeout;
+const usernameInput = document.getElementById('username');
+const usernameFeedback = document.getElementById('username-feedback');
+const originalUsername = '{{ user.username }}';
+
+usernameInput.addEventListener('input', function() {
+    clearTimeout(usernameTimeout);
+    const username = this.value.trim();
+    
+    if (username === originalUsername) {
+        usernameFeedback.className = 'form-text';
+        usernameFeedback.textContent = 'This is your current username';
+        return;
+    }
+    
+    if (username.length < 3) {
+        usernameFeedback.className = 'form-text text-danger';
+        usernameFeedback.textContent = 'Username must be at least 3 characters';
+        return;
+    }
+    
+    usernameFeedback.className = 'form-text text-muted';
+    usernameFeedback.textContent = 'Checking availability...';
+    
+    usernameTimeout = setTimeout(() => {
+        fetch(`/api/check_username?username=${encodeURIComponent(username)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.available) {
+                    usernameFeedback.className = 'form-text text-success';
+                    usernameFeedback.textContent = '✓ ' + data.message;
+                } else {
+                    usernameFeedback.className = 'form-text text-danger';
+                    usernameFeedback.textContent = '✗ ' + data.message;
+                }
+            })
+            .catch(error => {
+                usernameFeedback.className = 'form-text text-warning';
+                usernameFeedback.textContent = 'Could not check availability';
+            });
+    }, 500);
+});
+
+// Password confirmation validation
+const newPassword = document.getElementById('new_password');
+const confirmPassword = document.getElementById('confirm_password');
+
+function validatePasswords() {
+    if (newPassword.value && confirmPassword.value) {
+        if (newPassword.value === confirmPassword.value) {
+            confirmPassword.setCustomValidity('');
+            confirmPassword.classList.remove('is-invalid');
+            confirmPassword.classList.add('is-valid');
+        } else {
+            confirmPassword.setCustomValidity('Passwords do not match');
+            confirmPassword.classList.remove('is-valid');
+            confirmPassword.classList.add('is-invalid');
+        }
+    }
+}
+
+if (newPassword && confirmPassword) {
+    newPassword.addEventListener('input', validatePasswords);
+    confirmPassword.addEventListener('input', validatePasswords);
+}
+
+// File upload preview
+const avatarInput = document.getElementById('avatar');
+if (avatarInput) {
+    avatarInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            // Check file size (5MB limit)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('File too large! Please choose an image under 5MB.');
+                this.value = '';
+                return;
+            }
+            
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const currentAvatar = document.querySelector('img[alt="Current Avatar"], .rounded-circle');
+                if (currentAvatar) {
+                    if (currentAvatar.tagName === 'IMG') {
+                        currentAvatar.src = e.target.result;
+                    } else {
+                        // Replace placeholder with image
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        img.alt = 'Avatar Preview';
+                        img.className = 'rounded-circle';
+                        img.style.width = '120px';
+                        img.style.height = '120px';
+                        img.style.objectFit = 'cover';
+                        currentAvatar.parentNode.replaceChild(img, currentAvatar);
+                    }
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+}
+
+// Smooth form submission feedback
+document.querySelectorAll('form').forEach(form => {
+    form.addEventListener('submit', function() {
+        const submitBtn = this.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '⏳ Saving...';
+            submitBtn.disabled = true;
+            
+            // Re-enable after 3 seconds as fallback
+            setTimeout(() => {
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }, 3000);
+        }
+    });
+});
+
+// QR Code generation
+document.getElementById('qrModal').addEventListener('show.bs.modal', function() {
+    const container = document.getElementById('qr-code-container');
+    const username = '{{ user.username }}';
+    
+    fetch(`/api/qr/${username}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                container.innerHTML = `<img src="${data.qr_code}" alt="QR Code" class="img-fluid" style="max-width: 200px;">`;
+            } else {
+                container.innerHTML = `<div class="alert alert-danger">Error: ${data.error}</div>`;
+            }
+        })
+        .catch(error => {
+            container.innerHTML = '<div class="alert alert-danger">Failed to generate QR code</div>';
+        });
+});
+
+// Theme preview
+const themeSelect = document.getElementById('theme');
+if (themeSelect) {
+    themeSelect.addEventListener('change', function() {
+        const theme = this.value;
+        const body = document.body;
+        
+        // Remove existing theme classes
+        body.classList.remove('theme-light', 'theme-dark', 'theme-auto');
+        
+        // Add new theme class for preview
+        if (theme === 'dark') {
+            body.classList.add('theme-dark');
+            body.style.backgroundColor = '#1a1a1a';
+            body.style.color = '#ffffff';
+        } else if (theme === 'light') {
+            body.classList.add('theme-light');
+            body.style.backgroundColor = '#ffffff';
+            body.style.color = '#000000';
+        } else {
+            // Auto theme - detect system preference
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                body.style.backgroundColor = '#1a1a1a';
+                body.style.color = '#ffffff';
+            } else {
+                body.style.backgroundColor = '#ffffff';
+                body.style.color = '#000000';
+            }
+        }
+    });
+}
+</script>
+{% endblock %}

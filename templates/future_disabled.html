@@ -1,0 +1,43 @@
+{% extends "layout.html" %}
+
+{% block title %}Future List - Disabled{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card text-center">
+                <div class="card-body py-5">
+                    <div class="mb-4" style="font-size: 6rem;">🔒</div>
+                    <h2>Future List Disabled</h2>
+                    <p class="text-muted mb-4">
+                        The Future Recent Tab List feature is currently disabled by the administrators.
+                    </p>
+                    
+                    <div class="alert alert-info">
+                        <strong>What is the Future List?</strong><br>
+                        The Future List shows upcoming levels that are planned to be added to the main RTL. 
+                        It's a sneak peek into what's coming next!
+                    </div>
+                    
+                    {% if session.get('is_admin') %}
+                    <div class="alert alert-warning">
+                        <strong>Admin Notice:</strong> You can enable the Future List in the 
+                        <a href="{{ url_for('admin_settings') }}" class="alert-link">Admin Settings</a>.
+                    </div>
+                    {% endif %}
+                    
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('index') }}" class="btn btn-primary">
+                            🏠 Back to Main List
+                        </a>
+                        <a href="{{ url_for('legacy') }}" class="btn btn-outline-secondary">
+                            📜 Legacy List
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
