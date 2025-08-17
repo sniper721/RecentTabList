@@ -22,42 +22,45 @@
                 </div>
                 <div class="card-body">
                     {% if system_info.error %}
-                        <div class="alert alert-danger">{{ system_info.error }}</div>
+                    <div class="alert alert-danger">{{ system_info.error }}</div>
                     {% elif system_info.note %}
-                        <div class="alert alert-info">
-                            <strong>System monitoring unavailable</strong><br>
-                            {{ system_info.note }}
-                        </div>
-                        <p><strong>Python Version:</strong> {{ system_info.python_version.split()[0] }}</p>
+                    <div class="alert alert-info">
+                        <strong>System monitoring unavailable</strong><br>
+                        {{ system_info.note }}
+                    </div>
+                    <p><strong>Python Version:</strong> {{ system_info.python_version.split()[0] }}</p>
                     {% else %}
-                        <div class="row">
-                            <div class="col-sm-6">
-                                <strong>CPU Usage:</strong><br>
-                                <div class="progress mb-2">
-                                    <div class="progress-bar" style="width: {{ system_info.cpu_percent }}%">{{ system_info.cpu_percent }}%</div>
-                                </div>
-                            </div>
-                            <div class="col-sm-6">
-                                <strong>Memory Usage:</strong><br>
-                                <div class="progress mb-2">
-                                    <div class="progress-bar bg-warning" style="width: {{ system_info.memory_percent }}%">{{ system_info.memory_percent }}%</div>
-                                </div>
-                                <small>{{ system_info.memory_used }} / {{ system_info.memory_total }}</small>
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <strong>CPU Usage:</strong><br>
+                            <div class="progress mb-2">
+                                <div class="progress-bar" style="width: {{ system_info.cpu_percent }}%">{{
+                                    system_info.cpu_percent }}%</div>
                             </div>
                         </div>
-                        <div class="row mt-3">
-                            <div class="col-sm-6">
-                                <strong>Disk Usage:</strong><br>
-                                <div class="progress mb-2">
-                                    <div class="progress-bar bg-info" style="width: {{ system_info.disk_percent }}%">{{ system_info.disk_percent }}%</div>
-                                </div>
-                                <small>{{ system_info.disk_used }} / {{ system_info.disk_total }}</small>
+                        <div class="col-sm-6">
+                            <strong>Memory Usage:</strong><br>
+                            <div class="progress mb-2">
+                                <div class="progress-bar bg-warning" style="width: {{ system_info.memory_percent }}%">{{
+                                    system_info.memory_percent }}%</div>
                             </div>
-                            <div class="col-sm-6">
-                                <strong>Python Version:</strong><br>
-                                <small>{{ system_info.python_version.split()[0] }}</small>
-                            </div>
+                            <small>{{ system_info.memory_used }} / {{ system_info.memory_total }}</small>
                         </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-sm-6">
+                            <strong>Disk Usage:</strong><br>
+                            <div class="progress mb-2">
+                                <div class="progress-bar bg-info" style="width: {{ system_info.disk_percent }}%">{{
+                                    system_info.disk_percent }}%</div>
+                            </div>
+                            <small>{{ system_info.disk_used }} / {{ system_info.disk_total }}</small>
+                        </div>
+                        <div class="col-sm-6">
+                            <strong>Python Version:</strong><br>
+                            <small>{{ system_info.python_version.split()[0] }}</small>
+                        </div>
+                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -71,24 +74,25 @@
                 </div>
                 <div class="card-body">
                     {% if cache_info.error %}
-                        <div class="alert alert-danger">{{ cache_info.error }}</div>
+                    <div class="alert alert-danger">{{ cache_info.error }}</div>
                     {% else %}
-                        <p><strong>Main Levels:</strong> {{ cache_info.main_levels }} cached</p>
-                        <p><strong>Legacy Levels:</strong> {{ cache_info.legacy_levels }} cached</p>
-                        <p><strong>Last Updated:</strong> {{ cache_info.last_updated }}</p>
-                        
-                        <div class="btn-group w-100" role="group">
-                            <form method="POST" action="{{ url_for('admin_clear_cache') }}" class="flex-fill">
-                                <button type="submit" class="btn btn-warning w-100" onclick="return confirm('Clear all cached data?')">
-                                    🗑️ Clear Cache
-                                </button>
-                            </form>
-                            <form method="POST" action="{{ url_for('admin_reload_cache') }}" class="flex-fill">
-                                <button type="submit" class="btn btn-success w-100">
-                                    🔄 Reload Cache
-                                </button>
-                            </form>
-                        </div>
+                    <p><strong>Main Levels:</strong> {{ cache_info.main_levels }} cached</p>
+                    <p><strong>Legacy Levels:</strong> {{ cache_info.legacy_levels }} cached</p>
+                    <p><strong>Last Updated:</strong> {{ cache_info.last_updated }}</p>
+
+                    <div class="btn-group w-100" role="group">
+                        <form method="POST" action="{{ url_for('admin_clear_cache') }}" class="flex-fill">
+                            <button type="submit" class="btn btn-warning w-100"
+                                onclick="return confirm('Clear all cached data?')">
+                                🗑️ Clear Cache
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ url_for('admin_reload_cache') }}" class="flex-fill">
+                            <button type="submit" class="btn btn-success w-100">
+                                🔄 Reload Cache
+                            </button>
+                        </form>
+                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -104,28 +108,29 @@
                 </div>
                 <div class="card-body">
                     {% if db_stats.error %}
-                        <div class="alert alert-danger">{{ db_stats.error }}</div>
+                    <div class="alert alert-danger">{{ db_stats.error }}</div>
                     {% else %}
-                        <div class="row">
-                            <div class="col-sm-6">
-                                <p><strong>Total Levels:</strong> {{ db_stats.total_levels }}</p>
-                                <p><strong>Main Levels:</strong> {{ db_stats.main_levels }}</p>
-                                <p><strong>Legacy Levels:</strong> {{ db_stats.legacy_levels }}</p>
-                            </div>
-                            <div class="col-sm-6">
-                                <p><strong>Total Users:</strong> {{ db_stats.total_users }}</p>
-                                <p><strong>Total Records:</strong> {{ db_stats.total_records }}</p>
-                                <p><strong>Pending Records:</strong> 
-                                    <span class="badge bg-warning">{{ db_stats.pending_records }}</span>
-                                </p>
-                            </div>
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <p><strong>Total Levels:</strong> {{ db_stats.total_levels }}</p>
+                            <p><strong>Main Levels:</strong> {{ db_stats.main_levels }}</p>
+                            <p><strong>Legacy Levels:</strong> {{ db_stats.legacy_levels }}</p>
                         </div>
-                        
-                        <form method="POST" action="{{ url_for('admin_optimize_db') }}">
-                            <button type="submit" class="btn btn-primary w-100" onclick="return confirm('Optimize database? This will create indexes and remove Base64 images.')">
-                                ⚡ Optimize Database
-                            </button>
-                        </form>
+                        <div class="col-sm-6">
+                            <p><strong>Total Users:</strong> {{ db_stats.total_users }}</p>
+                            <p><strong>Total Records:</strong> {{ db_stats.total_records }}</p>
+                            <p><strong>Pending Records:</strong>
+                                <span class="badge bg-warning">{{ db_stats.pending_records }}</span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <form method="POST" action="{{ url_for('admin_optimize_db') }}">
+                        <button type="submit" class="btn btn-primary w-100"
+                            onclick="return confirm('Optimize database? This will create indexes and remove Base64 images.')">
+                            ⚡ Optimize Database
+                        </button>
+                    </form>
                     {% endif %}
                 </div>
             </div>
@@ -139,30 +144,31 @@
                 </div>
                 <div class="card-body">
                     {% set future_enabled = site_settings.future_list_enabled %}
-                    
+
                     <div class="mb-3">
                         <h6>🔮 Future List</h6>
                         <p class="text-muted small">Enable/disable the Future Recent Tab List feature</p>
-                        
+
                         {% if future_enabled %}
-                            <div class="alert alert-success py-2">
-                                <small>✅ Future List is <strong>ENABLED</strong></small>
-                            </div>
-                            <div class="d-grid gap-2">
-                                <a href="/future" class="btn btn-outline-primary btn-sm">👁️ View Future List</a>
-                                <form method="POST" action="{{ url_for('admin_toggle_future_list') }}">
-                                    <input type="hidden" name="action" value="disable">
-                                    <button type="submit" class="btn btn-warning btn-sm w-100">🔒 Disable Future List</button>
-                                </form>
-                            </div>
-                        {% else %}
-                            <div class="alert alert-secondary py-2">
-                                <small>❌ Future List is <strong>DISABLED</strong></small>
-                            </div>
+                        <div class="alert alert-success py-2">
+                            <small>✅ Future List is <strong>ENABLED</strong></small>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <a href="/future" class="btn btn-outline-primary btn-sm">👁️ View Future List</a>
                             <form method="POST" action="{{ url_for('admin_toggle_future_list') }}">
-                                <input type="hidden" name="action" value="enable">
-                                <button type="submit" class="btn btn-success w-100">🚀 Enable Future List</button>
+                                <input type="hidden" name="action" value="disable">
+                                <button type="submit" class="btn btn-warning btn-sm w-100">🔒 Disable Future
+                                    List</button>
                             </form>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-secondary py-2">
+                            <small>❌ Future List is <strong>DISABLED</strong></small>
+                        </div>
+                        <form method="POST" action="{{ url_for('admin_toggle_future_list') }}">
+                            <input type="hidden" name="action" value="enable">
+                            <button type="submit" class="btn btn-success w-100">🚀 Enable Future List</button>
+                        </form>
                         {% endif %}
                     </div>
                 </div>
@@ -180,30 +186,37 @@
                         <a href="/debug_db" class="btn btn-info">
                             🔍 Debug Database
                         </a>
-                        
+
                         <a href="/virtual" class="btn btn-secondary">
                             🚀 Virtual List View
                         </a>
-                        
+
                         <a href="/test_speed" class="btn btn-success">
                             ⏱️ Speed Test
                         </a>
-                        
-                        <form method="POST" action="{{ url_for('admin_restart') }}">
-                            <button type="submit" class="btn btn-danger w-100" onclick="return confirm('Restart the application? This will temporarily make the site unavailable.')">
-                                🔄 Restart Application
-                            </button>
-                        </form>
-                        
-                        <form method="POST" action="{{ url_for('admin_delete_website') }}">
-                            <button type="submit" class="btn btn-dark w-100 mt-2" onclick="return confirm('Are you ABSOLUTELY sure you want to delete the entire website? This cannot be undone!')">
-                                💀 Delete Website
-                            </button>
-                        </form>
-                        
-                        <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" class="btn btn-outline-danger w-100 mt-2">
-                            💥 Delete Website
-                        </a>
+
+                        <a href="{{ url_for('changelog') }}" class="btn btn-info">
+                            📝 View Changelog
+
+
+                            <form method="POST" action="{{ url_for('admin_restart') }}">
+                                <button type="submit" class="btn btn-danger w-100"
+                                    onclick="return confirm('Restart the application? This will temporarily make the site unavailable.')">
+                                    🔄 Restart Application
+                                </button>
+                            </form>
+
+                            <form method="POST" action="{{ url_for('admin_delete_website') }}">
+                                <button type="submit" class="btn btn-dark w-100 mt-2"
+                                    onclick="return confirm('Are you ABSOLUTELY sure you want to delete the entire website? This cannot be undone!')">
+                                    💀 Delete Website
+                                </button>
+                            </form>
+
+                            <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank"
+                                class="btn btn-outline-danger w-100 mt-2">
+                                💥 Delete Website
+                            </a>
                     </div>
                 </div>
             </div>
