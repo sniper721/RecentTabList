@@ -25,7 +25,12 @@
                                     <p class="mb-1">
                                         <strong>{{ entry.level_name }}</strong> was placed at 
                                         <span class="badge bg-primary">#{{ entry.position }}</span>
-                                        on the {{ entry.list_type }} list
+                                        on the 
+                                        {% if entry.list_type == 'main' %}🏆 main
+                                        {% elif entry.list_type == 'legacy' %}🕰️ legacy
+                                        {% elif entry.list_type == 'future' %}🚀 future
+                                        {% else %}{{ entry.list_type }}
+                                        {% endif %} list
                                         {% if entry.above_level and entry.below_level %}
                                             above <strong>{{ entry.below_level }}</strong> and below <strong>{{ entry.above_level }}</strong>
                                         {% elif entry.below_level %}
@@ -44,6 +49,12 @@
                                         <strong>{{ entry.level_name }}</strong> moved from 
                                         <span class="badge bg-secondary">#{{ entry.old_position }}</span> to 
                                         <span class="badge bg-primary">#{{ entry.new_position }}</span>
+                                        on the 
+                                        {% if entry.list_type == 'main' %}🏆 main
+                                        {% elif entry.list_type == 'legacy' %}🕰️ legacy
+                                        {% elif entry.list_type == 'future' %}🚀 future
+                                        {% else %}{{ entry.list_type }}
+                                        {% endif %} list
                                         {% if entry.above_level and entry.below_level %}
                                             (now above <strong>{{ entry.below_level }}</strong> and below <strong>{{ entry.above_level }}</strong>)
                                         {% elif entry.below_level %}
@@ -71,7 +82,12 @@
                                         <h5 class="mb-0">{{ entry.level_name }}</h5>
                                     </div>
                                     <p class="mb-1">
-                                        <strong>{{ entry.level_name }}</strong> was removed from the list
+                                        <strong>{{ entry.level_name }}</strong> was removed from the 
+                                        {% if entry.list_type == 'main' %}🏆 main
+                                        {% elif entry.list_type == 'legacy' %}🕰️ legacy
+                                        {% elif entry.list_type == 'future' %}🚀 future
+                                        {% else %}{{ entry.list_type }}
+                                        {% endif %} list
                                         {% if entry.old_position %}
                                             (was at #{{ entry.old_position }})
                                         {% endif %}

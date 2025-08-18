@@ -1,0 +1,119 @@
+{% extends "layout.html" %}
+
+{% block title %}Admin - Announcements{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">📢 Create Announcement</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">Title</label>
+                            <input type="text" name="title" class="form-control" required placeholder="Announcement title...">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Message</label>
+                            <textarea name="message" class="form-control" rows="4" required placeholder="Announcement message..."></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Type</label>
+                            <select name="type" class="form-select">
+                                <option value="info">ℹ️ Info (Blue)</option>
+                                <option value="success">✅ Success (Green)</option>
+                                <option value="warning">⚠️ Warning (Yellow)</option>
+                                <option value="danger">🚨 Important (Red)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Expires In</label>
+                            <select name="expires_in_hours" class="form-select">
+                                <option value="1">1 Hour</option>
+                                <option value="6">6 Hours</option>
+                                <option value="12">12 Hours</option>
+                                <option value="24" selected>24 Hours (1 Day)</option>
+                                <option value="72">72 Hours (3 Days)</option>
+                                <option value="168">168 Hours (1 Week)</option>
+                                <option value="720">720 Hours (1 Month)</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary w-100">📢 Create Announcement</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">📢 All Announcements</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if announcements %}
+                        {% for announcement in announcements %}
+                        <div class="border-bottom p-3">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <span class="badge bg-{{ announcement.type }} me-2">
+                                            {% if announcement.type == 'info' %}ℹ️ INFO
+                                            {% elif announcement.type == 'success' %}✅ SUCCESS
+                                            {% elif announcement.type == 'warning' %}⚠️ WARNING
+                                            {% elif announcement.type == 'danger' %}🚨 IMPORTANT
+                                            {% endif %}
+                                        </span>
+                                        <h6 class="mb-0">{{ announcement.title }}</h6>
+                                        
+                                        {% set now = moment.utcnow() %}
+                                        {% if announcement.expires_at > now %}
+                                            <span class="badge bg-success ms-2">ACTIVE</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary ms-2">EXPIRED</span>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <p class="mb-2">{{ announcement.message }}</p>
+                                    
+                                    <small class="text-muted">
+                                        Created by <strong>{{ announcement.created_by }}</strong> 
+                                        on {{ announcement.created_at.strftime('%Y-%m-%d %H:%M UTC') }}
+                                        <br>
+                                        Expires: {{ announcement.expires_at.strftime('%Y-%m-%d %H:%M UTC') }}
+                                    </small>
+                                </div>
+                                
+                                <div class="ms-3">
+                                    <form method="POST" action="{{ url_for('admin_delete_announcement') }}" style="display: inline;">
+                                        <input type="hidden" name="announcement_id" value="{{ announcement._id }}">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm" 
+                                                onclick="return confirm('Delete this announcement?')">
+                                            🗑️ Delete
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <div class="mb-4">
+                                <i class="fas fa-bullhorn fa-4x text-muted"></i>
+                            </div>
+                            <h4 class="text-muted">No Announcements Yet</h4>
+                            <p class="text-muted">Create your first announcement to notify users about important updates!</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

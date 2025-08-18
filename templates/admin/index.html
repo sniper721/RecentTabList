@@ -20,9 +20,15 @@
                         </div>
                     </div>
                     <div class="col-md-8">
-                        <div class="d-flex gap-2 mb-3">
+                        <div class="d-flex gap-2 mb-3 flex-wrap">
                             <a href="{{ url_for('admin_levels') }}" class="btn btn-primary">
                                 <i class="fas fa-list"></i> Manage Levels
+                            </a>
+                            <a href="{{ url_for('admin_future_levels') }}" class="btn btn-success">
+                                🚀 Future Levels
+                            </a>
+                            <a href="{{ url_for('admin_announcements') }}" class="btn btn-warning">
+                                📢 Announcements
                             </a>
                             <a href="{{ url_for('admin_users') }}" class="btn btn-secondary">
                                 <i class="fas fa-users"></i> Manage Users

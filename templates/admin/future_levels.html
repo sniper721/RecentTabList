@@ -1,0 +1,161 @@
+{% extends "layout.html" %}
+
+{% block title %}Admin - Future Levels{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">🚀 Add Future Level</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">Level Name</label>
+                            <input type="text" name="name" class="form-control" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Creator</label>
+                            <input type="text" name="creator" class="form-control" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Verifier</label>
+                            <input type="text" name="verifier" class="form-control" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Level ID (optional)</label>
+                            <input type="text" name="level_id" class="form-control">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Video URL</label>
+                            <input type="url" name="video_url" class="form-control">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea name="description" class="form-control" rows="3"></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Difficulty (1-10)</label>
+                            <input type="number" name="difficulty" class="form-control" min="1" max="10" step="0.1" value="5.0" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Position</label>
+                            <input type="number" name="position" class="form-control" min="1" value="{{ (levels|length) + 1 }}" required>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary w-100">🚀 Add Future Level</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-9">
+            <div class="card">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">🚀 Future Levels ({{ levels|length }})</h5>
+                    <a href="{{ url_for('future_list') }}" class="btn btn-light btn-sm">👁️ View Public List</a>
+                </div>
+                <div class="card-body p-0">
+                    {% if levels %}
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Pos</th>
+                                        <th>Level</th>
+                                        <th>Creator</th>
+                                        <th>Verifier</th>
+                                        <th>Difficulty</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for level in levels %}
+                                    <tr>
+                                        <td><span class="badge bg-primary">#{{ level.position }}</span></td>
+                                        <td>
+                                            <strong>{{ level.name }}</strong>
+                                            {% if level.level_id %}
+                                                <br><small class="text-muted">ID: {{ level.level_id }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ level.creator }}</td>
+                                        <td>{{ level.verifier }}</td>
+                                        <td>{{ level.difficulty }}/10</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-outline-warning" onclick="editFutureLevel({{ level._id }})">
+                                                    ✏️ Edit
+                                                </button>
+                                                <button class="btn btn-outline-danger" onclick="deleteFutureLevel({{ level._id }}, '{{ level.name }}')">
+                                                    🗑️ Delete
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <div class="mb-4">
+                                <i class="fas fa-rocket fa-4x text-muted"></i>
+                            </div>
+                            <h4 class="text-muted">No Future Levels Yet</h4>
+                            <p class="text-muted">Add some levels to the future list to get started!</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">🗑️ Delete Future Level</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong id="deleteLevelName"></strong> from the future list?</p>
+                <p class="text-danger"><small>This action cannot be undone.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="{{ url_for('admin_delete_future_level') }}" style="display: inline;">
+                    <input type="hidden" name="level_id" id="deleteLevelId">
+                    <button type="submit" class="btn btn-danger">🗑️ Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function deleteFutureLevel(levelId, levelName) {
+    document.getElementById('deleteLevelId').value = levelId;
+    document.getElementById('deleteLevelName').textContent = levelName;
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+
+function editFutureLevel(levelId) {
+    // TODO: Implement edit functionality
+    alert('Edit functionality coming soon!');
+}
+</script>
+{% endblock %}

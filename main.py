@@ -3,7 +3,7 @@ from pymongo import MongoClient
 from werkzeug.security import generate_password_hash, check_password_hash
 from authlib.integrations.flask_client import OAuth
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 # Try to import Discord integration, but don't fail if it's missing
 try:
@@ -212,13 +212,25 @@ def utility_processor():
     def format_points(points):
         return int(points) if points else 0
     
+    def get_active_announcements():
+        """Get active announcements that haven't expired"""
+        try:
+            now = datetime.now(timezone.utc)
+            return list(mongo_db.announcements.find({
+                "active": True,
+                "expires_at": {"$gt": now}
+            }).sort("created_at", -1).limit(5))
+        except:
+            return []
+    
     # Get current theme from session
     current_theme = session.get('theme', 'light')
     
     return dict(
         format_points=format_points, 
         get_video_embed_info=get_video_embed_info,
-        current_theme=current_theme
+        current_theme=current_theme,
+        get_active_announcements=get_active_announcements
     )
 
 def calculate_level_points(position, is_legacy=False, level_type="Level"):
@@ -3305,6 +3317,118 @@ def admin_delete_website():
     # This is totally a real delete function 😉
     return redirect('https://www.youtube.com/watch?v=dQw4w9WgXcQ')
 
+@app.route('/admin/future_levels', methods=['GET', 'POST'])
+def admin_future_levels():
+    """Admin interface for managing future levels"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        # Get next level ID
+        last_level = mongo_db.future_levels.find_one(sort=[("_id", -1)])
+        next_id = (last_level['_id'] + 1) if last_level else 1
+        
+        name = request.form.get('name')
+        creator = request.form.get('creator')
+        verifier = request.form.get('verifier')
+        level_id = request.form.get('level_id')
+        video_url = request.form.get('video_url')
+        description = request.form.get('description')
+        difficulty = float(request.form.get('difficulty'))
+        position = int(request.form.get('position'))
+        
+        # Shift existing levels at this position and below
+        mongo_db.future_levels.update_many(
+            {"position": {"$gte": position}},
+            {"$inc": {"position": 1}}
+        )
+        
+        new_level = {
+            "_id": next_id,
+            "name": name,
+            "creator": creator,
+            "verifier": verifier,
+            "level_id": level_id or None,
+            "video_url": video_url,
+            "description": description,
+            "difficulty": difficulty,
+            "position": position,
+            "date_added": datetime.now(timezone.utc)
+        }
+        
+        mongo_db.future_levels.insert_one(new_level)
+        
+        # Log level placement to changelog
+        above_level = None
+        below_level = None
+        
+        # Find levels above and below
+        if position > 1:
+            above_level_doc = mongo_db.future_levels.find_one({"position": position - 1})
+            if above_level_doc:
+                above_level = above_level_doc['name']
+        
+        below_level_doc = mongo_db.future_levels.find_one({"position": position + 1})
+        if below_level_doc:
+            below_level = below_level_doc['name']
+        
+        log_level_change(
+            action="placed",
+            level_name=name,
+            admin_username=session.get('username', 'Unknown'),
+            position=position,
+            above_level=above_level,
+            below_level=below_level,
+            list_type="future"
+        )
+        
+        flash('Future level added successfully!', 'success')
+        return redirect(url_for('admin_future_levels'))
+    
+    # Get all future levels
+    future_levels = list(mongo_db.future_levels.find({}).sort("position", 1))
+    
+    return render_template('admin/future_levels.html', levels=future_levels)
+
+@app.route('/admin/delete_future_level', methods=['POST'])
+def admin_delete_future_level():
+    """Delete a future level"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    level_id = int(request.form.get('level_id'))
+    
+    # Get level info before deletion
+    level = mongo_db.future_levels.find_one({"_id": level_id})
+    if not level:
+        flash('Future level not found', 'danger')
+        return redirect(url_for('admin_future_levels'))
+    
+    level_position = level['position']
+    
+    # Delete the level
+    mongo_db.future_levels.delete_one({"_id": level_id})
+    
+    # Log level removal to changelog
+    log_level_change(
+        action="removed",
+        level_name=level['name'],
+        admin_username=session.get('username', 'Unknown'),
+        old_position=level_position,
+        list_type="future"
+    )
+    
+    # Shift positions of levels that were below the deleted level
+    mongo_db.future_levels.update_many(
+        {"position": {"$gt": level_position}},
+        {"$inc": {"position": -1}}
+    )
+    
+    flash('Future level deleted successfully!', 'success')
+    return redirect(url_for('admin_future_levels'))
+
 @app.route('/future')
 def future_list():
     """Future Recent Tab List"""
@@ -3313,10 +3437,59 @@ def future_list():
     if not settings or not settings.get('future_list_enabled', False):
         return render_template('future_disabled.html')
     
-    # Get future levels (you can add these manually or create an admin interface)
+    # Get future levels
     future_levels = list(mongo_db.future_levels.find({}).sort("position", 1))
     
     return render_template('future.html', levels=future_levels)
+
+@app.route('/admin/announcements', methods=['GET', 'POST'])
+def admin_announcements():
+    """Admin interface for managing site announcements"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        title = request.form.get('title')
+        message = request.form.get('message')
+        announcement_type = request.form.get('type', 'info')  # info, success, warning, danger
+        expires_in_hours = int(request.form.get('expires_in_hours', 24))
+        
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=expires_in_hours)
+        
+        announcement = {
+            "title": title,
+            "message": message,
+            "type": announcement_type,
+            "created_at": datetime.now(timezone.utc),
+            "expires_at": expires_at,
+            "created_by": session.get('username', 'Unknown'),
+            "active": True
+        }
+        
+        mongo_db.announcements.insert_one(announcement)
+        
+        flash(f'Announcement created! Will expire in {expires_in_hours} hours.', 'success')
+        return redirect(url_for('admin_announcements'))
+    
+    # Get all announcements (active and expired)
+    announcements = list(mongo_db.announcements.find({}).sort("created_at", -1))
+    
+    return render_template('admin/announcements.html', announcements=announcements)
+
+@app.route('/admin/delete_announcement', methods=['POST'])
+def admin_delete_announcement():
+    """Delete an announcement"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    announcement_id = request.form.get('announcement_id')
+    
+    mongo_db.announcements.delete_one({"_id": ObjectId(announcement_id)})
+    
+    flash('Announcement deleted successfully!', 'success')
+    return redirect(url_for('admin_announcements'))
 
 @app.route('/search')
 def search_levels():
