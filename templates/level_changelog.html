@@ -9,6 +9,25 @@
             <div class="text-center mb-5">
                 <h1 class="display-4">📋 Level Changelog</h1>
                 <p class="lead text-muted">Track all level placements, movements, and changes to the RTL!</p>
+                
+                {% if session.get('is_admin') %}
+                <div class="mt-3">
+                    <div class="btn-group">
+                        <form method="POST" action="{{ url_for('admin_clear_changelog') }}" style="display: inline;">
+                            <input type="hidden" name="action" value="clear_old">
+                            <button type="submit" class="btn btn-outline-warning btn-sm" onclick="return confirm('Clear entries older than 30 days?')">
+                                🗑️ Clear Old Entries
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ url_for('admin_clear_changelog') }}" style="display: inline;">
+                            <input type="hidden" name="action" value="clear_all">
+                            <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('⚠️ Clear ALL changelog entries? This cannot be undone!')">
+                                💥 Clear All
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
             </div>
 
             {% if changelog %}
@@ -113,6 +132,16 @@
                                 <small class="text-muted">
                                     {{ entry.timestamp.strftime('%Y-%m-%d %H:%M UTC') if entry.timestamp else 'Unknown time' }}
                                 </small>
+                                {% if session.get('is_admin') %}
+                                <div class="mt-2">
+                                    <form method="POST" action="{{ url_for('admin_delete_changelog_entry') }}" style="display: inline;">
+                                        <input type="hidden" name="entry_id" value="{{ entry._id }}">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete this changelog entry?')">
+                                            🗑️
+                                        </button>
+                                    </form>
+                                </div>
+                                {% endif %}
                             </div>
                         </div>
                     </div>

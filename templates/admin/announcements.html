@@ -72,8 +72,7 @@
                                         </span>
                                         <h6 class="mb-0">{{ announcement.title }}</h6>
                                         
-                                        {% set now = moment.utcnow() %}
-                                        {% if announcement.expires_at > now %}
+                                        {% if announcement.expires_at > current_time %}
                                             <span class="badge bg-success ms-2">ACTIVE</span>
                                         {% else %}
                                             <span class="badge bg-secondary ms-2">EXPIRED</span>

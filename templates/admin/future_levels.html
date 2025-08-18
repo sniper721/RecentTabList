@@ -23,8 +23,9 @@
                         </div>
                         
                         <div class="mb-3">
-                            <label class="form-label">Verifier</label>
-                            <input type="text" name="verifier" class="form-control" required>
+                            <label class="form-label">Verifier (Optional - Not verified yet)</label>
+                            <input type="text" name="verifier" class="form-control" placeholder="Will be verified later...">
+                            <small class="text-muted">Future levels are not verified yet - leave empty or add potential verifier</small>
                         </div>
                         
                         <div class="mb-3">
@@ -93,7 +94,7 @@
                                         <td>{{ level.difficulty }}/10</td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
-                                                <button class="btn btn-outline-warning" onclick="editFutureLevel({{ level._id }})">
+                                                <button class="btn btn-outline-warning" onclick="editFutureLevel({{ level._id }}, '{{ level.name }}', '{{ level.creator }}', '{{ level.verifier }}', '{{ level.level_id or '' }}', '{{ level.video_url or '' }}', '{{ level.description or '' }}', {{ level.difficulty }}, {{ level.position }})">
                                                     ✏️ Edit
                                                 </button>
                                                 <button class="btn btn-outline-danger" onclick="deleteFutureLevel({{ level._id }}, '{{ level.name }}')">
@@ -117,6 +118,82 @@
                     {% endif %}
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">✏️ Edit Future Level</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('admin_edit_future_level') }}">
+                <div class="modal-body">
+                    <input type="hidden" name="level_id" id="editLevelId">
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Level Name</label>
+                                <input type="text" name="name" id="editName" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Creator</label>
+                                <input type="text" name="creator" id="editCreator" class="form-control" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Verifier (Optional)</label>
+                                <input type="text" name="verifier" id="editVerifier" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Level ID</label>
+                                <input type="text" name="level_id" id="editLevelGameId" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Video URL</label>
+                        <input type="url" name="video_url" id="editVideoUrl" class="form-control">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea name="description" id="editDescription" class="form-control" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Difficulty (1-10)</label>
+                                <input type="number" name="difficulty" id="editDifficulty" class="form-control" min="1" max="10" step="0.1" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Position</label>
+                                <input type="number" name="position" id="editPosition" class="form-control" min="1" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">✏️ Update Level</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -153,9 +230,18 @@ function deleteFutureLevel(levelId, levelName) {
     new bootstrap.Modal(document.getElementById('deleteModal')).show();
 }
 
-function editFutureLevel(levelId) {
-    // TODO: Implement edit functionality
-    alert('Edit functionality coming soon!');
+function editFutureLevel(levelId, name, creator, verifier, gameId, videoUrl, description, difficulty, position) {
+    document.getElementById('editLevelId').value = levelId;
+    document.getElementById('editName').value = name;
+    document.getElementById('editCreator').value = creator;
+    document.getElementById('editVerifier').value = verifier;
+    document.getElementById('editLevelGameId').value = gameId;
+    document.getElementById('editVideoUrl').value = videoUrl;
+    document.getElementById('editDescription').value = description;
+    document.getElementById('editDifficulty').value = difficulty;
+    document.getElementById('editPosition').value = position;
+    
+    new bootstrap.Modal(document.getElementById('editModal')).show();
 }
 </script>
 {% endblock %}
