@@ -89,12 +89,7 @@
                     <div class="mb-3">
                         {% if user.avatar_url %}
                             <img src="{{ user.avatar_url }}" alt="Current Avatar" 
-                                 class="rounded-circle" width="100" height="100" style="object-fit: cover;"
-                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
-                            <div class="bg-secondary rounded-circle d-inline-flex align-items-center justify-content-center text-white" 
-                                 style="width: 100px; height: 100px; font-size: 36px; display: none;">
-                                {{ user.username[0].upper() }}
-                            </div>
+                                 class="rounded-circle" width="100" height="100" style="object-fit: cover;">
                         {% else %}
                             <div class="bg-secondary rounded-circle d-inline-flex align-items-center justify-content-center text-white" 
                                  style="width: 100px; height: 100px; font-size: 36px;">
@@ -109,20 +104,16 @@
                         <div class="mb-3">
                             <label for="avatar" class="form-label">Upload Picture</label>
                             <input type="file" class="form-control form-control-sm" id="avatar" name="avatar" accept="image/*">
-                            <div class="form-text">Max 5MB, JPG/PNG only</div>
-                        </div>
-                        
-                        <div class="text-center mb-2">
-                            <small class="text-muted">OR</small>
+                            <div class="form-text">Max 5MB</div>
                         </div>
                         
                         <div class="mb-3">
-                            <label for="avatar_url" class="form-label">Image URL</label>
+                            <label for="avatar_url" class="form-label">Or URL</label>
                             <input type="url" class="form-control form-control-sm" id="avatar_url" name="avatar_url" 
                                    value="{{ user.avatar_url or '' }}" placeholder="https://example.com/image.jpg">
                         </div>
                         
-                        <button type="submit" class="btn btn-success btn-sm w-100">📷 Update Picture</button>
+                        <button type="submit" class="btn btn-success btn-sm w-100">📷 Update</button>
                     </form>
                 </div>
             </div>
@@ -150,6 +141,18 @@
                         </div>
                         
                         <div class="mb-3">
+                            <label for="timezone" class="form-label">Timezone</label>
+                            <select class="form-select form-select-sm" id="timezone" name="timezone">
+                                <option value="UTC" {% if not user.timezone or user.timezone == 'UTC' %}selected{% endif %}>UTC</option>
+                                <option value="US/Eastern" {% if user.timezone == 'US/Eastern' %}selected{% endif %}>Eastern</option>
+                                <option value="US/Central" {% if user.timezone == 'US/Central' %}selected{% endif %}>Central</option>
+                                <option value="US/Pacific" {% if user.timezone == 'US/Pacific' %}selected{% endif %}>Pacific</option>
+                                <option value="Europe/London" {% if user.timezone == 'Europe/London' %}selected{% endif %}>London</option>
+                                <option value="Europe/Berlin" {% if user.timezone == 'Europe/Berlin' %}selected{% endif %}>Berlin</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="email_notifications" 
                                        name="email_notifications" {% if user.email_notifications %}checked{% endif %}>
@@ -169,7 +172,7 @@
                             </div>
                         </div>
                         
-                        <button type="submit" class="btn btn-info btn-sm w-100">💾 Save Preferences</button>
+                        <button type="submit" class="btn btn-info btn-sm w-100">💾 Save</button>
                     </form>
                 </div>
             </div>
@@ -216,7 +219,7 @@
                                    value="{{ user.twitter_url or '' }}" placeholder="https://twitter.com/username">
                         </div>
                         
-                        <button type="submit" class="btn btn-warning btn-sm w-100">🔗 Update Social</button>
+                        <button type="submit" class="btn btn-warning btn-sm w-100">🔗 Update</button>
                     </form>
                 </div>
             </div>
@@ -253,7 +256,7 @@
                                    name="confirm_password" required minlength="6">
                         </div>
                         
-                        <button type="submit" class="btn btn-danger btn-sm w-100">🔑 Change Password</button>
+                        <button type="submit" class="btn btn-danger btn-sm w-100">🔑 Change</button>
                     </form>
                 </div>
             </div>
@@ -299,6 +302,9 @@
                         <a href="/user/{{ user.username }}" class="btn btn-outline-success btn-sm" target="_blank">
                             🔗 Public Link
                         </a>
+                        <a href="{{ url_for('export_user_data') }}" class="btn btn-outline-secondary btn-sm">
+                            📥 Export Data
+                        </a>
                     </div>
                 </div>
             </div>
@@ -342,60 +348,7 @@
     </div>
 </div>
 
-<!-- Reset API Key Modal -->
-<div class="modal fade" id="resetApiModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">🔑 Reset API Key</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Are you sure you want to reset your API key? This will invalidate your current key.</p>
-                <p><strong>Type "RESET API KEY" to confirm:</strong></p>
-                <form method="POST" action="{{ url_for('update_user_settings') }}">
-                    <input type="hidden" name="action" value="reset_api_key">
-                    <input type="text" class="form-control" name="confirm_reset" placeholder="RESET API KEY" required>
-                    <div class="mt-3">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-warning">Reset API Key</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Delete Account Modal -->
-<div class="modal fade" id="deleteModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">🗑️ Delete Account</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p><strong>⚠️ WARNING: This action cannot be undone!</strong></p>
-                <p>This will permanently delete:</p>
-                <ul>
-                    <li>Your account and profile</li>
-                    <li>All your submitted records</li>
-                    <li>Your points and achievements</li>
-                    <li>All associated data</li>
-                </ul>
-                <p><strong>Type "DELETE MY ACCOUNT" to confirm:</strong></p>
-                <form method="POST" action="{{ url_for('update_user_settings') }}">
-                    <input type="hidden" name="action" value="delete_account">
-                    <input type="text" class="form-control" name="confirm_delete" placeholder="DELETE MY ACCOUNT" required>
-                    <div class="mt-3">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-danger">Delete Account</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- Modals would go here but keeping it simple for now -->
 
 <script>
 // Form validation and interactions
@@ -421,41 +374,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         newPassword.addEventListener('input', validatePasswords);
         confirmPassword.addEventListener('input', validatePasswords);
-    }
-    
-    // File upload validation
-    const avatarInput = document.getElementById('avatar');
-    const avatarUrlInput = document.getElementById('avatar_url');
-    
-    if (avatarInput && avatarUrlInput) {
-        avatarInput.addEventListener('change', function() {
-            if (this.files && this.files[0]) {
-                // Clear URL input when file is selected
-                avatarUrlInput.value = '';
-                
-                // Validate file size (5MB max)
-                const file = this.files[0];
-                if (file.size > 5 * 1024 * 1024) {
-                    alert('File size must be less than 5MB');
-                    this.value = '';
-                    return;
-                }
-                
-                // Validate file type
-                if (!file.type.startsWith('image/')) {
-                    alert('Please select an image file');
-                    this.value = '';
-                    return;
-                }
-            }
-        });
-        
-        avatarUrlInput.addEventListener('input', function() {
-            if (this.value) {
-                // Clear file input when URL is entered
-                avatarInput.value = '';
-            }
-        });
     }
 });
 </script>

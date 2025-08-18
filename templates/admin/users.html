@@ -73,16 +73,29 @@
                                 </td>
                                 <td>{{ user.date_joined.strftime('%Y-%m-%d') }}</td>
                                 <td>
-                                    {% if not user.is_admin %}
-                                        <form method="POST" action="{{ url_for('admin_toggle_admin', user_id=user._id) }}" style="display: inline;">
-                                            <button type="submit" class="btn btn-sm btn-success me-1">Make Admin</button>
-                                        </form>
-                                        <form method="POST" action="{{ url_for('admin_ban_user', user_id=user._id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to ban this user? This will permanently delete their account and all records.');">
-                                            <button type="submit" class="btn btn-sm btn-danger">Ban User</button>
-                                        </form>
-                                    {% else %}
-                                        <span class="text-muted">Protected Admin</span>
-                                    {% endif %}
+                                    <div class="btn-group" role="group">
+                                        {% if not user.is_admin %}
+                                            <form method="POST" action="{{ url_for('admin_toggle_admin', user_id=user._id) }}" class="d-inline">
+                                                <button type="submit" class="btn btn-sm btn-success" title="Make Admin">
+                                                    <i class="fas fa-user-shield"></i>
+                                                </button>
+                                            </form>
+                                            <form method="POST" action="{{ url_for('admin_reset_user', user_id=user._id) }}" class="d-inline" 
+                                                  onsubmit="return confirm('Reset {{ user.username }}? This will delete ALL their records and reset points to 0!');">
+                                                <button type="submit" class="btn btn-sm btn-warning" title="Reset Points & Records">
+                                                    <i class="fas fa-undo"></i>
+                                                </button>
+                                            </form>
+                                            <form method="POST" action="{{ url_for('admin_ban_user', user_id=user._id) }}" class="d-inline" 
+                                                  onsubmit="return confirm('Ban {{ user.username }}? This will permanently delete their account and all records!');">
+                                                <button type="submit" class="btn btn-sm btn-danger" title="Ban User">
+                                                    <i class="fas fa-ban"></i>
+                                                </button>
+                                            </form>
+                                        {% else %}
+                                            <span class="badge bg-info">Protected Admin</span>
+                                        {% endif %}
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}

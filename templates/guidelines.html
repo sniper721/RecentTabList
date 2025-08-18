@@ -1,0 +1,239 @@
+{% extends "layout.html" %}
+
+{% block title %}Community Guidelines - GD Recent Tab List{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h1 class="mb-0">📖 Community Guidelines</h1>
+                    <p class="mb-0 mt-2">Rules and guidelines for the GD Recent Tab List community</p>
+                </div>
+                <div class="card-body">
+                    
+                    <!-- General Rules -->
+                    <section class="mb-5">
+                        <h2 class="text-primary mb-3">🏛️ General Community Rules</h2>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card border-success mb-3">
+                                    <div class="card-header bg-success text-white">
+                                        <h5 class="mb-0">✅ Do's</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="list-unstyled">
+                                            <li class="mb-2">✅ Be respectful to all community members</li>
+                                            <li class="mb-2">✅ Follow Discord server rules</li>
+                                            <li class="mb-2">✅ Provide constructive feedback</li>
+                                            <li class="mb-2">✅ Help newcomers learn the ropes</li>
+                                            <li class="mb-2">✅ Report bugs and issues properly</li>
+                                            <li class="mb-2">✅ Use appropriate language</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card border-danger mb-3">
+                                    <div class="card-header bg-danger text-white">
+                                        <h5 class="mb-0">❌ Don'ts</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="list-unstyled">
+                                            <li class="mb-2">❌ No harassment or bullying</li>
+                                            <li class="mb-2">❌ No spam or excessive self-promotion</li>
+                                            <li class="mb-2">❌ No hate speech or discrimination</li>
+                                            <li class="mb-2">❌ No sharing of inappropriate content</li>
+                                            <li class="mb-2">❌ No doxxing or sharing personal info</li>
+                                            <li class="mb-2">❌ No impersonation of staff/players</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Record Submission Guidelines -->
+                    <section class="mb-5">
+                        <h2 class="text-primary mb-3">🎥 Record Submission Guidelines</h2>
+                        
+                        <div class="alert alert-info">
+                            <h5><i class="fas fa-info-circle me-2"></i>Important Notice</h5>
+                            <p class="mb-0">All records must be legitimate and follow these strict guidelines. Fake or cheated records will result in immediate penalties.</p>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h4 class="text-success">📹 Video Requirements</h4>
+                                <ul>
+                                    <li><strong>Platform:</strong> YouTube links only (youtube.com or youtu.be)</li>
+                                    <li><strong>Quality:</strong> Minimum 720p resolution recommended</li>
+                                    <li><strong>Audio:</strong> Game audio must be audible</li>
+                                    <li><strong>Length:</strong> Show full attempt from start to completion/death</li>
+                                    <li><strong>Visibility:</strong> Video must be public or unlisted (not private)</li>
+                                    <li><strong>Editing:</strong> Minimal editing allowed, no cuts during gameplay</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h4 class="text-warning">⚠️ Technical Requirements</h4>
+                                <ul>
+                                    <li><strong>FPS:</strong> Show FPS counter if playing on high refresh rate</li>
+                                    <li><strong>Clicks:</strong> Click sounds or visual indicators recommended</li>
+                                    <li><strong>Progress:</strong> Must show clear progress percentage</li>
+                                    <li><strong>Attempts:</strong> Show multiple attempts for credibility</li>
+                                    <li><strong>Raw Footage:</strong> Unedited gameplay preferred</li>
+                                    <li><strong>Handcam:</strong> Required for top 10 completions</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="card bg-light mt-3">
+                            <div class="card-body">
+                                <h5 class="text-primary">📊 Progress Requirements</h5>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="text-center p-3 border rounded bg-success text-white">
+                                            <h6>100% Completion</h6>
+                                            <p class="mb-0">Full level completion<br><strong>Full Points</strong></p>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="text-center p-3 border rounded bg-warning text-white">
+                                            <h6>List% Completion</h6>
+                                            <p class="mb-0">Minimum required %<br><strong>10% of Points</strong></p>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="text-center p-3 border rounded bg-secondary text-white">
+                                            <h6>Below Minimum</h6>
+                                            <p class="mb-0">Under required %<br><strong>No Points</strong></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Level Submission Guidelines -->
+                    <section class="mb-5">
+                        <h2 class="text-primary mb-3">🎮 Level Submission Guidelines</h2>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h4 class="text-info">📋 Level Criteria</h4>
+                                <ul>
+                                    <li><strong>Difficulty:</strong> Must be Recent Tab difficulty (6-10 stars)</li>
+                                    <li><strong>Quality:</strong> Well-decorated and engaging gameplay</li>
+                                    <li><strong>Length:</strong> Appropriate length for difficulty</li>
+                                    <li><strong>Originality:</strong> Unique and creative design</li>
+                                    <li><strong>Verification:</strong> Must have a legitimate verification video</li>
+                                    <li><strong>Accessibility:</strong> Level must be publicly available</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h4 class="text-danger">🚫 Disqualifying Factors</h4>
+                                <ul>
+                                    <li><strong>Copied/Stolen:</strong> Levels that copy existing content</li>
+                                    <li><strong>Inappropriate:</strong> Offensive or inappropriate content</li>
+                                    <li><strong>Buggy:</strong> Levels with game-breaking bugs</li>
+                                    <li><strong>Impossible:</strong> Levels that are humanly impossible</li>
+                                    <li><strong>Auto/Spam:</strong> Auto levels or spam gameplay</li>
+                                    <li><strong>Private:</strong> Levels that are not publicly accessible</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Moderation and Appeals -->
+                    <section class="mb-5">
+                        <h2 class="text-primary mb-3">⚖️ Moderation & Appeals</h2>
+                        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="card border-warning">
+                                    <div class="card-header bg-warning text-dark">
+                                        <h5 class="mb-0">⚠️ Warning System</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <p><strong>1st Offense:</strong> Warning + Record removal</p>
+                                        <p><strong>2nd Offense:</strong> 7-day submission ban</p>
+                                        <p><strong>3rd Offense:</strong> 30-day submission ban</p>
+                                        <p class="mb-0"><strong>Severe Violations:</strong> Permanent ban</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card border-info">
+                                    <div class="card-header bg-info text-white">
+                                        <h5 class="mb-0">📞 Appeal Process</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <p><strong>Step 1:</strong> Contact moderators on Discord</p>
+                                        <p><strong>Step 2:</strong> Provide evidence/explanation</p>
+                                        <p><strong>Step 3:</strong> Wait for review (1-7 days)</p>
+                                        <p class="mb-0"><strong>Step 4:</strong> Accept final decision</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card border-success">
+                                    <div class="card-header bg-success text-white">
+                                        <h5 class="mb-0">🎯 Best Practices</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <p><strong>Quality over Quantity:</strong> Submit your best records</p>
+                                        <p><strong>Patience:</strong> Reviews take time</p>
+                                        <p><strong>Communication:</strong> Ask questions if unsure</p>
+                                        <p class="mb-0"><strong>Improvement:</strong> Learn from feedback</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Contact Information -->
+                    <section class="mb-4">
+                        <h2 class="text-primary mb-3">📞 Contact & Support</h2>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card bg-primary text-white">
+                                    <div class="card-body text-center">
+                                        <h5><i class="fab fa-discord me-2"></i>Discord Server</h5>
+                                        <p>Join our community for real-time support and discussions</p>
+                                        <a href="https://discord.gg/TSjXSecuaz" class="btn btn-light" target="_blank">
+                                            Join Discord
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card bg-secondary text-white">
+                                    <div class="card-body">
+                                        <h5><i class="fas fa-users me-2"></i>Staff Team</h5>
+                                        <p><strong>List Admin:</strong> Miifin</p>
+                                        <p><strong>Moderators:</strong> Kye, Monika, DetiousMage, DairyFarmer</p>
+                                        <p><strong>Developer:</strong> ENGINE</p>
+                                        <p class="mb-0"><strong>Server Mod:</strong> Cesium</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Footer Notice -->
+                    <div class="alert alert-primary">
+                        <h5><i class="fas fa-exclamation-triangle me-2"></i>Important Notice</h5>
+                        <p class="mb-0">
+                            These guidelines are subject to change. All community members are expected to stay updated with the latest rules. 
+                            Ignorance of the guidelines is not an excuse for violations. By participating in our community, you agree to follow these guidelines.
+                        </p>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

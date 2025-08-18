@@ -182,6 +182,15 @@ def get_video_embed_info(video_url):
             'video_id': video_id
         }
     
+    # Vimeo support
+    elif 'vimeo.com' in video_url:
+        video_id = video_url.split('/')[-1].split('?')[0]
+        return {
+            'platform': 'vimeo',
+            'embed_url': f'https://player.vimeo.com/video/{video_id}',
+            'video_id': video_id
+        }
+    
     # TikTok support
     elif 'tiktok.com' in video_url:
         # Extract video ID from TikTok URL
@@ -266,7 +275,9 @@ def reinitialize_db_connection():
 
 def calculate_record_points(record, level):
     """Calculate points earned from a record"""
-    if record['status'] != 'approved' or level.get('is_legacy', False):
+    # Handle both dict and aggregation result formats
+    status = record.get('status', 'pending')
+    if status != 'approved' or level.get('is_legacy', False):
         return 0
     
     # Full completion
@@ -280,7 +291,7 @@ def calculate_record_points(record, level):
     return 0
 
 def update_user_points(user_id):
-    """Recalculate and update user's total points - OPTIMIZED with aggregation"""
+    """Recalculate and update user's total points - FIXED aggregation handling"""
     # Use aggregation to join records with levels in a single query
     pipeline = [
         {"$match": {"user_id": user_id, "status": "approved"}},
@@ -293,8 +304,10 @@ def update_user_points(user_id):
         {"$unwind": "$level"},
         {"$project": {
             "progress": 1,
+            "status": 1,  # Include status field
             "level.points": 1,
-            "level.is_legacy": 1
+            "level.is_legacy": 1,
+            "level.min_percentage": 1
         }}
     ]
     
@@ -303,7 +316,16 @@ def update_user_points(user_id):
     
     for record in records_with_levels:
         level = record['level']
-        total_points += calculate_record_points(record, level)
+        # Ensure record has status field for calculation
+        record_with_status = {
+            'progress': record['progress'],
+            'status': record.get('status', 'approved')  # Default to approved since we filtered for it
+        }
+        points = calculate_record_points(record_with_status, level)
+        total_points += points
+        print(f"DEBUG: User {user_id} - Record progress {record['progress']}% = {points} points")
+    
+    print(f"DEBUG: User {user_id} total points: {total_points}")
     
     mongo_db.users.update_one(
         {"_id": user_id},
@@ -320,24 +342,82 @@ def shift_level_positions(position, is_legacy=False, direction=1):
 
 def recalculate_all_points():
     """Recalculate points for all levels based on their current positions - OPTIMIZED with bulk operations"""
+    from pymongo import UpdateOne
+    
     levels = list(mongo_db.levels.find({}, {"_id": 1, "position": 1, "is_legacy": 1, "points": 1}))
     
-    # Prepare bulk operations
+    # Prepare bulk operations using proper MongoDB UpdateOne objects
     bulk_operations = []
     for level in levels:
         new_points = calculate_level_points(level['position'], level.get('is_legacy', False))
         if level.get('points') != new_points:
             bulk_operations.append(
-                {"updateOne": {
-                    "filter": {"_id": level['_id']},
-                    "update": {"$set": {"points": new_points}}
-                }}
+                UpdateOne(
+                    {"_id": level['_id']},
+                    {"$set": {"points": new_points}}
+                )
             )
     
     # Execute all updates in a single bulk operation
     if bulk_operations:
         mongo_db.levels.bulk_write(bulk_operations)
         print(f"Updated points for {len(bulk_operations)} levels")
+
+def log_admin_action(admin_username, action, details=""):
+    """Log admin actions to Discord"""
+    try:
+        import requests
+        import os
+        
+        webhook_url = os.environ.get('DISCORD_WEBHOOK_URL')
+        if not webhook_url:
+            print("No Discord webhook URL configured for admin logs")
+            return
+        
+        embed = {
+            "title": "🔧 Admin Action",
+            "color": 0xff9500,  # Orange color
+            "fields": [
+                {
+                    "name": "👤 Admin",
+                    "value": admin_username,
+                    "inline": True
+                },
+                {
+                    "name": "⚡ Action",
+                    "value": action,
+                    "inline": True
+                },
+                {
+                    "name": "🕒 Time",
+                    "value": datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"),
+                    "inline": True
+                }
+            ],
+            "footer": {
+                "text": "RTL Admin Logs"
+            }
+        }
+        
+        if details:
+            embed["fields"].append({
+                "name": "📝 Details",
+                "value": details,
+                "inline": False
+            })
+        
+        payload = {
+            "embeds": [embed]
+        }
+        
+        response = requests.post(webhook_url, json=payload, timeout=10)
+        if response.status_code == 204:
+            print(f"Admin action logged: {action}")
+        else:
+            print(f"Failed to log admin action: {response.status_code}")
+            
+    except Exception as e:
+        print(f"Error logging admin action: {e}")
 
 def send_discord_notification_direct(username, level_name, progress, video_url):
     """Direct Discord notification without external file"""
@@ -401,9 +481,350 @@ def send_discord_notification_direct(username, level_name, progress, video_url):
 
 print("Setting up routes...")
 
+@app.route('/thumb/<path:url>')
+def thumbnail_proxy(url):
+    """SIMPLE thumbnail proxy - just pass through the URL"""
+    import requests
+    from flask import Response
+    from urllib.parse import unquote
+    
+    try:
+        # Decode the URL
+        url = unquote(url)
+        
+        # Simple headers
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        # Just fetch and return the image
+        response = requests.get(url, headers=headers, timeout=5)
+        
+        if response.status_code == 200:
+            return Response(
+                response.content,
+                mimetype='image/jpeg',
+                headers={'Cache-Control': 'public, max-age=3600'}
+            )
+        else:
+            # Return 1x1 transparent pixel as fallback
+            return Response(
+                b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xdb\x00\x00\x00\x00IEND\xaeB`\x82',
+                mimetype='image/png'
+            )
+            
+    except Exception as e:
+        print(f"Thumbnail error: {e}")
+        # Return 1x1 transparent pixel
+        return Response(
+            b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xdb\x00\x00\x00\x00IEND\xaeB`\x82',
+            mimetype='image/png'
+        )
+
 @app.route('/test')
 def test():
     return "<h1>Test route works!</h1>"
+
+@app.route('/test_images_simple')
+def test_images_simple():
+    """Simple image test with known YouTube videos"""
+    test_levels = [
+        {
+            'name': 'Test Level 1',
+            'video_url': 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            'position': 1
+        },
+        {
+            'name': 'Test Level 2', 
+            'video_url': 'https://youtu.be/9bZkp7q19f0',
+            'position': 2
+        },
+        {
+            'name': 'Test Level 3',
+            'video_url': 'https://www.youtube.com/watch?v=KDjwz-Lt-Qo',
+            'position': 3
+        },
+        {
+            'name': 'Test Level 4 (No Video)',
+            'video_url': '',
+            'position': 4
+        }
+    ]
+    
+    html = """
+    <h2>🧪 Simple Image Test</h2>
+    <p>Testing the new clean image code...</p>
+    <div style="display: flex; flex-wrap: wrap; gap: 20px;">
+    """
+    
+    for level in test_levels:
+        video_url = level['video_url']
+        level_name = level['name']
+        
+        # Same logic as template
+        if video_url and 'youtube.com' in video_url and 'v=' in video_url:
+            video_id = video_url.split('v=')[1].split('&')[0]
+            img_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" alt="{level_name}" style="width: 206px; height: 116px; object-fit: cover; border-radius: 8px;">'
+        elif video_url and 'youtu.be' in video_url:
+            video_id = video_url.split('youtu.be/')[1].split('?')[0]
+            img_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" alt="{level_name}" style="width: 206px; height: 116px; object-fit: cover; border-radius: 8px;">'
+        else:
+            img_html = '<div style="width: 206px; height: 116px; background: #f8f9fa; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #6c757d;">📷 No Preview</div>'
+        
+        html += f"""
+        <div style="border: 1px solid #ddd; padding: 15px; border-radius: 8px; background: white;">
+            <h4>#{level['position']} - {level_name}</h4>
+            <p><strong>Video URL:</strong> {video_url if video_url else 'None'}</p>
+            <div style="margin: 10px 0;">
+                {img_html}
+            </div>
+        </div>
+        """
+    
+    html += """
+    </div>
+    <p style="margin-top: 20px;">
+        <a href="/">← Back to main list</a> | 
+        <a href="/test_images_simple">🔄 Refresh test</a>
+    </p>
+    """
+    
+    return html
+
+@app.route('/stress_test_images')
+def stress_test_images():
+    """Stress test images with multiple refreshes"""
+    import time
+    from datetime import datetime
+    
+    html = f"""
+    <h2>🔥 Image Stress Test</h2>
+    <p><strong>Test Time:</strong> {datetime.now().strftime('%H:%M:%S')}</p>
+    <p>This page will auto-refresh every 5 seconds to test image stability...</p>
+    
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin: 20px 0;">
+    """
+    
+    # Test with real levels from database
+    try:
+        levels = list(mongo_db.levels.find(
+            {"is_legacy": False, "video_url": {"$exists": True, "$ne": ""}},
+            {"name": 1, "video_url": 1, "position": 1}
+        ).limit(12))
+        
+        for level in levels:
+            video_url = level.get('video_url', '')
+            level_name = level.get('name', 'Unknown')
+            position = level.get('position', 0)
+            
+            if video_url and 'youtube.com' in video_url and 'v=' in video_url:
+                video_id = video_url.split('v=')[1].split('&')[0]
+                img_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" alt="{level_name}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px;" onload="this.style.border=\'2px solid green\'" onerror="this.style.border=\'2px solid red\'">'
+            elif video_url and 'youtu.be' in video_url:
+                video_id = video_url.split('youtu.be/')[1].split('?')[0]
+                img_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" alt="{level_name}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px;" onload="this.style.border=\'2px solid green\'" onerror="this.style.border=\'2px solid red\'">'
+            else:
+                img_html = '<div style="width: 100%; height: 120px; background: #f8f9fa; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #6c757d; border: 2px solid orange;">📷 No Preview</div>'
+            
+            html += f"""
+            <div style="border: 1px solid #ddd; padding: 10px; border-radius: 8px; background: white;">
+                <h5>#{position} - {level_name[:20]}{'...' if len(level_name) > 20 else ''}</h5>
+                <div style="margin: 10px 0;">
+                    {img_html}
+                </div>
+                <small style="color: #666; word-break: break-all;">{video_url[:50]}{'...' if len(video_url) > 50 else ''}</small>
+            </div>
+            """
+            
+    except Exception as e:
+        html += f'<p style="color: red;">Database error: {e}</p>'
+    
+    html += """
+    </div>
+    
+    <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+        <h4>🎯 Test Results:</h4>
+        <ul>
+            <li><strong>Green border:</strong> Image loaded successfully ✅</li>
+            <li><strong>Red border:</strong> Image failed to load ❌</li>
+            <li><strong>Orange border:</strong> No video URL provided ⚠️</li>
+        </ul>
+    </div>
+    
+    <p>
+        <a href="/">← Back to main list</a> | 
+        <a href="/stress_test_images">🔄 Manual refresh</a> |
+        <a href="/test_images_simple">Simple test</a>
+    </p>
+    
+    <script>
+        // Auto-refresh every 5 seconds for stress testing
+        setTimeout(function() {
+            window.location.reload();
+        }, 5000);
+        
+        // Count successful/failed images
+        setTimeout(function() {
+            const images = document.querySelectorAll('img');
+            let loaded = 0, failed = 0;
+            images.forEach(img => {
+                if (img.style.border.includes('green')) loaded++;
+                if (img.style.border.includes('red')) failed++;
+            });
+            console.log(`Images: ${loaded} loaded, ${failed} failed`);
+        }, 2000);
+    </script>
+    """
+    
+    return html
+
+@app.route('/debug_images')
+def debug_images():
+    """Debug route to check what's actually in the database"""
+    try:
+        # Get ALL levels and see what we have
+        levels = list(mongo_db.levels.find(
+            {},
+            {"name": 1, "thumbnail_url": 1, "video_url": 1, "position": 1}
+        ).sort("position", 1).limit(20))
+        
+        html = "<h2>🔍 Debug: What's Actually in the Database</h2>"
+        html += f"<p>Checking first 20 levels...</p>"
+        
+        for level in levels:
+            thumbnail_url = level.get('thumbnail_url', '')
+            video_url = level.get('video_url', '')
+            
+            # Build the image part separately to avoid nested f-string issues
+            image_part = ""
+            if thumbnail_url:
+                image_part = f'<p><img src="{thumbnail_url}" style="max-width: 200px; border: 1px solid red;" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'block\'"><div style="display:none; background:#f0f0f0; padding:10px;">❌ FAILED TO LOAD</div></p>'
+            else:
+                image_part = '<p>❌ No thumbnail URL</p>'
+            
+            html += f"""
+            <div style="border: 1px solid #ccc; margin: 10px; padding: 10px; background: #f9f9f9;">
+                <h4>#{level.get('position', '?')} - {level.get('name', 'Unknown')}</h4>
+                <p><strong>Thumbnail URL:</strong> <code>{thumbnail_url if thumbnail_url else 'EMPTY'}</code></p>
+                <p><strong>Video URL:</strong> <code>{video_url if video_url else 'EMPTY'}</code></p>
+                {image_part}
+            </div>
+            """
+        
+        html += '<p><a href="/">← Back to main list</a> | <a href="/fix_all_images">Fix All Images</a></p>'
+        return html
+        
+    except Exception as e:
+        return f"Error: {e}"
+
+@app.route('/fix_all_images')
+def fix_all_images():
+    """Fix ALL image URLs in database - nuclear option"""
+    try:
+        results = []
+        fixed_count = 0
+        
+        # Get ALL levels
+        all_levels = list(mongo_db.levels.find({}))
+        
+        for level in all_levels:
+            video_url = level.get('video_url', '')
+            current_thumbnail = level.get('thumbnail_url', '')
+            
+            new_thumbnail = None
+            
+            # If it has a YouTube video, generate thumbnail
+            if video_url and ('youtube.com' in video_url or 'youtu.be' in video_url):
+                video_id = None
+                if 'watch?v=' in video_url:
+                    video_id = video_url.split('watch?v=')[1].split('&')[0]
+                elif 'youtu.be/' in video_url:
+                    video_id = video_url.split('youtu.be/')[1].split('?')[0]
+                
+                if video_id:
+                    new_thumbnail = f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg"
+            
+            # Update if we have a new thumbnail or need to clear a bad one
+            if new_thumbnail and new_thumbnail != current_thumbnail:
+                mongo_db.levels.update_one(
+                    {"_id": level["_id"]},
+                    {"$set": {"thumbnail_url": new_thumbnail}}
+                )
+                fixed_count += 1
+                results.append(f"✅ {level.get('name', 'Unknown')}: {new_thumbnail}")
+            elif not video_url and current_thumbnail:
+                # Clear thumbnail if no video
+                mongo_db.levels.update_one(
+                    {"_id": level["_id"]},
+                    {"$set": {"thumbnail_url": ""}}
+                )
+                results.append(f"🗑️ Cleared {level.get('name', 'Unknown')}: no video")
+        
+        # Clear cache
+        global levels_cache
+        levels_cache.clear()
+        
+        html = f"<h2>🔧 Fixed {fixed_count} images total</h2>"
+        html += "<h3>Changes made:</h3><ul>"
+        for result in results[:30]:  # Show first 30
+            html += f"<li>{result}</li>"
+        html += "</ul>"
+        html += f'<p><a href="/debug_images">Check results</a> | <a href="/">Main list</a></p>'
+        
+        return html
+        
+    except Exception as e:
+        return f"Error fixing all images: {e}"
+
+@app.route('/test_images')
+def test_images():
+    """Test what data is actually being passed to templates"""
+    try:
+        # Get first 5 levels exactly like the main route does
+        main_list = list(mongo_db.levels.find(
+            {"is_legacy": False},
+            {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, "level_id": 1, "difficulty": 1, "thumbnail_url": 1, "video_url": 1}
+        ).sort("position", 1).limit(5))
+        
+        html = "<h2>🧪 Test: Data Being Passed to Template</h2>"
+        
+        for level in main_list:
+            thumbnail_url = level.get('thumbnail_url', '')
+            video_url = level.get('video_url', '')
+            level_name = level.get('name', 'Unknown')
+            
+            # Test the same logic as the template
+            img_src = ''
+            if thumbnail_url and thumbnail_url.strip() != '':
+                img_src = thumbnail_url
+            elif video_url and 'youtube.com' in video_url and 'watch?v=' in video_url:
+                video_id = video_url.split('watch?v=')[1].split('&')[0]
+                img_src = f'https://img.youtube.com/vi/{video_id}/mqdefault.jpg'
+            elif video_url and 'youtu.be' in video_url:
+                video_id = video_url.split('youtu.be/')[1].split('?')[0]
+                img_src = f'https://img.youtube.com/vi/{video_id}/mqdefault.jpg'
+            
+            # Build image test HTML separately to avoid f-string issues
+            if img_src:
+                image_test = f'<p><strong>TEST IMAGE:</strong><br><img src="{img_src}" style="max-width: 200px; border: 2px solid green;" onload="this.style.border=\'2px solid green\'" onerror="this.style.border=\'2px solid red\'; this.nextElementSibling.style.display=\'block\'"><div style="display:none; color:red;">❌ FAILED TO LOAD</div></p>'
+            else:
+                image_test = '<p style="color: red;">❌ NO IMAGE SOURCE COMPUTED</p>'
+            
+            html += f"""
+            <div style="border: 2px solid #007bff; margin: 15px; padding: 15px; background: #f8f9fa;">
+                <h4>#{level.get('position', '?')} - {level_name}</h4>
+                <p><strong>Raw thumbnail_url:</strong> <code>"{thumbnail_url}"</code></p>
+                <p><strong>Raw video_url:</strong> <code>"{video_url}"</code></p>
+                <p><strong>Computed img_src:</strong> <code>"{img_src}"</code></p>
+                {image_test}
+            </div>
+            """
+        
+        html += '<p><a href="/">← Back to main list</a></p>'
+        return html
+        
+    except Exception as e:
+        return f"Error testing images: {e}"
 
 @app.route('/clear_cache')
 def clear_cache():
@@ -604,6 +1025,403 @@ def fix_base64():
     except Exception as e:
         return f"Error fixing Base64: {e}"
 
+@app.route('/fix_thumbnails')
+def fix_thumbnails():
+    """Comprehensive thumbnail system fix"""
+    try:
+        import os
+        import shutil
+        
+        results = []
+        
+        # 1. Clear thumbnail cache
+        cache_dir = 'static/thumbs'
+        if os.path.exists(cache_dir):
+            shutil.rmtree(cache_dir)
+            results.append("✅ Cleared thumbnail cache")
+        
+        os.makedirs(cache_dir, exist_ok=True)
+        results.append("✅ Created fresh thumbnail cache directory")
+        
+        # 2. Remove Base64 thumbnails
+        base64_count = mongo_db.levels.count_documents({"thumbnail_url": {"$regex": "^data:"}})
+        if base64_count > 0:
+            mongo_db.levels.update_many(
+                {"thumbnail_url": {"$regex": "^data:"}},
+                {"$set": {"thumbnail_url": ""}}
+            )
+            results.append(f"✅ Removed {base64_count} Base64 thumbnails")
+        
+        # 3. Fix YouTube URLs
+        youtube_levels = list(mongo_db.levels.find({
+            "video_url": {"$regex": "youtube|youtu.be", "$options": "i"}
+        }))
+        
+        fixed_youtube = 0
+        for level in youtube_levels:
+            video_url = level.get('video_url', '')
+            if video_url and not level.get('thumbnail_url'):
+                # Extract video ID and create thumbnail URL
+                video_id = None
+                if 'watch?v=' in video_url:
+                    video_id = video_url.split('watch?v=')[1].split('&')[0]
+                elif 'youtu.be/' in video_url:
+                    video_id = video_url.split('youtu.be/')[1].split('?')[0]
+                
+                if video_id:
+                    thumbnail_url = f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg"
+                    mongo_db.levels.update_one(
+                        {"_id": level["_id"]},
+                        {"$set": {"thumbnail_url": thumbnail_url}}
+                    )
+                    fixed_youtube += 1
+        
+        if fixed_youtube > 0:
+            results.append(f"✅ Fixed {fixed_youtube} YouTube thumbnails")
+        
+        # 4. Clear levels cache to force reload
+        global levels_cache
+        levels_cache.clear()
+        results.append("✅ Cleared levels cache")
+        
+        # 5. Create placeholder for missing thumbnails
+        placeholder_path = os.path.join(cache_dir, 'placeholder.jpg')
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+            
+            img = Image.new('RGB', (320, 180), color='#f8f9fa')
+            draw = ImageDraw.Draw(img)
+            
+            try:
+                font = ImageFont.truetype("arial.ttf", 24)
+            except:
+                font = ImageFont.load_default()
+            
+            text = "No Thumbnail"
+            bbox = draw.textbbox((0, 0), text, font=font)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+            
+            x = (320 - text_width) // 2
+            y = (180 - text_height) // 2
+            
+            draw.text((x, y), text, fill='#6c757d', font=font)
+            img.save(placeholder_path, 'JPEG', quality=85)
+            results.append("✅ Created placeholder thumbnail")
+            
+        except Exception as e:
+            results.append(f"⚠️ Could not create placeholder: {e}")
+        
+        return f"""
+        <h2>🔧 Thumbnail System Fixed!</h2>
+        <div style="font-family: monospace; background: #f8f9fa; padding: 20px; border-radius: 8px;">
+            {'<br>'.join(results)}
+        </div>
+        <br>
+        <p><a href="/instant_load" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🔄 Reload Data</a></p>
+        <p><a href="/" style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🏠 Back to Main</a></p>
+        <p><a href="/test_thumbnails" style="background: #ffc107; color: black; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🧪 Test Thumbnails</a></p>
+        """
+        
+    except Exception as e:
+        return f"❌ Error fixing thumbnails: {e}"
+
+@app.route('/test_thumbnails')
+def test_thumbnails():
+    """Test thumbnail system with sample URLs"""
+    try:
+        import requests
+        
+        test_urls = [
+            "https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg",  # Rick Roll
+            "https://img.youtube.com/vi/9bZkp7q19f0/mqdefault.jpg",  # Gangnam Style
+            "https://example.com/nonexistent.jpg",  # Should fail gracefully
+        ]
+        
+        results = []
+        
+        for url in test_urls:
+            try:
+                # Test our thumbnail proxy
+                proxy_url = f"/thumb/{url}"
+                results.append(f"✅ Proxy URL: <a href='{proxy_url}' target='_blank'>{proxy_url}</a>")
+                
+                # Test direct access
+                response = requests.head(url, timeout=5)
+                if response.status_code == 200:
+                    results.append(f"✅ Direct access OK: {url}")
+                else:
+                    results.append(f"⚠️ Direct access failed ({response.status_code}): {url}")
+                    
+            except Exception as e:
+                results.append(f"❌ Error testing {url}: {e}")
+        
+        return f"""
+        <h2>🧪 Thumbnail System Test</h2>
+        <div style="font-family: monospace; background: #f8f9fa; padding: 20px; border-radius: 8px;">
+            {'<br>'.join(results)}
+        </div>
+        <br>
+        <h3>Sample Thumbnails:</h3>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            {' '.join([f'<img src="/thumb/{url}" style="max-width: 200px; border: 1px solid #ddd;" onerror="this.style.display=\'none\'">' for url in test_urls])}
+        </div>
+        <br>
+        <p><a href="/" style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🏠 Back to Main</a></p>
+        """
+        
+    except Exception as e:
+        return f"❌ Error testing thumbnails: {e}"
+
+@app.route('/debug_records')
+def debug_records():
+    """Debug route to check record and points system"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return "Access denied - Admin only"
+    
+    try:
+        # Get some sample data
+        pending_count = mongo_db.records.count_documents({"status": "pending"})
+        approved_count = mongo_db.records.count_documents({"status": "approved"})
+        total_users = mongo_db.users.count_documents({})
+        total_levels = mongo_db.levels.count_documents({})
+        
+        # Get a sample pending record
+        sample_record = mongo_db.records.find_one({"status": "pending"})
+        
+        # Get a sample user with points
+        sample_user = mongo_db.users.find_one({"points": {"$gt": 0}})
+        
+        # Get a sample level
+        sample_level = mongo_db.levels.find_one({})
+        
+        results = [
+            f"📊 Database Status:",
+            f"- Pending records: {pending_count}",
+            f"- Approved records: {approved_count}",
+            f"- Total users: {total_users}",
+            f"- Total levels: {total_levels}",
+            "",
+            f"🔍 Sample Data:",
+        ]
+        
+        if sample_record:
+            results.append(f"- Sample pending record: ID {sample_record['_id']}, Progress {sample_record.get('progress', 'N/A')}%")
+        else:
+            results.append("- No pending records found")
+        
+        if sample_user:
+            results.append(f"- Sample user with points: {sample_user.get('username', 'N/A')} ({sample_user.get('points', 0)} points)")
+        else:
+            results.append("- No users with points found")
+        
+        if sample_level:
+            results.append(f"- Sample level: {sample_level.get('name', 'N/A')} (Position {sample_level.get('position', 'N/A')}, Points {sample_level.get('points', 'N/A')})")
+        else:
+            results.append("- No levels found")
+        
+        # Test points calculation
+        if sample_record and sample_level:
+            test_record = dict(sample_record)
+            test_record['status'] = 'approved'
+            test_points = calculate_record_points(test_record, sample_level)
+            results.append(f"- Test points calculation: {test_points} points for {test_record.get('progress', 'N/A')}% on {sample_level.get('name', 'N/A')}")
+        
+        return f"""
+        <h2>🔧 Record System Debug</h2>
+        <div style="font-family: monospace; background: #f8f9fa; padding: 20px; border-radius: 8px;">
+            {'<br>'.join(results)}
+        </div>
+        <br>
+        <p><a href="/admin" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🏠 Back to Admin</a></p>
+        """
+        
+    except Exception as e:
+        return f"❌ Error debugging records: {e}"
+
+@app.route('/quick_fix')
+def quick_fix():
+    """Quick fix for common issues"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return "Access denied - Admin only"
+    
+    try:
+        results = []
+        
+        # 1. Fix missing points in levels
+        levels_without_points = mongo_db.levels.count_documents({"points": {"$exists": False}})
+        if levels_without_points > 0:
+            # Update levels without points
+            for level in mongo_db.levels.find({"points": {"$exists": False}}):
+                position = level.get('position', 1)
+                is_legacy = level.get('is_legacy', False)
+                level_type = level.get('level_type', 'Level')
+                points = calculate_level_points(position, is_legacy, level_type)
+                
+                mongo_db.levels.update_one(
+                    {"_id": level["_id"]},
+                    {"$set": {"points": points}}
+                )
+            
+            results.append(f"✅ Fixed {levels_without_points} levels without points")
+        
+        # 2. Fix missing points in users
+        users_without_points = mongo_db.users.count_documents({"points": {"$exists": False}})
+        if users_without_points > 0:
+            mongo_db.users.update_many(
+                {"points": {"$exists": False}},
+                {"$set": {"points": 0}}
+            )
+            results.append(f"✅ Fixed {users_without_points} users without points")
+        
+        # 3. Recalculate all user points
+        users_with_records = mongo_db.records.distinct("user_id", {"status": "approved"})
+        points_fixed = 0
+        for user_id in users_with_records:
+            try:
+                update_user_points(user_id)
+                points_fixed += 1
+            except Exception as e:
+                print(f"Error updating points for user {user_id}: {e}")
+        
+        results.append(f"✅ Recalculated points for {points_fixed}/{len(users_with_records)} users")
+        
+        # 4. Fix missing min_percentage in levels
+        levels_without_min_pct = mongo_db.levels.count_documents({"min_percentage": {"$exists": False}})
+        if levels_without_min_pct > 0:
+            mongo_db.levels.update_many(
+                {"min_percentage": {"$exists": False}},
+                {"$set": {"min_percentage": 100}}
+            )
+            results.append(f"✅ Fixed {levels_without_min_pct} levels without min_percentage")
+        
+        # 5. Clear levels cache
+        global levels_cache
+        levels_cache.clear()
+        results.append("✅ Cleared levels cache")
+        
+        return f"""
+        <h2>⚡ Quick Fix Complete!</h2>
+        <div style="font-family: monospace; background: #f8f9fa; padding: 20px; border-radius: 8px;">
+            {'<br>'.join(results)}
+        </div>
+        <br>
+        <p><a href="/admin" style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🏠 Back to Admin</a></p>
+        <p><a href="/debug_records" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🔍 Debug Records</a></p>
+        <p><a href="/fix_all_points" style="background: #ffc107; color: black; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🔧 Fix All Points</a></p>
+        """
+        
+    except Exception as e:
+        return f"❌ Error in quick fix: {e}"
+
+@app.route('/fix_all_points')
+def fix_all_points():
+    """Fix all user points immediately"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return "Access denied - Admin only"
+    
+    try:
+        # Get all users who have approved records
+        users_with_records = mongo_db.records.distinct("user_id", {"status": "approved"})
+        
+        results = []
+        total_fixed = 0
+        
+        for user_id in users_with_records:
+            try:
+                # Get user info
+                user = mongo_db.users.find_one({"_id": user_id})
+                if not user:
+                    continue
+                
+                old_points = user.get('points', 0)
+                
+                # Recalculate points
+                update_user_points(user_id)
+                
+                # Get new points
+                updated_user = mongo_db.users.find_one({"_id": user_id})
+                new_points = updated_user.get('points', 0) if updated_user else 0
+                
+                if new_points != old_points:
+                    results.append(f"✅ {user.get('username', 'Unknown')}: {old_points} → {new_points} points")
+                    total_fixed += 1
+                else:
+                    results.append(f"✓ {user.get('username', 'Unknown')}: {new_points} points (no change)")
+                    
+            except Exception as e:
+                results.append(f"❌ Error fixing user {user_id}: {e}")
+        
+        # Also fix users with 0 points who should have points
+        zero_point_users = mongo_db.users.count_documents({"points": {"$lte": 0}})
+        if zero_point_users > 0:
+            mongo_db.users.update_many(
+                {"points": {"$exists": False}},
+                {"$set": {"points": 0}}
+            )
+        
+        return f"""
+        <h2>🔧 All User Points Fixed!</h2>
+        <div style="font-family: monospace; background: #f8f9fa; padding: 20px; border-radius: 8px; max-height: 400px; overflow-y: auto;">
+            <strong>Fixed {total_fixed} users with point changes:</strong><br><br>
+            {'<br>'.join(results)}
+        </div>
+        <br>
+        <p><a href="/debug_records" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🔍 Check Results</a></p>
+        <p><a href="/admin" style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🏠 Back to Admin</a></p>
+        """
+        
+    except Exception as e:
+        return f"❌ Error fixing all points: {e}"
+
+@app.route('/admin/reset_user/<int:user_id>', methods=['POST'])
+def admin_reset_user(user_id):
+    """Reset a user's points and records (admin only)"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Get user info
+        user = mongo_db.users.find_one({"_id": user_id})
+        if not user:
+            flash('User not found', 'danger')
+            return redirect(url_for('admin_users'))
+        
+        # Get admin info for logging
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        
+        # Count records before deletion
+        record_count = mongo_db.records.count_documents({"user_id": user_id})
+        old_points = user.get('points', 0)
+        
+        # Delete all user's records
+        mongo_db.records.delete_many({"user_id": user_id})
+        
+        # Reset user points to 0
+        mongo_db.users.update_one(
+            {"_id": user_id},
+            {"$set": {"points": 0}}
+        )
+        
+        # Log admin action
+        log_admin_action(
+            admin_username,
+            "User Reset",
+            f"Reset {user['username']}: Deleted {record_count} records, Points {old_points} → 0"
+        )
+        
+        flash(f'✅ Reset {user["username"]}: Deleted {record_count} records and reset {old_points} points to 0', 'success')
+        
+    except Exception as e:
+        flash(f'Error resetting user: {str(e)}', 'danger')
+        print(f"Admin reset user error: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    return redirect(url_for('admin_users'))
+
 @app.route('/virtual')
 def virtual_list():
     """Virtual scrolling version - only renders visible items"""
@@ -698,57 +1516,7 @@ def virtual_list():
     </html>
     """
 
-@app.route('/thumb/<path:image_url>')
-def thumbnail_proxy(image_url):
-    """Proxy and cache thumbnails with proper headers"""
-    import requests
-    from flask import Response
-    import hashlib
-    import os
-    
-    try:
-        # Create cache directory
-        cache_dir = 'static/thumbs'
-        os.makedirs(cache_dir, exist_ok=True)
-        
-        # Create cache filename
-        url_hash = hashlib.md5(image_url.encode()).hexdigest()
-        cache_file = os.path.join(cache_dir, f"{url_hash}.jpg")
-        
-        # Check if cached
-        if os.path.exists(cache_file):
-            with open(cache_file, 'rb') as f:
-                response = Response(f.read(), mimetype='image/jpeg')
-                response.headers['Cache-Control'] = 'public, max-age=31536000'  # 1 year
-                return response
-        
-        # Download and resize image
-        response = requests.get(image_url, timeout=10)
-        if response.status_code == 200:
-            from PIL import Image
-            import io
-            
-            # Open and resize image
-            img = Image.open(io.BytesIO(response.content))
-            img.thumbnail((206, 116), Image.Resampling.LANCZOS)
-            
-            # Save to cache
-            img.save(cache_file, 'JPEG', quality=85, optimize=True)
-            
-            # Return resized image
-            img_io = io.BytesIO()
-            img.save(img_io, 'JPEG', quality=85, optimize=True)
-            img_io.seek(0)
-            
-            response = Response(img_io.getvalue(), mimetype='image/jpeg')
-            response.headers['Cache-Control'] = 'public, max-age=31536000'
-            return response
-            
-    except Exception as e:
-        print(f"Thumbnail error: {e}")
-    
-    # Fallback - return placeholder
-    return Response(status=404)
+
 
 @app.route('/instant_load')
 def instant_load():
@@ -1874,26 +2642,95 @@ def admin_move_to_main():
 
 @app.route('/admin/approve_record/<int:record_id>', methods=['POST'])
 def admin_approve_record(record_id):
+    """Enhanced record approval with better error handling and debugging"""
     if 'user_id' not in session or not session.get('is_admin'):
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
     
-    record = mongo_db.records.find_one({"_id": record_id})
-    if record:
-        mongo_db.records.update_one(
+    try:
+        print(f"DEBUG: Attempting to approve record {record_id}")
+        
+        # Get record with detailed error checking
+        record = mongo_db.records.find_one({"_id": record_id})
+        if not record:
+            flash('Record not found', 'danger')
+            print(f"DEBUG: Record {record_id} not found in database")
+            return redirect(url_for('admin'))
+        
+        print(f"DEBUG: Found record: {record}")
+        
+        # Check if already approved
+        if record.get('status') == 'approved':
+            flash('Record is already approved', 'warning')
+            return redirect(url_for('admin'))
+        
+        # Get admin info for logging
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        
+        # Get user and level info with validation
+        user = mongo_db.users.find_one({"_id": record['user_id']})
+        level = mongo_db.levels.find_one({"_id": record['level_id']})
+        
+        print(f"DEBUG: User found: {user is not None}, Level found: {level is not None}")
+        
+        if not user:
+            flash('Error: User not found for this record', 'danger')
+            return redirect(url_for('admin'))
+        
+        if not level:
+            flash('Error: Level not found for this record', 'danger')
+            return redirect(url_for('admin'))
+        
+        # Validate record data
+        if not record.get('progress') or record['progress'] < 1 or record['progress'] > 100:
+            flash('Error: Invalid progress value in record', 'danger')
+            return redirect(url_for('admin'))
+        
+        print(f"DEBUG: About to approve record. Progress: {record['progress']}, Level points: {level.get('points', 'N/A')}")
+        
+        # Approve the record with timestamp
+        approval_time = datetime.now(timezone.utc)
+        update_result = mongo_db.records.update_one(
             {"_id": record_id},
-            {"$set": {"status": "approved"}}
+            {"$set": {
+                "status": "approved",
+                "approved_by": admin_username,
+                "approved_at": approval_time
+            }}
         )
         
-        # Update user points
+        print(f"DEBUG: Record update result: {update_result.modified_count} documents modified")
+        
+        # Calculate points for this specific record
+        approved_record = dict(record)
+        approved_record['status'] = 'approved'
+        points_earned = calculate_record_points(approved_record, level)
+        
+        print(f"DEBUG: Points calculated: {points_earned}")
+        
+        # Get user's points before update
+        old_points = user.get('points', 0)
+        
+        # Update user points (recalculate all)
         update_user_points(record['user_id'])
+        
+        # Get user's points after update
+        updated_user = mongo_db.users.find_one({"_id": record['user_id']})
+        new_points = updated_user.get('points', 0) if updated_user else 0
+        
+        print(f"DEBUG: User points - Before: {old_points}, After: {new_points}, Difference: {new_points - old_points}")
+        
+        # Log admin action with more details
+        log_admin_action(
+            admin_username,
+            "Record Approved",
+            f"Approved {user['username']}'s {record['progress']}% record on {level['name']} (Position #{level.get('position', '?')}) - Earned {points_earned} points (Total: {old_points} → {new_points})"
+        )
         
         # Send Discord notification
         try:
-            user = mongo_db.users.find_one({"_id": record['user_id']})
-            level = mongo_db.levels.find_one({"_id": record['level_id']})
-            if user and level:
-                points_earned = calculate_record_points(record, level)
+            if DISCORD_AVAILABLE:
                 notify_record_approved(
                     user['username'], 
                     level['name'], 
@@ -1902,40 +2739,173 @@ def admin_approve_record(record_id):
                 )
         except Exception as e:
             print(f"Discord notification error: {e}")
+            # Don't let Discord errors break the approval process
         
-        flash('Record approved successfully!', 'success')
+        flash(f'✅ Record approved! {user["username"]} earned {points_earned} points for {record["progress"]}% on {level["name"]} (Total: {old_points} → {new_points} points)', 'success')
+        
+    except Exception as e:
+        flash(f'Error approving record: {str(e)}', 'danger')
+        print(f"Admin approve record error: {e}")
+        import traceback
+        traceback.print_exc()
     
     return redirect(url_for('admin'))
 
 @app.route('/admin/reject_record/<int:record_id>', methods=['POST'])
 def admin_reject_record(record_id):
+    """Enhanced record rejection with better error handling"""
     if 'user_id' not in session or not session.get('is_admin'):
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
     
-    # Get record info before rejecting for Discord notification
-    record = mongo_db.records.find_one({"_id": record_id})
+    try:
+        # Get record info before rejecting
+        record = mongo_db.records.find_one({"_id": record_id})
+        if not record:
+            flash('Record not found', 'danger')
+            return redirect(url_for('admin'))
+        
+        # Check if already rejected
+        if record.get('status') == 'rejected':
+            flash('Record is already rejected', 'warning')
+            return redirect(url_for('admin'))
+        
+        # Get admin info for logging
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        
+        # Get rejection reason from form if provided
+        rejection_reason = request.form.get('reason', 'No reason provided')
+        
+        # Reject the record with timestamp and reason
+        rejection_time = datetime.now(timezone.utc)
+        mongo_db.records.update_one(
+            {"_id": record_id},
+            {"$set": {
+                "status": "rejected",
+                "rejected_by": admin_username,
+                "rejected_at": rejection_time,
+                "rejection_reason": rejection_reason
+            }}
+        )
+        
+        # Get user and level info for notifications
+        user = mongo_db.users.find_one({"_id": record['user_id']})
+        level = mongo_db.levels.find_one({"_id": record['level_id']})
+        
+        if user and level:
+            # Log admin action
+            log_admin_action(
+                admin_username,
+                "Record Rejected",
+                f"Rejected {user['username']}'s {record['progress']}% record on {level['name']} - Reason: {rejection_reason}"
+            )
+            
+            # Send Discord notification
+            try:
+                if DISCORD_AVAILABLE:
+                    notify_record_rejected(
+                        user['username'], 
+                        level['name'], 
+                        record['progress']
+                    )
+            except Exception as e:
+                print(f"Discord notification error: {e}")
+            
+            flash(f'❌ Record rejected: {user["username"]}\'s {record["progress"]}% on {level["name"]}', 'warning')
+        else:
+            flash('Record rejected (user/level info unavailable)', 'warning')
+            
+    except Exception as e:
+        flash(f'Error rejecting record: {str(e)}', 'danger')
+        print(f"Admin reject record error: {e}")
+        import traceback
+        traceback.print_exc()
     
-    mongo_db.records.update_one(
-        {"_id": record_id},
-        {"$set": {"status": "rejected"}}
-    )
+    return redirect(url_for('admin'))
+
+@app.route('/admin/bulk_records', methods=['POST'])
+def admin_bulk_records():
+    """Bulk approve/reject records"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
     
-    # Send Discord notification
-    if record:
-        try:
-            user = mongo_db.users.find_one({"_id": record['user_id']})
-            level = mongo_db.levels.find_one({"_id": record['level_id']})
-            if user and level:
-                notify_record_rejected(
-                    user['username'], 
-                    level['name'], 
-                    record['progress']
-                )
-        except Exception as e:
-            print(f"Discord notification error: {e}")
+    try:
+        action = request.form.get('action')  # 'approve' or 'reject'
+        record_ids = request.form.getlist('record_ids')
+        
+        if not record_ids:
+            flash('No records selected', 'warning')
+            return redirect(url_for('admin'))
+        
+        # Convert to integers
+        record_ids = [int(rid) for rid in record_ids]
+        
+        # Get admin info
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        
+        success_count = 0
+        error_count = 0
+        
+        for record_id in record_ids:
+            try:
+                if action == 'approve':
+                    # Use existing approve logic
+                    record = mongo_db.records.find_one({"_id": record_id})
+                    if record and record.get('status') != 'approved':
+                        user = mongo_db.users.find_one({"_id": record['user_id']})
+                        level = mongo_db.levels.find_one({"_id": record['level_id']})
+                        
+                        if user and level:
+                            mongo_db.records.update_one(
+                                {"_id": record_id},
+                                {"$set": {
+                                    "status": "approved",
+                                    "approved_by": admin_username,
+                                    "approved_at": datetime.now(timezone.utc)
+                                }}
+                            )
+                            update_user_points(record['user_id'])
+                            success_count += 1
+                        else:
+                            error_count += 1
+                    
+                elif action == 'reject':
+                    record = mongo_db.records.find_one({"_id": record_id})
+                    if record and record.get('status') != 'rejected':
+                        mongo_db.records.update_one(
+                            {"_id": record_id},
+                            {"$set": {
+                                "status": "rejected",
+                                "rejected_by": admin_username,
+                                "rejected_at": datetime.now(timezone.utc),
+                                "rejection_reason": "Bulk rejection"
+                            }}
+                        )
+                        success_count += 1
+                        
+            except Exception as e:
+                print(f"Error processing record {record_id}: {e}")
+                error_count += 1
+        
+        # Log bulk action
+        log_admin_action(
+            admin_username,
+            f"Bulk {action.title()}",
+            f"Bulk {action}ed {success_count} records ({error_count} errors)"
+        )
+        
+        if success_count > 0:
+            flash(f'✅ Successfully {action}ed {success_count} records', 'success')
+        if error_count > 0:
+            flash(f'⚠️ {error_count} records had errors', 'warning')
+            
+    except Exception as e:
+        flash(f'Error in bulk operation: {str(e)}', 'danger')
+        print(f"Bulk records error: {e}")
     
-    flash('Record rejected!', 'warning')
     return redirect(url_for('admin'))
 
 @app.route('/admin/users', methods=['GET', 'POST'])
@@ -2064,6 +3034,11 @@ def admin_clear_cache():
     levels_cache['legacy_list'] = None
     levels_cache['last_updated'] = None
     
+    # Log admin action
+    admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+    admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+    log_admin_action(admin_username, "Cache Cleared", "Cleared all cached level data")
+    
     flash('Cache cleared successfully!', 'success')
     return redirect(url_for('admin_settings'))
 
@@ -2094,6 +3069,11 @@ def admin_reload_cache():
         levels_cache['legacy_list'] = legacy_levels
         
         levels_cache['last_updated'] = datetime.now(timezone.utc)
+        
+        # Log admin action
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        log_admin_action(admin_username, "Cache Reloaded", f"Reloaded cache: {len(main_levels)} main, {len(legacy_levels)} legacy levels")
         
         flash(f'Cache reloaded! Main: {len(main_levels)}, Legacy: {len(legacy_levels)}', 'success')
         
@@ -2143,14 +3123,25 @@ def admin_optimize_db():
         return redirect(url_for('index'))
     
     try:
-        # Create indexes for better performance
-        mongo_db.levels.create_index([("is_legacy", 1), ("position", 1)])
-        mongo_db.levels.create_index([("position", 1)])
-        mongo_db.levels.create_index([("is_legacy", 1)])
-        mongo_db.records.create_index([("level_id", 1), ("status", 1)])
-        mongo_db.records.create_index([("user_id", 1)])
-        mongo_db.users.create_index([("username", 1)])
-        mongo_db.users.create_index([("email", 1)])
+        # Create indexes for better performance (with error handling for existing indexes)
+        indexes_to_create = [
+            (mongo_db.levels, [("is_legacy", 1), ("position", 1)]),
+            (mongo_db.levels, [("position", 1)]),
+            (mongo_db.levels, [("is_legacy", 1)]),
+            (mongo_db.records, [("level_id", 1), ("status", 1)]),
+            (mongo_db.records, [("user_id", 1)]),
+            (mongo_db.users, [("username", 1)]),
+            (mongo_db.users, [("email", 1)])
+        ]
+        
+        for collection, index_spec in indexes_to_create:
+            try:
+                collection.create_index(index_spec)
+            except Exception as idx_error:
+                if "IndexKeySpecsConflict" in str(idx_error) or "already exists" in str(idx_error):
+                    print(f"Index already exists: {index_spec}")
+                else:
+                    print(f"Error creating index {index_spec}: {idx_error}")
         
         # Remove Base64 images if any
         result = mongo_db.levels.update_many(
@@ -2180,12 +3171,17 @@ def admin_toggle_future_list():
         if not settings:
             settings = {"_id": "main", "future_list_enabled": False}
         
+        # Get admin info for logging
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        
         if action == 'enable':
             mongo_db.site_settings.update_one(
                 {"_id": "main"},
                 {"$set": {"future_list_enabled": True}},
                 upsert=True
             )
+            log_admin_action(admin_username, "Future List Enabled", "Enabled the Future List feature")
             flash('Future List enabled! 🚀', 'success')
         elif action == 'disable':
             mongo_db.site_settings.update_one(
@@ -2193,6 +3189,7 @@ def admin_toggle_future_list():
                 {"$set": {"future_list_enabled": False}},
                 upsert=True
             )
+            log_admin_action(admin_username, "Future List Disabled", "Disabled the Future List feature")
             flash('Future List disabled', 'info')
             
     except Exception as e:
@@ -2223,11 +3220,63 @@ def future_list():
     
     return render_template('future.html', levels=future_levels)
 
+@app.route('/search')
+def search_levels():
+    """Search levels across the entire database"""
+    query = request.args.get('q', '').strip()
+    
+    if not query:
+        return redirect(url_for('index'))
+    
+    try:
+        # Search in level names, creators, and verifiers
+        search_filter = {
+            "is_legacy": False,
+            "$or": [
+                {"name": {"$regex": query, "$options": "i"}},
+                {"creator": {"$regex": query, "$options": "i"}},
+                {"verifier": {"$regex": query, "$options": "i"}}
+            ]
+        }
+        
+        levels = list(mongo_db.levels.find(
+            search_filter,
+            {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, "level_id": 1, "difficulty": 1, "video_url": 1}
+        ).sort("position", 1))
+        
+        return render_template('search_results.html', levels=levels, query=query, total_results=len(levels))
+        
+    except Exception as e:
+        flash(f'Search error: {e}', 'danger')
+        return redirect(url_for('index'))
+
+@app.route('/guidelines')
+def guidelines():
+    """Community guidelines page"""
+    return render_template('guidelines.html')
+
 @app.route('/changelog')
 def changelog():
     """Website changelog page"""
     # You can store changelog entries in database or just hardcode them
     changelog_entries = [
+        {
+            "version": "v2.2.0",
+            "date": "2025-08-18",
+            "title": "�️M Image System Revolution",
+            "changes": [
+                "🔥 Complete image system rewrite from scratch",
+                "⚡ Lightning-fast YouTube thumbnail loading",
+                "� Fixled disappearing images after 1 second",
+                "�️R Removed problematic JavaScript that was hiding images",
+                "✨ Clean, reliable image fallbacks for levels without videos",
+                "🎯 One image per level - no more duplicates or debug text",
+                "� PConsistent 206x116px sizing for all thumbnails",
+                "� Imaages now load instantly and stay visible",
+                "🔧 Simplified HTML structure for better performance",
+                "💎 Professional-grade image handling system"
+            ]
+        },
         {
             "version": "v2.1.0",
             "date": "2024-12-19",
@@ -2817,6 +3866,7 @@ def update_user_settings():
             nickname = request.form.get('nickname', '').strip()
             email = request.form.get('email', '').strip()
             bio = request.form.get('bio', '').strip()
+            country = request.form.get('country', '').strip()
             
             # Validation
             if not username or len(username) < 3:
@@ -2849,7 +3899,8 @@ def update_user_settings():
                     "username": username,
                     "nickname": nickname,
                     "email": email,
-                    "bio": bio
+                    "bio": bio,
+                    "country": country
                 }}
             )
             
@@ -2861,6 +3912,7 @@ def update_user_settings():
             timezone = request.form.get('timezone', 'UTC')
             email_notifications = 'email_notifications' in request.form
             public_profile = 'public_profile' in request.form
+            country = request.form.get('country', '').strip()
             
             mongo_db.users.update_one(
                 {"_id": user_id},
@@ -2868,11 +3920,35 @@ def update_user_settings():
                     "theme": theme,
                     "timezone": timezone,
                     "email_notifications": email_notifications,
-                    "public_profile": public_profile
+                    "public_profile": public_profile,
+                    "country": country
                 }}
             )
             
             flash('Preferences updated successfully!', 'success')
+            
+        elif action == 'social_media':
+            # Update social media connections
+            youtube_url = request.form.get('youtube_url', '').strip()
+            twitch_url = request.form.get('twitch_url', '').strip()
+            tiktok_url = request.form.get('tiktok_url', '').strip()
+            vimeo_url = request.form.get('vimeo_url', '').strip()
+            discord_tag = request.form.get('discord_tag', '').strip()
+            twitter_url = request.form.get('twitter_url', '').strip()
+            
+            mongo_db.users.update_one(
+                {"_id": user_id},
+                {"$set": {
+                    "youtube_url": youtube_url,
+                    "twitch_url": twitch_url,
+                    "tiktok_url": tiktok_url,
+                    "vimeo_url": vimeo_url,
+                    "discord_tag": discord_tag,
+                    "twitter_url": twitter_url
+                }}
+            )
+            
+            flash('Social media connections updated successfully!', 'success')
             
         elif action == 'password':
             # Update password
@@ -2912,19 +3988,28 @@ def update_user_settings():
             avatar_file = request.files.get('avatar')
             avatar_url = request.form.get('avatar_url', '').strip()
             
+            # Check if user provided a file
             if avatar_file and avatar_file.filename:
                 # Handle file upload
                 import os
                 
+                # Validate file type
+                allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+                file_extension = avatar_file.filename.rsplit('.', 1)[1].lower() if '.' in avatar_file.filename else ''
+                
+                if file_extension not in allowed_extensions:
+                    flash('Invalid file type. Please use PNG, JPG, JPEG, GIF, or WebP.', 'danger')
+                    return redirect(url_for('user_settings'))
+                
                 # Create uploads directory
                 os.makedirs('static/avatars', exist_ok=True)
                 
-                # Save file
-                filename = f"avatar_{user_id}_{int(datetime.now().timestamp())}.jpg"
+                # Save file with proper extension
+                filename = f"avatar_{user_id}_{int(datetime.now().timestamp())}.{file_extension}"
                 filepath = os.path.join('static/avatars', filename)
                 
-                # Resize and save image
                 try:
+                    # Try to resize and optimize image
                     from PIL import Image
                     
                     img = Image.open(avatar_file.stream)
@@ -2935,20 +4020,54 @@ def update_user_settings():
                     avatar_url = f"/static/avatars/{filename}"
                     
                 except ImportError:
-                    # Fallback without PIL
+                    # Fallback without PIL - just save the file
+                    avatar_file.seek(0)  # Reset file pointer
                     avatar_file.save(filepath)
                     avatar_url = f"/static/avatars/{filename}"
+                    
                 except Exception as e:
                     flash(f'Error processing image: {e}', 'danger')
                     return redirect(url_for('user_settings'))
             
-            # Update avatar URL
+            # Check if user provided a URL instead
+            elif avatar_url:
+                # Validate URL format
+                if not (avatar_url.startswith('http://') or avatar_url.startswith('https://')):
+                    flash('Please provide a valid URL starting with http:// or https://', 'warning')
+                    return redirect(url_for('user_settings'))
+            
+            else:
+                flash('Please either upload a file or provide a URL', 'warning')
+                return redirect(url_for('user_settings'))
+            
+            # Update avatar URL in database
+            if avatar_url:
+                mongo_db.users.update_one(
+                    {"_id": user_id},
+                    {"$set": {"avatar_url": avatar_url}}
+                )
+                flash('Profile picture updated successfully!', 'success')
+            else:
+                flash('No avatar provided', 'warning')
+            
+        elif action == 'reset_api_key':
+            # Reset API key (with confirmation)
+            confirm_text = request.form.get('confirm_reset', '').strip()
+            if confirm_text.upper() != 'RESET API KEY':
+                flash('Please type "RESET API KEY" to confirm', 'danger')
+                return redirect(url_for('user_settings'))
+            
+            # Generate new API key
+            import secrets
+            new_api_key = secrets.token_urlsafe(32)
+            
+            # Update user with new API key
             mongo_db.users.update_one(
                 {"_id": user_id},
-                {"$set": {"avatar_url": avatar_url}}
+                {"$set": {"api_key": new_api_key}}
             )
             
-            flash('Profile picture updated!', 'success')
+            flash(f'API key reset successfully! New key: {new_api_key}', 'success')
             
         elif action == 'delete_account':
             # Delete account (with confirmation)
@@ -3119,6 +4238,132 @@ def public_profile(username):
     ]))
     
     return render_template('public_profile.html', user=user, records=user_records)
+
+@app.route('/world')
+def world_leaderboard():
+    """World map leaderboard with country-based rankings"""
+    try:
+        # Get top players by country (only those with points > 0)
+        country_stats = list(mongo_db.users.aggregate([
+            {"$match": {"points": {"$gt": 0}, "country": {"$exists": True, "$ne": ""}}},
+            {"$group": {
+                "_id": "$country",
+                "player_count": {"$sum": 1},
+                "total_points": {"$sum": "$points"},
+                "avg_points": {"$avg": "$points"},
+                "top_player": {"$first": "$$ROOT"}
+            }},
+            {"$sort": {"total_points": -1}}
+        ]))
+        
+        # Get overall top players with countries
+        top_players = list(mongo_db.users.find(
+            {"points": {"$gt": 0}},
+            {"username": 1, "nickname": 1, "points": 1, "country": 1}
+        ).sort("points", -1).limit(100))
+        
+        # Country name mapping
+        country_names = {
+            'AF': 'Afghanistan', 'AL': 'Albania', 'DZ': 'Algeria', 'AD': 'Andorra', 'AO': 'Angola',
+            'AR': 'Argentina', 'AM': 'Armenia', 'AU': 'Australia', 'AT': 'Austria', 'AZ': 'Azerbaijan',
+            'BS': 'Bahamas', 'BH': 'Bahrain', 'BD': 'Bangladesh', 'BB': 'Barbados', 'BY': 'Belarus',
+            'BE': 'Belgium', 'BZ': 'Belize', 'BJ': 'Benin', 'BT': 'Bhutan', 'BO': 'Bolivia',
+            'BA': 'Bosnia and Herzegovina', 'BW': 'Botswana', 'BR': 'Brazil', 'BN': 'Brunei', 'BG': 'Bulgaria',
+            'BF': 'Burkina Faso', 'BI': 'Burundi', 'CV': 'Cape Verde', 'KH': 'Cambodia', 'CM': 'Cameroon',
+            'CA': 'Canada', 'CF': 'Central African Republic', 'TD': 'Chad', 'CL': 'Chile', 'CN': 'China',
+            'CO': 'Colombia', 'KM': 'Comoros', 'CG': 'Congo', 'CR': 'Costa Rica', 'HR': 'Croatia',
+            'CU': 'Cuba', 'CY': 'Cyprus', 'CZ': 'Czech Republic', 'DK': 'Denmark', 'DJ': 'Djibouti',
+            'DM': 'Dominica', 'DO': 'Dominican Republic', 'EC': 'Ecuador', 'EG': 'Egypt', 'SV': 'El Salvador',
+            'GQ': 'Equatorial Guinea', 'ER': 'Eritrea', 'EE': 'Estonia', 'SZ': 'Eswatini', 'ET': 'Ethiopia',
+            'FJ': 'Fiji', 'FI': 'Finland', 'FR': 'France', 'GA': 'Gabon', 'GM': 'Gambia',
+            'GE': 'Georgia', 'DE': 'Germany', 'GH': 'Ghana', 'GR': 'Greece', 'GD': 'Grenada',
+            'GT': 'Guatemala', 'GN': 'Guinea', 'GW': 'Guinea-Bissau', 'GY': 'Guyana', 'HT': 'Haiti',
+            'HN': 'Honduras', 'HU': 'Hungary', 'IS': 'Iceland', 'IN': 'India', 'ID': 'Indonesia',
+            'IR': 'Iran', 'IQ': 'Iraq', 'IE': 'Ireland', 'IL': 'Israel', 'IT': 'Italy',
+            'CI': 'Ivory Coast', 'JM': 'Jamaica', 'JP': 'Japan', 'JO': 'Jordan', 'KZ': 'Kazakhstan',
+            'KE': 'Kenya', 'KI': 'Kiribati', 'KW': 'Kuwait', 'KG': 'Kyrgyzstan', 'LA': 'Laos',
+            'LV': 'Latvia', 'LB': 'Lebanon', 'LS': 'Lesotho', 'LR': 'Liberia', 'LY': 'Libya',
+            'LI': 'Liechtenstein', 'LT': 'Lithuania', 'LU': 'Luxembourg', 'MG': 'Madagascar', 'MW': 'Malawi',
+            'MY': 'Malaysia', 'MV': 'Maldives', 'ML': 'Mali', 'MT': 'Malta', 'MH': 'Marshall Islands',
+            'MR': 'Mauritania', 'MU': 'Mauritius', 'MX': 'Mexico', 'FM': 'Micronesia', 'MD': 'Moldova',
+            'MC': 'Monaco', 'MN': 'Mongolia', 'ME': 'Montenegro', 'MA': 'Morocco', 'MZ': 'Mozambique',
+            'MM': 'Myanmar', 'NA': 'Namibia', 'NR': 'Nauru', 'NP': 'Nepal', 'NL': 'Netherlands',
+            'NZ': 'New Zealand', 'NI': 'Nicaragua', 'NE': 'Niger', 'NG': 'Nigeria', 'MK': 'North Macedonia',
+            'NO': 'Norway', 'OM': 'Oman', 'PK': 'Pakistan', 'PW': 'Palau', 'PA': 'Panama',
+            'PG': 'Papua New Guinea', 'PY': 'Paraguay', 'PE': 'Peru', 'PH': 'Philippines', 'PL': 'Poland',
+            'PT': 'Portugal', 'QA': 'Qatar', 'RO': 'Romania', 'RU': 'Russia', 'RW': 'Rwanda',
+            'KN': 'Saint Kitts and Nevis', 'LC': 'Saint Lucia', 'VC': 'Saint Vincent and the Grenadines',
+            'WS': 'Samoa', 'SM': 'San Marino', 'ST': 'Sao Tome and Principe', 'SA': 'Saudi Arabia',
+            'SN': 'Senegal', 'RS': 'Serbia', 'SC': 'Seychelles', 'SL': 'Sierra Leone', 'SG': 'Singapore',
+            'SK': 'Slovakia', 'SI': 'Slovenia', 'SB': 'Solomon Islands', 'SO': 'Somalia', 'ZA': 'South Africa',
+            'KR': 'South Korea', 'SS': 'South Sudan', 'ES': 'Spain', 'LK': 'Sri Lanka', 'SD': 'Sudan',
+            'SR': 'Suriname', 'SE': 'Sweden', 'CH': 'Switzerland', 'SY': 'Syria', 'TW': 'Taiwan',
+            'TJ': 'Tajikistan', 'TZ': 'Tanzania', 'TH': 'Thailand', 'TL': 'Timor-Leste', 'TG': 'Togo',
+            'TO': 'Tonga', 'TT': 'Trinidad and Tobago', 'TN': 'Tunisia', 'TR': 'Turkey', 'TM': 'Turkmenistan',
+            'TV': 'Tuvalu', 'UG': 'Uganda', 'UA': 'Ukraine', 'AE': 'United Arab Emirates', 'GB': 'United Kingdom',
+            'US': 'United States', 'UY': 'Uruguay', 'UZ': 'Uzbekistan', 'VU': 'Vanuatu', 'VA': 'Vatican City',
+            'VE': 'Venezuela', 'VN': 'Vietnam', 'YE': 'Yemen', 'ZM': 'Zambia', 'ZW': 'Zimbabwe'
+        }
+        
+        return render_template('world_leaderboard.html', 
+                             country_stats=country_stats,
+                             top_players=top_players,
+                             country_names=country_names)
+        
+    except Exception as e:
+        flash(f'Error loading world leaderboard: {e}', 'danger')
+        return redirect(url_for('index'))
+
+@app.route('/country/<country_code>')
+def country_leaderboard(country_code):
+    """Country-specific leaderboard with pagination"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = 20
+        
+        # Get players from specific country with points > 0
+        total_players = mongo_db.users.count_documents({
+            "country": country_code,
+            "points": {"$gt": 0}
+        })
+        
+        players = list(mongo_db.users.find(
+            {"country": country_code, "points": {"$gt": 0}},
+            {"username": 1, "nickname": 1, "points": 1, "country": 1}
+        ).sort("points", -1).skip((page - 1) * per_page).limit(per_page))
+        
+        # Country name mapping (same as above)
+        country_names = {
+            'US': 'United States', 'CA': 'Canada', 'GB': 'United Kingdom', 'DE': 'Germany',
+            'FR': 'France', 'IT': 'Italy', 'ES': 'Spain', 'RU': 'Russia', 'CN': 'China',
+            'JP': 'Japan', 'KR': 'South Korea', 'BR': 'Brazil', 'MX': 'Mexico', 'AU': 'Australia',
+            'IN': 'India', 'NL': 'Netherlands', 'SE': 'Sweden', 'NO': 'Norway', 'PL': 'Poland'
+        }
+        
+        country_name = country_names.get(country_code, country_code)
+        
+        # Pagination info
+        has_prev = page > 1
+        has_next = (page * per_page) < total_players
+        prev_page = page - 1 if has_prev else None
+        next_page = page + 1 if has_next else None
+        total_pages = (total_players + per_page - 1) // per_page
+        
+        return render_template('country_leaderboard.html',
+                             players=players,
+                             country_code=country_code,
+                             country_name=country_name,
+                             page=page,
+                             has_prev=has_prev,
+                             has_next=has_next,
+                             prev_page=prev_page,
+                             next_page=next_page,
+                             total_pages=total_pages,
+                             total_players=total_players)
+        
+    except Exception as e:
+        flash(f'Error loading country leaderboard: {e}', 'danger')
+        return redirect(url_for('world_leaderboard'))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000, debug=True)
