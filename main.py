@@ -3331,7 +3331,7 @@ def admin_future_levels():
         
         name = request.form.get('name')
         creator = request.form.get('creator')
-        verifier = request.form.get('verifier')
+        verifier = request.form.get('verifier') or "Not verified yet"
         level_id = request.form.get('level_id')
         video_url = request.form.get('video_url')
         description = request.form.get('description')
@@ -3390,6 +3390,80 @@ def admin_future_levels():
     future_levels = list(mongo_db.future_levels.find({}).sort("position", 1))
     
     return render_template('admin/future_levels.html', levels=future_levels)
+
+@app.route('/admin/edit_future_level', methods=['POST'])
+def admin_edit_future_level():
+    """Edit a future level"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    level_id = int(request.form.get('level_id'))
+    
+    # Get current level
+    level = mongo_db.future_levels.find_one({"_id": level_id})
+    if not level:
+        flash('Future level not found', 'danger')
+        return redirect(url_for('admin_future_levels'))
+    
+    old_position = level['position']
+    new_position = int(request.form.get('position'))
+    
+    # Handle position changes
+    if new_position != old_position:
+        if old_position < new_position:
+            # Moving down: shift levels between old and new position up
+            mongo_db.future_levels.update_many(
+                {"position": {"$gt": old_position, "$lte": new_position}},
+                {"$inc": {"position": -1}}
+            )
+        elif old_position > new_position:
+            # Moving up: shift levels between new and old position down
+            mongo_db.future_levels.update_many(
+                {"position": {"$gte": new_position, "$lt": old_position}},
+                {"$inc": {"position": 1}}
+            )
+    
+    update_data = {
+        "name": request.form.get('name'),
+        "creator": request.form.get('creator'),
+        "verifier": request.form.get('verifier') or "Not verified yet",
+        "level_id": request.form.get('level_id') or None,
+        "video_url": request.form.get('video_url'),
+        "description": request.form.get('description'),
+        "difficulty": float(request.form.get('difficulty')),
+        "position": new_position
+    }
+    
+    mongo_db.future_levels.update_one({"_id": level_id}, {"$set": update_data})
+    
+    # Log changes if position changed
+    if new_position != old_position:
+        above_level = None
+        below_level = None
+        
+        if new_position > 1:
+            above_level_doc = mongo_db.future_levels.find_one({"position": new_position - 1})
+            if above_level_doc:
+                above_level = above_level_doc['name']
+        
+        below_level_doc = mongo_db.future_levels.find_one({"position": new_position + 1})
+        if below_level_doc:
+            below_level = below_level_doc['name']
+        
+        log_level_change(
+            action="moved",
+            level_name=update_data['name'],
+            admin_username=session.get('username', 'Unknown'),
+            old_position=old_position,
+            new_position=new_position,
+            above_level=above_level,
+            below_level=below_level,
+            list_type="future"
+        )
+    
+    flash('Future level updated successfully!', 'success')
+    return redirect(url_for('admin_future_levels'))
 
 @app.route('/admin/delete_future_level', methods=['POST'])
 def admin_delete_future_level():
@@ -3475,7 +3549,10 @@ def admin_announcements():
     # Get all announcements (active and expired)
     announcements = list(mongo_db.announcements.find({}).sort("created_at", -1))
     
-    return render_template('admin/announcements.html', announcements=announcements)
+    # Add current time for template
+    current_time = datetime.now(timezone.utc)
+    
+    return render_template('admin/announcements.html', announcements=announcements, current_time=current_time)
 
 @app.route('/admin/delete_announcement', methods=['POST'])
 def admin_delete_announcement():
@@ -3490,6 +3567,114 @@ def admin_delete_announcement():
     
     flash('Announcement deleted successfully!', 'success')
     return redirect(url_for('admin_announcements'))
+
+@app.route('/admin/level_stats')
+def admin_level_stats():
+    """Cool level statistics dashboard"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Get comprehensive statistics
+        stats = {
+            'main_levels': mongo_db.levels.count_documents({"is_legacy": False}),
+            'legacy_levels': mongo_db.levels.count_documents({"is_legacy": True}),
+            'future_levels': mongo_db.future_levels.count_documents({}),
+            'total_records': mongo_db.records.count_documents({}),
+            'pending_records': mongo_db.records.count_documents({"status": "pending"}),
+            'approved_records': mongo_db.records.count_documents({"status": "approved"}),
+            'total_users': mongo_db.users.count_documents({}),
+            'active_users': mongo_db.users.count_documents({"points": {"$gt": 0}}),
+            'changelog_entries': mongo_db.level_changelog.count_documents({}),
+            'active_announcements': mongo_db.announcements.count_documents({
+                "active": True,
+                "expires_at": {"$gt": datetime.now(timezone.utc)}
+            })
+        }
+        
+        # Get top creators and verifiers
+        top_creators = list(mongo_db.levels.aggregate([
+            {"$group": {"_id": "$creator", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+            {"$limit": 10}
+        ]))
+        
+        top_verifiers = list(mongo_db.levels.aggregate([
+            {"$group": {"_id": "$verifier", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+            {"$limit": 10}
+        ]))
+        
+        # Recent activity
+        recent_changelog = list(mongo_db.level_changelog.find().sort("timestamp", -1).limit(10))
+        
+        # Difficulty distribution
+        difficulty_dist = list(mongo_db.levels.aggregate([
+            {"$group": {"_id": {"$floor": "$difficulty"}, "count": {"$sum": 1}}},
+            {"$sort": {"_id": 1}}
+        ]))
+        
+        return render_template('admin/level_stats.html', 
+                             stats=stats, 
+                             top_creators=top_creators,
+                             top_verifiers=top_verifiers,
+                             recent_changelog=recent_changelog,
+                             difficulty_dist=difficulty_dist)
+        
+    except Exception as e:
+        flash(f'Error loading statistics: {e}', 'danger')
+        return redirect(url_for('admin'))
+
+@app.route('/admin/bulk_actions', methods=['POST'])
+def admin_bulk_actions():
+    """Bulk actions for levels - SURPRISE FEATURE!"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    action = request.form.get('action')
+    level_ids = request.form.getlist('level_ids')
+    
+    if not level_ids:
+        flash('No levels selected!', 'warning')
+        return redirect(url_for('admin_levels'))
+    
+    level_ids = [int(id) for id in level_ids]
+    
+    if action == 'move_to_legacy':
+        # Move selected levels to legacy
+        for level_id in level_ids:
+            level = mongo_db.levels.find_one({"_id": level_id})
+            if level and not level.get('is_legacy', False):
+                mongo_db.levels.update_one(
+                    {"_id": level_id},
+                    {"$set": {"is_legacy": True, "position": mongo_db.levels.count_documents({"is_legacy": True}) + 1}}
+                )
+                log_level_change(
+                    action="legacy",
+                    level_name=level['name'],
+                    admin_username=session.get('username', 'Unknown'),
+                    old_position=level['position'],
+                    list_type="legacy"
+                )
+        flash(f'Moved {len(level_ids)} levels to legacy!', 'success')
+        
+    elif action == 'recalculate_points':
+        # Recalculate points for selected levels
+        recalculate_all_points()
+        flash(f'Recalculated points for all levels!', 'success')
+        
+    elif action == 'export_data':
+        # Export level data as JSON
+        levels = list(mongo_db.levels.find({"_id": {"$in": level_ids}}))
+        import json
+        filename = f"levels_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        with open(filename, 'w') as f:
+            json.dump(levels, f, indent=2, default=str)
+        flash(f'Exported {len(levels)} levels to {filename}!', 'success')
+    
+    return redirect(url_for('admin_levels'))
 
 @app.route('/search')
 def search_levels():
@@ -3525,6 +3710,40 @@ def search_levels():
 def guidelines():
     """Community guidelines page"""
     return render_template('guidelines.html')
+
+@app.route('/admin/clear_changelog', methods=['POST'])
+def admin_clear_changelog():
+    """Clear all changelog entries"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    action = request.form.get('action')
+    
+    if action == 'clear_all':
+        mongo_db.level_changelog.delete_many({})
+        flash('All changelog entries cleared!', 'success')
+    elif action == 'clear_old':
+        # Clear entries older than 30 days
+        thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+        result = mongo_db.level_changelog.delete_many({"timestamp": {"$lt": thirty_days_ago}})
+        flash(f'Cleared {result.deleted_count} old changelog entries!', 'success')
+    
+    return redirect(url_for('changelog'))
+
+@app.route('/admin/delete_changelog_entry', methods=['POST'])
+def admin_delete_changelog_entry():
+    """Delete a single changelog entry"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    entry_id = request.form.get('entry_id')
+    
+    mongo_db.level_changelog.delete_one({"_id": ObjectId(entry_id)})
+    
+    flash('Changelog entry deleted!', 'success')
+    return redirect(url_for('changelog'))
 
 @app.route('/changelog')
 def changelog():
