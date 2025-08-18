@@ -235,6 +235,33 @@
             {% endif %}
         {% endwith %}
 
+        <!-- Site Announcements -->
+        {% set active_announcements = get_active_announcements() %}
+        {% if active_announcements %}
+            {% for announcement in active_announcements %}
+            <div class="alert alert-{{ announcement.type }} alert-dismissible fade show" role="alert">
+                <div class="d-flex align-items-start">
+                    <div class="me-2">
+                        {% if announcement.type == 'info' %}📢
+                        {% elif announcement.type == 'success' %}🎉
+                        {% elif announcement.type == 'warning' %}⚠️
+                        {% elif announcement.type == 'danger' %}🚨
+                        {% endif %}
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="alert-heading mb-1">{{ announcement.title }}</h6>
+                        <p class="mb-0">{{ announcement.message }}</p>
+                        <small class="text-muted">
+                            Posted by {{ announcement.created_by }} • 
+                            Expires {{ announcement.expires_at.strftime('%Y-%m-%d %H:%M UTC') }}
+                        </small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        {% endif %}
+
         {% block content %}{% endblock %}
     </div>
 
