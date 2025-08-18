@@ -363,6 +363,23 @@ def recalculate_all_points():
         mongo_db.levels.bulk_write(bulk_operations)
         print(f"Updated points for {len(bulk_operations)} levels")
 
+def log_level_change(action, level_name, admin_username, **kwargs):
+    """Log level placement/movement changes to changelog"""
+    try:
+        changelog_entry = {
+            "timestamp": datetime.now(timezone.utc),
+            "action": action,  # "placed", "moved", "legacy", "removed"
+            "level_name": level_name,
+            "admin": admin_username,
+            **kwargs  # Additional data like position, above_level, below_level, etc.
+        }
+        
+        mongo_db.level_changelog.insert_one(changelog_entry)
+        print(f"📝 Logged level change: {action} - {level_name}")
+        
+    except Exception as e:
+        print(f"Error logging level change: {e}")
+
 def log_admin_action(admin_username, action, details=""):
     """Log admin actions to Discord"""
     try:
@@ -2340,6 +2357,30 @@ def admin_levels():
         # Recalculate points for all levels after position changes
         recalculate_all_points()
         
+        # Log level placement to changelog
+        above_level = None
+        below_level = None
+        
+        # Find levels above and below
+        if position > 1:
+            above_level_doc = mongo_db.levels.find_one({"position": position - 1, "is_legacy": is_legacy})
+            if above_level_doc:
+                above_level = above_level_doc['name']
+        
+        below_level_doc = mongo_db.levels.find_one({"position": position + 1, "is_legacy": is_legacy})
+        if below_level_doc:
+            below_level = below_level_doc['name']
+        
+        log_level_change(
+            action="placed",
+            level_name=name,
+            admin_username=session.get('username', 'Unknown'),
+            position=position,
+            above_level=above_level,
+            below_level=below_level,
+            list_type="legacy" if is_legacy else "main"
+        )
+        
         # Save history
         history_entry = {
             "level_id": next_id,
@@ -2500,6 +2541,54 @@ def admin_edit_level():
     
     mongo_db.levels.update_one({"_id": db_level_id}, {"$set": update_data})
     
+    # Log level changes to changelog
+    if position != old_position or is_legacy != old_is_legacy:
+        level_name = update_data['name']
+        
+        if is_legacy != old_is_legacy:
+            # Moved between lists
+            if is_legacy:
+                log_level_change(
+                    action="legacy",
+                    level_name=level_name,
+                    admin_username=session.get('username', 'Unknown'),
+                    old_position=old_position,
+                    list_type="legacy"
+                )
+            else:
+                log_level_change(
+                    action="placed",
+                    level_name=level_name,
+                    admin_username=session.get('username', 'Unknown'),
+                    position=position,
+                    list_type="main"
+                )
+        else:
+            # Just moved position within same list
+            above_level = None
+            below_level = None
+            
+            # Find levels above and below new position
+            if position > 1:
+                above_level_doc = mongo_db.levels.find_one({"position": position - 1, "is_legacy": is_legacy})
+                if above_level_doc:
+                    above_level = above_level_doc['name']
+            
+            below_level_doc = mongo_db.levels.find_one({"position": position + 1, "is_legacy": is_legacy})
+            if below_level_doc:
+                below_level = below_level_doc['name']
+            
+            log_level_change(
+                action="moved",
+                level_name=level_name,
+                admin_username=session.get('username', 'Unknown'),
+                old_position=old_position,
+                new_position=position,
+                above_level=above_level,
+                below_level=below_level,
+                list_type="legacy" if is_legacy else "main"
+            )
+    
     # Clear cache since levels changed
     levels_cache['main_list'] = None
     levels_cache['legacy_list'] = None
@@ -2541,6 +2630,15 @@ def admin_delete_level():
     
     # Delete the level
     mongo_db.levels.delete_one({"_id": level_id})
+    
+    # Log level removal to changelog
+    log_level_change(
+        action="removed",
+        level_name=level['name'],
+        admin_username=session.get('username', 'Unknown'),
+        old_position=level_position,
+        list_type="legacy" if is_legacy else "main"
+    )
     
     # Clear cache since levels changed
     levels_cache['main_list'] = None
@@ -3257,89 +3355,52 @@ def guidelines():
 
 @app.route('/changelog')
 def changelog():
-    """Website changelog page"""
-    # You can store changelog entries in database or just hardcode them
-    changelog_entries = [
-        {
-            "version": "v2.2.0",
-            "date": "2025-08-18",
-            "title": "�️M Image System Revolution",
-            "changes": [
-                "🔥 Complete image system rewrite from scratch",
-                "⚡ Lightning-fast YouTube thumbnail loading",
-                "� Fixled disappearing images after 1 second",
-                "�️R Removed problematic JavaScript that was hiding images",
-                "✨ Clean, reliable image fallbacks for levels without videos",
-                "🎯 One image per level - no more duplicates or debug text",
-                "� PConsistent 206x116px sizing for all thumbnails",
-                "� Imaages now load instantly and stay visible",
-                "🔧 Simplified HTML structure for better performance",
-                "💎 Professional-grade image handling system"
+    """Level changelog page - tracks level placements and movements"""
+    try:
+        # Get level changelog entries from database, sorted by date (newest first)
+        changelog_entries = list(mongo_db.level_changelog.find().sort("timestamp", -1).limit(50))
+        
+        # If no entries exist, create some sample entries
+        if not changelog_entries:
+            sample_entries = [
+                {
+                    "timestamp": datetime.now(timezone.utc),
+                    "action": "placed",
+                    "level_name": "555",
+                    "position": 1,
+                    "above_level": None,
+                    "below_level": "deimonx",
+                    "list_type": "main",
+                    "admin": "Miifin"
+                },
+                {
+                    "timestamp": datetime.now(timezone.utc) - timedelta(hours=2),
+                    "action": "moved",
+                    "level_name": "deimonx", 
+                    "old_position": 1,
+                    "new_position": 2,
+                    "above_level": "555",
+                    "below_level": "fommy txt do verify",
+                    "list_type": "main",
+                    "admin": "Miifin"
+                },
+                {
+                    "timestamp": datetime.now(timezone.utc) - timedelta(days=1),
+                    "action": "legacy",
+                    "level_name": "old level example",
+                    "old_position": 75,
+                    "list_type": "legacy",
+                    "admin": "Kye"
+                }
             ]
-        },
-        {
-            "version": "v2.1.0",
-            "date": "2024-12-19",
-            "title": "🚀 Major Feature Update",
-            "changes": [
-                "✨ Added Future List system with admin controls",
-                "⚙️ Complete user settings overhaul with themes and preferences", 
-                "👤 Public profile pages with QR code sharing",
-                "📱 Real-time username availability checking",
-                "🎨 Enhanced admin settings panel with system monitoring",
-                "💾 User data export functionality",
-                "🔒 Privacy controls for profiles",
-                "📊 Advanced user statistics and completion tracking",
-                "🎯 Improved UI/UX with smooth animations",
-                "⚡ Performance optimizations and caching improvements"
-            ]
-        },
-        {
-            "version": "v2.0.0", 
-            "date": "2024-12-18",
-            "title": "🔥 Speed Revolution",
-            "changes": [
-                "⚡ Complete speed overhaul - 10x faster loading",
-                "💾 Smart caching system implementation",
-                "📄 Pagination for better performance (10 levels per page)",
-                "🖼️ Lazy loading for images",
-                "🗄️ Database query optimization",
-                "🚀 Virtual scrolling option for ultra-fast browsing",
-                "🔧 Admin tools for cache management",
-                "📈 Performance monitoring and debugging tools"
-            ]
-        },
-        {
-            "version": "v1.5.0",
-            "date": "2024-12-17", 
-            "title": "🎮 Enhanced User Experience",
-            "changes": [
-                "👥 User registration and authentication system",
-                "🏆 Record submission and approval workflow",
-                "📊 User profiles with points and statistics",
-                "🔐 Admin panel for level and user management",
-                "📱 Mobile-responsive design improvements",
-                "🎨 Dark/light theme toggle",
-                "🔍 Search and filtering capabilities"
-            ]
-        },
-        {
-            "version": "v1.0.0",
-            "date": "2024-12-15",
-            "title": "🎉 Initial Release", 
-            "changes": [
-                "📋 Basic level listing functionality",
-                "🗄️ MongoDB database integration",
-                "🎯 Level difficulty and points system",
-                "📜 Legacy list support",
-                "🕰️ Time machine feature",
-                "🎥 Video integration for levels",
-                "🖼️ Thumbnail support"
-            ]
-        }
-    ]
+            mongo_db.level_changelog.insert_many(sample_entries)
+            changelog_entries = sample_entries
+            
+    except Exception as e:
+        print(f"Error loading changelog: {e}")
+        changelog_entries = []
     
-    return render_template('changelog.html', changelog=changelog_entries)
+    return render_template('level_changelog.html', changelog=changelog_entries)
 
 @app.route('/stats')
 def stats_viewer():
