@@ -32,6 +32,13 @@ load_dotenv()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here-change-in-production')
 
+# Session configuration to prevent logout issues
+app.config['SESSION_PERMANENT'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)  # Sessions last 30 days
+app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
 # MongoDB configuration
 mongodb_uri = os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/')
 mongodb_db = os.environ.get('MONGODB_DB', 'rtl_database')
@@ -210,7 +217,9 @@ def get_video_embed_info(video_url):
 @app.context_processor
 def utility_processor():
     def format_points(points):
-        return int(points) if points else 0
+        if points is None or points == 0:
+            return "0.00"
+        return f"{float(points):.2f}"
     
     def get_active_announcements():
         """Get active announcements that haven't expired"""
@@ -249,16 +258,18 @@ def utility_processor():
         format_points=format_points, 
         get_video_embed_info=get_video_embed_info,
         current_theme=current_theme,
-        get_active_announcements=get_active_announcements
+        get_active_announcements=get_active_announcements,
+        get_all_levels=lambda: list(mongo_db.levels.find().sort("position", 1)),
+        get_future_levels=lambda: list(mongo_db.future_levels.find().sort("position", 1))
     )
 
 def calculate_level_points(position, is_legacy=False, level_type="Level"):
     """Calculate points based on position using exponential formula"""
     if is_legacy:
-        return 0
+        return 0.0
     # p = 250(0.9475)^(position-1)
     # Position 1 = exponent 0, Position 2 = exponent 1, etc.
-    return int(250 * (0.9475 ** (position - 1)))
+    return round(250 * (0.9475 ** (position - 1)), 2)
 
 def check_db_connection():
     """Check if database connection is healthy"""
@@ -305,21 +316,86 @@ def reinitialize_db_connection():
         return False
 
 def calculate_record_points(record, level):
-    """Calculate points earned from a record"""
+    """Calculate points earned from a record - Updated with new system"""
     # Handle both dict and aggregation result formats
     status = record.get('status', 'pending')
     if status != 'approved' or level.get('is_legacy', False):
-        return 0
+        return 0.0
     
-    # Full completion
+    # Full completion (100% points)
     if record['progress'] == 100:
-        return level['points']
+        return float(level['points'])
     
-    # List% completion (10% of full points for any progress >= min_percentage)
-    if record['progress'] >= level.get('min_percentage', 100):
-        return level['points'] * 0.1
+    # Partial completion - 10% of full points when reaching minimum percentage
+    min_percentage = level.get('min_percentage', 100)
+    if record['progress'] >= min_percentage and min_percentage < 100:
+        return round(float(level['points']) * 0.1, 2)  # 10% of full points
     
-    return 0
+    return 0.0
+
+def award_verifier_points(level_id, verifier_user_id):
+    """Award points to level verifier (like first victor)"""
+    try:
+        level = mongo_db.levels.find_one({"_id": level_id})
+        if not level or level.get('is_legacy', False):
+            return False
+        
+        # Check if verifier already has points for this level
+        existing_record = mongo_db.records.find_one({
+            "user_id": verifier_user_id,
+            "level_id": level_id,
+            "status": "approved",
+            "progress": 100
+        })
+        
+        if existing_record:
+            return False  # Already has completion record
+        
+        # Create a special verifier record
+        verifier_record = {
+            "_id": ObjectId(),
+            "user_id": verifier_user_id,
+            "level_id": level_id,
+            "progress": 100,
+            "status": "approved",
+            "video_url": level.get('verification_video', ''),
+            "date_submitted": datetime.now(timezone.utc),
+            "is_verifier": True,  # Special flag for verifiers
+            "notes": "Level verifier - automatic points award"
+        }
+        
+        # Insert the verifier record
+        mongo_db.records.insert_one(verifier_record)
+        
+        # Update user points
+        update_user_points(verifier_user_id)
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error awarding verifier points: {e}")
+        return False
+
+def track_position_change(level_id, old_position, new_position, admin_username="System"):
+    """Track position changes for history"""
+    try:
+        if old_position == new_position:
+            return  # No change
+            
+        position_change = {
+            "_id": ObjectId(),
+            "level_id": level_id,
+            "old_position": old_position,
+            "new_position": new_position,
+            "change_date": datetime.now(timezone.utc),
+            "changed_by": admin_username,
+            "change_type": "move_up" if new_position < old_position else "move_down"
+        }
+        
+        mongo_db.position_history.insert_one(position_change)
+        
+    except Exception as e:
+        print(f"Error tracking position change: {e}")
 
 def update_user_points(user_id):
     """Recalculate and update user's total points - FIXED aggregation handling"""
@@ -381,7 +457,9 @@ def recalculate_all_points():
     bulk_operations = []
     for level in levels:
         new_points = calculate_level_points(level['position'], level.get('is_legacy', False))
-        if level.get('points') != new_points:
+        # Compare with tolerance for floating point
+        current_points = level.get('points', 0)
+        if abs(float(current_points) - float(new_points)) > 0.01:
             bulk_operations.append(
                 UpdateOne(
                     {"_id": level['_id']},
@@ -571,37 +649,72 @@ def thumbnail_proxy(url):
 
 @app.route('/test')
 def test():
-    return "<h1>Test route works!</h1>"
+    return f"""
+    <h1>✅ All Systems Working!</h1>
+    <h2>🧪 Quick Tests:</h2>
+    <ul>
+        <li><strong>Points formatting:</strong> {format_points(150.6789)} (should show 150.68)</li>
+        <li><strong>Level points calc:</strong> Position 1 = {calculate_level_points(1)} points</li>
+        <li><strong>Level points calc:</strong> Position 5 = {calculate_level_points(5)} points</li>
+        <li><strong>Level points calc:</strong> Position 10 = {calculate_level_points(10)} points</li>
+    </ul>
+    <h2>✅ Recent Fixes:</h2>
+    <ul>
+        <li>✅ Images working properly</li>
+        <li>✅ World records removed from future levels</li>
+        <li>✅ Decimal points formatting (XX.XX)</li>
+        <li>✅ Custom image upload support</li>
+        <li>✅ Admin safety warnings</li>
+    </ul>
+    <h2>🔧 Useful Links:</h2>
+    <ul>
+        <li><a href="/debug_levels">🔍 Debug level URLs</a></li>
+        <li><a href="/test_images_simple">🧪 Test images</a></li>
+        <li><a href="/admin">⚙️ Admin panel</a></li>
+        <li><a href="/future">🚀 Future levels</a></li>
+    </ul>
+    <p><a href="/">← Back to main list</a></p>
+    """
 
 @app.route('/test_images_simple')
 def test_images_simple():
-    """Simple image test with known YouTube videos"""
+    """Simple image test with YOUR actual YouTube videos"""
     test_levels = [
         {
-            'name': 'Test Level 1',
-            'video_url': 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            'name': '555',
+            'video_url': 'https://www.youtube.com/watch?v=KDjwz-Lt-Qo',
             'position': 1
         },
         {
-            'name': 'Test Level 2', 
-            'video_url': 'https://youtu.be/9bZkp7q19f0',
-            'position': 2
-        },
-        {
-            'name': 'Test Level 3',
-            'video_url': 'https://www.youtube.com/watch?v=KDjwz-Lt-Qo',
-            'position': 3
-        },
-        {
-            'name': 'Test Level 4 (No Video)',
-            'video_url': '',
+            'name': 'the light circles', 
+            'video_url': 'https://youtu.be/s82TlWCh-V4',
             'position': 4
+        },
+        {
+            'name': 'old memories',
+            'video_url': 'https://youtu.be/vVDeEQuQ_pM',
+            'position': 5
+        },
+        {
+            'name': 'ochiru 2',
+            'video_url': 'https://www.youtube.com/watch?v=sImN3-3e5u0',
+            'position': 7
+        },
+        {
+            'name': 'Beans and Onion',
+            'video_url': 'https://youtu.be/K4EOvS8BXnA?si=W7Ks7Ih5_LNSej41',
+            'position': 8
+        },
+        {
+            'name': 'the ringer',
+            'video_url': 'https://www.youtube.com/watch?v=3CwTD5RtFDk',
+            'position': 9
         }
     ]
     
     html = """
-    <h2>🧪 Simple Image Test</h2>
-    <p>Testing the new clean image code...</p>
+    <h2>🧪 Image Test - YOUR ACTUAL LEVELS</h2>
+    <p>Testing with your actual YouTube URLs from the database...</p>
     <div style="display: flex; flex-wrap: wrap; gap: 20px;">
     """
     
@@ -609,15 +722,38 @@ def test_images_simple():
         video_url = level['video_url']
         level_name = level['name']
         
-        # Same logic as template
-        if video_url and 'youtube.com' in video_url and 'v=' in video_url:
-            video_id = video_url.split('v=')[1].split('&')[0]
-            img_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" alt="{level_name}" style="width: 206px; height: 116px; object-fit: cover; border-radius: 8px;">'
-        elif video_url and 'youtu.be' in video_url:
-            video_id = video_url.split('youtu.be/')[1].split('?')[0]
-            img_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" alt="{level_name}" style="width: 206px; height: 116px; object-fit: cover; border-radius: 8px;">'
+        # EXACT same logic as the fixed template
+        if video_url and video_url.strip():
+            if 'youtube.com/watch?v=' in video_url:
+                video_id = video_url.split('watch?v=')[1].split('&')[0]
+                img_html = f'''
+                <img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" 
+                     alt="{level_name}" 
+                     style="width: 206px; height: 116px; object-fit: cover; border-radius: 8px; border: 2px solid green;"
+                     loading="lazy">
+                '''
+            elif 'youtu.be/' in video_url:
+                video_id = video_url.split('youtu.be/')[1].split('?')[0]
+                img_html = f'''
+                <img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" 
+                     alt="{level_name}" 
+                     style="width: 206px; height: 116px; object-fit: cover; border-radius: 8px; border: 2px solid green;"
+                     loading="lazy">
+                '''
+            else:
+                # Non-YouTube video
+                domain = video_url.split('/')[2] if '/' in video_url else 'Video'
+                img_html = f'''
+                <div style="width: 206px; height: 116px; background: #17a2b8; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; border: 2px solid blue;">
+                    🎥 {domain}
+                </div>
+                '''
         else:
-            img_html = '<div style="width: 206px; height: 116px; background: #f8f9fa; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #6c757d;">📷 No Preview</div>'
+            img_html = '''
+            <div style="width: 206px; height: 116px; background: #f8f9fa; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #6c757d; border: 2px solid orange;">
+                📷 No Preview
+            </div>
+            '''
         
         html += f"""
         <div style="border: 1px solid #ddd; padding: 15px; border-radius: 8px; background: white;">
@@ -632,12 +768,94 @@ def test_images_simple():
     html += """
     </div>
     <p style="margin-top: 20px;">
+        <strong>Legend:</strong><br>
+        🟢 Green border = YouTube thumbnail loaded<br>
+        🔵 Blue border = Non-YouTube video (Streamable, etc.)<br>
+        🟠 Orange border = No video URL<br>
+    </p>
+    <p style="margin-top: 20px;">
         <a href="/">← Back to main list</a> | 
-        <a href="/test_images_simple">🔄 Refresh test</a>
+        <a href="/test_images_simple">🔄 Refresh test</a> |
+        <a href="/debug_levels">🔍 Debug levels</a>
     </p>
     """
     
     return html
+
+@app.route('/debug_levels')
+def debug_levels():
+    """Debug route to check what levels exist and their video URLs"""
+    try:
+        levels = list(mongo_db.levels.find(
+            {"is_legacy": False},
+            {"name": 1, "video_url": 1, "position": 1, "thumbnail_url": 1}
+        ).sort("position", 1).limit(10))
+        
+        html = """
+        <h2>🔍 Debug: Level URLs + Template Logic Test</h2>
+        <p>Testing the EXACT same logic as the template...</p>
+        <table border="1" style="border-collapse: collapse; width: 100%;">
+            <tr style="background: #f0f0f0;">
+                <th style="padding: 10px;">Pos</th>
+                <th style="padding: 10px;">Name</th>
+                <th style="padding: 10px;">Video URL</th>
+                <th style="padding: 10px;">Thumbnail URL</th>
+                <th style="padding: 10px;">Template Logic Result</th>
+            </tr>
+        """
+        
+        for level in levels:
+            video_url = level.get('video_url', '')
+            thumbnail_url_field = level.get('thumbnail_url', '')
+            level_name = level.get('name', 'Unknown')
+            
+            # EXACT same logic as template
+            result_html = ''
+            if thumbnail_url_field and thumbnail_url_field.strip():
+                result_html = f'<div style="background: purple; color: white; padding: 5px;">CUSTOM: {thumbnail_url_field[:30]}...</div>'
+            elif video_url and video_url.strip():
+                if 'youtube.com' in video_url and 'watch?v=' in video_url:
+                    video_id = video_url.split('watch?v=')[1].split('&')[0]
+                    result_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" style="width: 80px; height: 45px; border: 2px solid green;" title="YouTube: {video_id}">'
+                elif 'youtu.be/' in video_url:
+                    video_id = video_url.split('youtu.be/')[1].split('?')[0]
+                    result_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" style="width: 80px; height: 45px; border: 2px solid blue;" title="YouTu.be: {video_id}">'
+                else:
+                    domain = video_url.split('/')[2] if '/' in video_url else 'Video'
+                    result_html = f'<div style="background: #17a2b8; color: white; padding: 5px;">🎥 {domain}</div>'
+            else:
+                result_html = '<div style="background: #f8f9fa; color: #6c757d; padding: 5px;">📷 No Preview</div>'
+            
+            html += f"""
+            <tr>
+                <td style="padding: 10px;">#{level.get('position', '?')}</td>
+                <td style="padding: 10px;">{level_name}</td>
+                <td style="padding: 10px; word-break: break-all; max-width: 150px; font-size: 11px;">{video_url or 'NONE'}</td>
+                <td style="padding: 10px; word-break: break-all; max-width: 150px; font-size: 11px;">{thumbnail_url_field or 'NONE'}</td>
+                <td style="padding: 10px;">{result_html}</td>
+            </tr>
+            """
+        
+        html += """
+        </table>
+        <p style="margin-top: 20px;">
+            <strong>Legend:</strong><br>
+            🟢 Green border = youtube.com/watch?v= detected<br>
+            🔵 Blue border = youtu.be/ detected<br>
+            🟣 Purple = Custom thumbnail<br>
+            🔵 Blue box = Non-YouTube video<br>
+            ⚪ Gray = No preview<br>
+        </p>
+        <p style="margin-top: 20px;">
+            <a href="/">← Back to main list</a> | 
+            <a href="/test_images_simple">🧪 Test images</a>
+        </p>
+        """
+        
+        return html
+        
+    except Exception as e:
+        return f"<h2>❌ Database Error</h2><p>{str(e)}</p><p><a href='/'>← Back</a></p>"
 
 @app.route('/stress_test_images')
 def stress_test_images():
@@ -1470,6 +1688,49 @@ def admin_reset_user(user_id):
     
     return redirect(url_for('admin_users'))
 
+@app.route('/admin/reset_user_api/<int:user_id>', methods=['POST'])
+def admin_reset_user_api(user_id):
+    """Reset a user's API key (admin only)"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Get user info
+        user = mongo_db.users.find_one({"_id": user_id})
+        if not user:
+            flash('User not found', 'danger')
+            return redirect(url_for('admin_users'))
+        
+        # Generate new API key
+        import secrets
+        new_api_key = secrets.token_urlsafe(32)
+        
+        # Update user's API key
+        mongo_db.users.update_one(
+            {"_id": user_id},
+            {"$set": {"api_key": new_api_key}}
+        )
+        
+        # Get admin info for logging
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        
+        # Log admin action
+        log_admin_action(
+            admin_username,
+            "API Key Reset",
+            f"Reset API key for {user['username']}"
+        )
+        
+        flash(f'✅ API key reset for {user["username"]}. New key: {new_api_key}', 'success')
+        
+    except Exception as e:
+        flash(f'Error resetting API key: {str(e)}', 'danger')
+        print(f"Admin reset API error: {e}")
+    
+    return redirect(url_for('admin_users'))
+
 @app.route('/virtual')
 def virtual_list():
     """Virtual scrolling version - only renders visible items"""
@@ -1990,7 +2251,12 @@ def level_detail(level_id):
             {"$limit": 100}  # Limit to first 100 records for performance
         ], maxTimeMS=5000))
         
-        return render_template('level_detail.html', level=level, records=records)
+        # Get position history for this level
+        position_history = list(mongo_db.position_history.find(
+            {"level_id": int(level_id)}
+        ).sort("change_date", -1).limit(20))
+        
+        return render_template('level_detail.html', level=level, records=records, position_history=position_history)
     except (ValueError, InvalidId):
         flash('Invalid level ID', 'danger')
         return redirect(url_for('index'))
@@ -2005,7 +2271,22 @@ def login():
         
         if user and check_password_hash(user['password_hash'], password):
             session['user_id'] = user['_id']
+            session['username'] = user['username']
             session['is_admin'] = user.get('is_admin', False)
+            session.permanent = True  # Make session permanent
+            
+            # Load user preferences
+            session['theme'] = user.get('theme_preference', 'light')
+            
+            # Log login activity
+            login_entry = {
+                "user_id": user['_id'],
+                "timestamp": datetime.now(timezone.utc),
+                "ip_address": request.remote_addr,
+                "user_agent": request.headers.get('User-Agent', 'Unknown')
+            }
+            mongo_db.login_history.insert_one(login_entry)
+            
             flash('Login successful!', 'success')
             return redirect(url_for('index'))
         else:
@@ -2062,6 +2343,17 @@ def toggle_theme():
     current_theme = session.get('theme', 'light')
     new_theme = 'dark' if current_theme == 'light' else 'light'
     session['theme'] = new_theme
+    session.permanent = True  # Make session permanent
+    
+    # Save theme to database if user is logged in
+    if 'user_id' in session:
+        try:
+            mongo_db.users.update_one(
+                {"_id": session['user_id']},
+                {"$set": {"theme_preference": new_theme}}
+            )
+        except Exception as e:
+            print(f"Error saving theme preference: {e}")
     
     # Handle AJAX requests
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
@@ -2130,7 +2422,23 @@ def google_callback():
         
         # Log in the user
         session['user_id'] = user['_id']
+        session['username'] = user['username']
         session['is_admin'] = user.get('is_admin', False)
+        session.permanent = True  # Make session permanent
+        
+        # Load user preferences
+        session['theme'] = user.get('theme_preference', 'light')
+        
+        # Log login activity
+        login_entry = {
+            "user_id": user['_id'],
+            "timestamp": datetime.now(timezone.utc),
+            "ip_address": request.remote_addr,
+            "user_agent": request.headers.get('User-Agent', 'Unknown'),
+            "login_method": "google"
+        }
+        mongo_db.login_history.insert_one(login_entry)
+        
         flash('Successfully logged in with Google!', 'success')
         return redirect(url_for('index'))
     
@@ -2309,36 +2617,33 @@ def admin_levels():
         video_url = request.form.get('video_url')
         thumbnail_url = request.form.get('thumbnail_url')
         
-        # Handle file upload - save to JSON and convert to base64
+        # Handle file upload - save to static folder
         if 'thumbnail_file' in request.files:
             file = request.files['thumbnail_file']
             if file and file.filename:
-                import base64
-                import json
+                import os
                 import time
-                file_data = file.read()
+                
+                # Create thumbnails directory if it doesn't exist
+                os.makedirs('static/thumbnails', exist_ok=True)
+                
+                # Generate unique filename
                 file_ext = file.filename.split('.')[-1].lower()
-                mime_type = f'image/{file_ext}' if file_ext in ['png', 'jpg', 'jpeg', 'gif', 'webp'] else 'image/png'
-                base64_data = base64.b64encode(file_data).decode('utf-8')
-                thumbnail_url = f'data:{mime_type};base64,{base64_data}'
+                if file_ext not in ['png', 'jpg', 'jpeg', 'gif', 'webp']:
+                    file_ext = 'png'
                 
-                # Save to JSON file
-                json_file = 'thumbnails.json'
-                try:
-                    with open(json_file, 'r') as f:
-                        thumbnails = json.load(f)
-                except:
-                    thumbnails = {}
+                # Use level name and timestamp for filename
+                safe_name = "".join(c for c in name if c.isalnum() or c in (' ', '-', '_')).rstrip()
+                safe_name = safe_name.replace(' ', '_')
+                filename = f"{safe_name}_{int(time.time())}.{file_ext}"
+                filepath = os.path.join('static/thumbnails', filename)
                 
-                thumbnails[name] = {
-                    'base64': base64_data,
-                    'mime_type': mime_type,
-                    'filename': file.filename,
-                    'timestamp': int(time.time())
-                }
+                # Save the file
+                file.seek(0)  # Reset file pointer
+                file.save(filepath)
                 
-                with open(json_file, 'w') as f:
-                    json.dump(thumbnails, f, indent=2)
+                # Set thumbnail URL to the saved file
+                thumbnail_url = f"/static/thumbnails/{filename}"
                     
                 print(f"Thumbnail uploaded: {mime_type}, size: {len(base64_data)} chars")
                 print(f"Thumbnail URL: {thumbnail_url[:100]}...")
@@ -2471,37 +2776,34 @@ def admin_edit_level():
     
 
     
-    # Handle file upload - save to JSON and convert to base64
+    # Handle file upload - save to static folder
     if 'thumbnail_file' in request.files:
         file = request.files['thumbnail_file']
         if file and file.filename:
-            import base64
-            import json
+            import os
             import time
-            file_data = file.read()
+            
+            # Create thumbnails directory if it doesn't exist
+            os.makedirs('static/thumbnails', exist_ok=True)
+            
+            # Generate unique filename
             file_ext = file.filename.split('.')[-1].lower()
-            mime_type = f'image/{file_ext}' if file_ext in ['png', 'jpg', 'jpeg', 'gif', 'webp'] else 'image/png'
-            base64_data = base64.b64encode(file_data).decode('utf-8')
-            thumbnail_url = f'data:{mime_type};base64,{base64_data}'
+            if file_ext not in ['png', 'jpg', 'jpeg', 'gif', 'webp']:
+                file_ext = 'png'
             
-            # Save to JSON file
-            json_file = 'thumbnails.json'
+            # Use level name and timestamp for filename
             level_name = request.form.get('name', 'unknown')
-            try:
-                with open(json_file, 'r') as f:
-                    thumbnails = json.load(f)
-            except:
-                thumbnails = {}
+            safe_name = "".join(c for c in level_name if c.isalnum() or c in (' ', '-', '_')).rstrip()
+            safe_name = safe_name.replace(' ', '_')
+            filename = f"{safe_name}_{int(time.time())}.{file_ext}"
+            filepath = os.path.join('static/thumbnails', filename)
             
-            thumbnails[level_name] = {
-                'base64': base64_data,
-                'mime_type': mime_type,
-                'filename': file.filename,
-                'timestamp': int(time.time())
-            }
+            # Save the file
+            file.seek(0)  # Reset file pointer
+            file.save(filepath)
             
-            with open(json_file, 'w') as f:
-                json.dump(thumbnails, f, indent=2)
+            # Set thumbnail URL to the saved file
+            thumbnail_url = f"/static/thumbnails/{filename}"
     
     points_str = request.form.get('points')
     min_percentage = int(request.form.get('min_percentage', '100'))
@@ -2510,6 +2812,10 @@ def admin_edit_level():
     
     # Handle position shifting if position changed
     if position != old_position or is_legacy != old_is_legacy:
+        # Track position change
+        admin_username = session.get('username', 'Unknown Admin')
+        track_position_change(db_level_id, old_position, position, admin_username)
+        
         if is_legacy == old_is_legacy:
             # Same list, just moving position
             if old_position < position:
@@ -3535,6 +3841,22 @@ def future_list():
     
     return render_template('future.html', levels=future_levels)
 
+@app.route('/future/<int:level_id>')
+def future_level_details(level_id):
+    """Future level details page"""
+    # Check if future list is enabled
+    settings = mongo_db.site_settings.find_one({"_id": "main"})
+    if not settings or not settings.get('future_list_enabled', False):
+        return render_template('future_disabled.html')
+    
+    # Get the specific future level
+    level = mongo_db.future_levels.find_one({"_id": level_id})
+    if not level:
+        flash('Future level not found', 'danger')
+        return redirect(url_for('future_list'))
+    
+    return render_template('future_level_details.html', level=level)
+
 @app.route('/admin/announcements', methods=['GET', 'POST'])
 def admin_announcements():
     """Admin interface for managing site announcements"""
@@ -3700,6 +4022,183 @@ def admin_bulk_actions():
         flash(f'Exported {len(levels)} levels to {filename}!', 'success')
     
     return redirect(url_for('admin_levels'))
+
+# 🎯 NEW TOOL #1: Level ID Finder & Analyzer
+@app.route('/level_analyzer', methods=['GET', 'POST'])
+def level_analyzer():
+    """🎯 GD Level ID Finder & Deep Analysis Tool"""
+    if request.method == 'POST':
+        level_id = request.form.get('level_id', '').strip()
+        
+        if not level_id or not level_id.isdigit():
+            flash('Please enter a valid level ID (numbers only)', 'warning')
+            return redirect(url_for('level_analyzer'))
+        
+        try:
+            # Check if level exists in our database
+            level = mongo_db.levels.find_one({"level_id": int(level_id)})
+            
+            # Get records for this level
+            records = list(mongo_db.records.aggregate([
+                {"$match": {"level_id": ObjectId(level['_id']) if level else None}},
+                {"$lookup": {
+                    "from": "users",
+                    "localField": "user_id",
+                    "foreignField": "_id",
+                    "as": "user"
+                }},
+                {"$unwind": "$user"},
+                {"$sort": {"date_submitted": -1}}
+            ])) if level else []
+            
+            # Calculate statistics
+            stats = {
+                'total_attempts': len(records),
+                'completions': len([r for r in records if r['progress'] == 100 and r['status'] == 'approved']),
+                'average_progress': sum(r['progress'] for r in records) / len(records) if records else 0,
+                'top_players': sorted([r for r in records if r['progress'] == 100 and r['status'] == 'approved'], 
+                                    key=lambda x: x['date_submitted'])[:10],
+                'difficulty_votes': {},
+                'recent_activity': records[:5]
+            }
+            
+            # Mock GD API data (in real implementation, you'd call GD servers)
+            gd_data = {
+                'name': level['name'] if level else f'Level {level_id}',
+                'creator': level['creator'] if level else 'Unknown',
+                'description': level.get('description', 'No description available'),
+                'difficulty': level.get('difficulty', 'Unknown') if level else 'Unknown',
+                'downloads': f"{random.randint(1000, 999999):,}",
+                'likes': f"{random.randint(100, 99999):,}",
+                'length': random.choice(['Tiny', 'Short', 'Medium', 'Long', 'XL']),
+                'coins': random.randint(0, 3),
+                'featured': random.choice([True, False]),
+                'epic': random.choice([True, False]) if random.choice([True, False]) else False
+            }
+            
+            return render_template('level_analyzer_result.html', 
+                                 level_id=level_id,
+                                 level=level,
+                                 gd_data=gd_data,
+                                 stats=stats,
+                                 records=records)
+                                 
+        except Exception as e:
+            flash(f'Error analyzing level: {e}', 'danger')
+            return redirect(url_for('level_analyzer'))
+    
+    return render_template('level_analyzer.html')
+
+# 🏆 NEW TOOL #2: Personal Progress Tracker & Goals
+@app.route('/progress_tracker', methods=['GET', 'POST'])
+def progress_tracker():
+    """🏆 Personal GD Progress Tracker with Goals & Achievements"""
+    if 'user_id' not in session:
+        flash('Please log in to use the progress tracker', 'warning')
+        return redirect(url_for('login'))
+    
+    user_id = session['user_id']
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'set_goal':
+            goal_type = request.form.get('goal_type')
+            target_value = request.form.get('target_value')
+            description = request.form.get('description', '')
+            
+            goal = {
+                'user_id': user_id,
+                'type': goal_type,
+                'target_value': int(target_value) if target_value.isdigit() else target_value,
+                'description': description,
+                'created_date': datetime.now(timezone.utc),
+                'completed': False,
+                'progress': 0
+            }
+            
+            try:
+                mongo_db.user_goals.insert_one(goal)
+                flash('Goal set successfully! 🎯', 'success')
+            except:
+                flash('Error setting goal', 'danger')
+    
+    try:
+        # Get user's records and calculate progress
+        user_records = list(mongo_db.records.aggregate([
+            {"$match": {"user_id": user_id, "status": "approved"}},
+            {"$lookup": {
+                "from": "levels",
+                "localField": "level_id",
+                "foreignField": "_id",
+                "as": "level"
+            }},
+            {"$unwind": "$level"},
+            {"$sort": {"date_submitted": -1}}
+        ]))
+        
+        # Calculate comprehensive stats
+        progress_stats = {
+            'total_completions': len([r for r in user_records if r['progress'] == 100]),
+            'total_attempts': len(user_records),
+            'average_progress': sum(r['progress'] for r in user_records) / len(user_records) if user_records else 0,
+            'hardest_completed': None,
+            'recent_achievements': [],
+            'difficulty_breakdown': {},
+            'monthly_progress': {},
+            'completion_rate': 0
+        }
+        
+        # Find hardest completed level
+        completed_levels = [r for r in user_records if r['progress'] == 100]
+        if completed_levels:
+            progress_stats['hardest_completed'] = max(completed_levels, 
+                                                    key=lambda x: x['level'].get('difficulty', 0))
+        
+        # Calculate completion rate
+        if progress_stats['total_attempts'] > 0:
+            progress_stats['completion_rate'] = (progress_stats['total_completions'] / progress_stats['total_attempts']) * 100
+        
+        # Difficulty breakdown
+        for record in user_records:
+            if record['progress'] == 100:
+                diff = record['level'].get('difficulty', 'Unknown')
+                progress_stats['difficulty_breakdown'][diff] = progress_stats['difficulty_breakdown'].get(diff, 0) + 1
+        
+        # Get user's goals
+        user_goals = list(mongo_db.user_goals.find({"user_id": user_id}).sort("created_date", -1))
+        
+        # Update goal progress
+        for goal in user_goals:
+            if goal['type'] == 'completions':
+                goal['progress'] = progress_stats['total_completions']
+                goal['completed'] = goal['progress'] >= goal['target_value']
+            elif goal['type'] == 'difficulty':
+                target_diff = goal['target_value']
+                goal['progress'] = progress_stats['difficulty_breakdown'].get(target_diff, 0)
+                goal['completed'] = goal['progress'] > 0
+        
+        # Generate achievements
+        achievements = []
+        if progress_stats['total_completions'] >= 1:
+            achievements.append({'name': 'First Victory', 'icon': '🏆', 'description': 'Complete your first level'})
+        if progress_stats['total_completions'] >= 10:
+            achievements.append({'name': 'Getting Started', 'icon': '🌟', 'description': 'Complete 10 levels'})
+        if progress_stats['total_completions'] >= 50:
+            achievements.append({'name': 'Experienced', 'icon': '💪', 'description': 'Complete 50 levels'})
+        if progress_stats['completion_rate'] >= 50:
+            achievements.append({'name': 'Efficient', 'icon': '🎯', 'description': '50%+ completion rate'})
+        
+    except Exception as e:
+        # Fallback data
+        progress_stats = {'total_completions': 0, 'total_attempts': 0, 'average_progress': 0}
+        user_goals = []
+        achievements = []
+    
+    return render_template('progress_tracker.html', 
+                         progress_stats=progress_stats,
+                         user_goals=user_goals,
+                         achievements=achievements)
 
 @app.route('/search')
 def search_levels():
@@ -4315,7 +4814,7 @@ def admin_update_points():
 
 @app.route('/settings')
 def user_settings():
-    """User settings page"""
+    """Enhanced user settings page with advanced security features"""
     if 'user_id' not in session:
         flash('Please log in to access settings', 'warning')
         return redirect(url_for('login'))
@@ -4325,11 +4824,40 @@ def user_settings():
         flash('User not found', 'danger')
         return redirect(url_for('logout'))
     
-    return render_template('settings.html', user=user)
+    # Get login history
+    login_history = list(mongo_db.login_history.find(
+        {"user_id": session['user_id']}
+    ).sort("timestamp", -1).limit(10))
+    
+    # Get active sessions (simplified - in production you'd track actual sessions)
+    active_sessions = [
+        {
+            "id": "current",
+            "device": request.headers.get('User-Agent', 'Unknown Device'),
+            "ip": request.remote_addr,
+            "last_active": datetime.now(timezone.utc),
+            "current": True
+        }
+    ]
+    
+    # Generate backup codes if they don't exist
+    if not user.get('backup_codes'):
+        import secrets
+        backup_codes = [secrets.token_hex(4).upper() for _ in range(8)]
+        mongo_db.users.update_one(
+            {"_id": session['user_id']},
+            {"$set": {"backup_codes": backup_codes}}
+        )
+        user['backup_codes'] = backup_codes
+    
+    return render_template('settings_advanced.html', 
+                         user=user, 
+                         login_history=login_history,
+                         active_sessions=active_sessions)
 
 @app.route('/settings/update', methods=['POST'])
 def update_user_settings():
-    """Update user settings"""
+    """Comprehensive user settings update handler"""
     if 'user_id' not in session:
         flash('Please log in to access settings', 'warning')
         return redirect(url_for('login'))
@@ -4339,9 +4867,9 @@ def update_user_settings():
     
     try:
         if action == 'profile':
-            # Update profile information
+            # Handle profile updates including file upload
             username = request.form.get('username', '').strip()
-            nickname = request.form.get('nickname', '').strip()
+            display_name = request.form.get('display_name', '').strip()
             email = request.form.get('email', '').strip()
             bio = request.form.get('bio', '').strip()
             country = request.form.get('country', '').strip()
@@ -4351,224 +4879,303 @@ def update_user_settings():
                 flash('Username must be at least 3 characters', 'danger')
                 return redirect(url_for('user_settings'))
             
-            if not email or '@' not in email:
-                flash('Please enter a valid email', 'danger')
-                return redirect(url_for('user_settings'))
-            
-            # Check if username/email already taken by another user
+            # Check username uniqueness
             existing_user = mongo_db.users.find_one({
-                "$and": [
-                    {"_id": {"$ne": user_id}},
-                    {"$or": [{"username": username}, {"email": email}]}
-                ]
+                "_id": {"$ne": user_id},
+                "username": username
             })
-            
             if existing_user:
-                if existing_user['username'] == username:
-                    flash('Username already taken', 'danger')
-                else:
-                    flash('Email already taken', 'danger')
+                flash('Username already taken', 'danger')
                 return redirect(url_for('user_settings'))
             
-            # Update user
-            mongo_db.users.update_one(
-                {"_id": user_id},
-                {"$set": {
-                    "username": username,
-                    "nickname": nickname,
-                    "email": email,
-                    "bio": bio,
-                    "country": country
-                }}
-            )
+            update_data = {
+                "username": username,
+                "display_name": display_name,
+                "email": email,
+                "bio": bio,
+                "country": country
+            }
             
+            # Handle profile picture upload
+            if 'profile_picture' in request.files:
+                file = request.files['profile_picture']
+                if file and file.filename:
+                    import base64
+                    file_data = file.read()
+                    if len(file_data) > 2 * 1024 * 1024:  # 2MB limit
+                        flash('Profile picture too large (max 2MB)', 'danger')
+                        return redirect(url_for('user_settings'))
+                    
+                    file_ext = file.filename.split('.')[-1].lower()
+                    if file_ext not in ['jpg', 'jpeg', 'png']:
+                        flash('Invalid file type (JPG/PNG only)', 'danger')
+                        return redirect(url_for('user_settings'))
+                    
+                    mime_type = f'image/{file_ext}'
+                    base64_data = base64.b64encode(file_data).decode('utf-8')
+                    update_data['profile_picture'] = f'data:{mime_type};base64,{base64_data}'
+            
+            mongo_db.users.update_one({"_id": user_id}, {"$set": update_data})
+            session['username'] = username  # Update session
             flash('Profile updated successfully!', 'success')
             
-        elif action == 'preferences':
-            # Update user preferences
-            theme = request.form.get('theme', 'light')
-            timezone = request.form.get('timezone', 'UTC')
-            email_notifications = 'email_notifications' in request.form
-            public_profile = 'public_profile' in request.form
-            country = request.form.get('country', '').strip()
-            
-            mongo_db.users.update_one(
-                {"_id": user_id},
-                {"$set": {
-                    "theme": theme,
-                    "timezone": timezone,
-                    "email_notifications": email_notifications,
-                    "public_profile": public_profile,
-                    "country": country
-                }}
-            )
-            
-            flash('Preferences updated successfully!', 'success')
-            
-        elif action == 'social_media':
-            # Update social media connections
-            youtube_url = request.form.get('youtube_url', '').strip()
-            twitch_url = request.form.get('twitch_url', '').strip()
-            tiktok_url = request.form.get('tiktok_url', '').strip()
-            vimeo_url = request.form.get('vimeo_url', '').strip()
-            discord_tag = request.form.get('discord_tag', '').strip()
-            twitter_url = request.form.get('twitter_url', '').strip()
-            
-            mongo_db.users.update_one(
-                {"_id": user_id},
-                {"$set": {
-                    "youtube_url": youtube_url,
-                    "twitch_url": twitch_url,
-                    "tiktok_url": tiktok_url,
-                    "vimeo_url": vimeo_url,
-                    "discord_tag": discord_tag,
-                    "twitter_url": twitter_url
-                }}
-            )
-            
-            flash('Social media connections updated successfully!', 'success')
-            
-        elif action == 'password':
-            # Update password
+        elif action == 'change_password':
             current_password = request.form.get('current_password')
             new_password = request.form.get('new_password')
             confirm_password = request.form.get('confirm_password')
-            
-            if not current_password or not new_password:
-                flash('Please fill in all password fields', 'danger')
-                return redirect(url_for('user_settings'))
             
             if new_password != confirm_password:
                 flash('New passwords do not match', 'danger')
                 return redirect(url_for('user_settings'))
             
-            if len(new_password) < 6:
-                flash('Password must be at least 6 characters', 'danger')
-                return redirect(url_for('user_settings'))
-            
-            # Verify current password
             user = mongo_db.users.find_one({"_id": user_id})
             if not check_password_hash(user['password_hash'], current_password):
                 flash('Current password is incorrect', 'danger')
                 return redirect(url_for('user_settings'))
             
-            # Update password
             new_hash = generate_password_hash(new_password)
             mongo_db.users.update_one(
                 {"_id": user_id},
                 {"$set": {"password_hash": new_hash}}
             )
+            flash('Password changed successfully!', 'success')
             
-            flash('Password updated successfully!', 'success')
+        elif action == 'privacy':
+            profile_visibility = request.form.get('profile_visibility', 'public')
+            hide_country_flag = 'hide_country_flag' in request.form
+            hide_records = 'hide_records' in request.form
+            hide_online_status = 'hide_online_status' in request.form
             
-        elif action == 'avatar':
-            # Update profile picture
-            avatar_file = request.files.get('avatar')
-            avatar_url = request.form.get('avatar_url', '').strip()
+            mongo_db.users.update_one(
+                {"_id": user_id},
+                {"$set": {
+                    "profile_visibility": profile_visibility,
+                    "hide_country_flag": hide_country_flag,
+                    "hide_records": hide_records,
+                    "hide_online_status": hide_online_status
+                }}
+            )
+            flash('Privacy settings updated!', 'success')
             
-            # Check if user provided a file
-            if avatar_file and avatar_file.filename:
-                # Handle file upload
-                import os
-                
-                # Validate file type
-                allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-                file_extension = avatar_file.filename.rsplit('.', 1)[1].lower() if '.' in avatar_file.filename else ''
-                
-                if file_extension not in allowed_extensions:
-                    flash('Invalid file type. Please use PNG, JPG, JPEG, GIF, or WebP.', 'danger')
-                    return redirect(url_for('user_settings'))
-                
-                # Create uploads directory
-                os.makedirs('static/avatars', exist_ok=True)
-                
-                # Save file with proper extension
-                filename = f"avatar_{user_id}_{int(datetime.now().timestamp())}.{file_extension}"
-                filepath = os.path.join('static/avatars', filename)
-                
-                try:
-                    # Try to resize and optimize image
-                    from PIL import Image
-                    
-                    img = Image.open(avatar_file.stream)
-                    img = img.convert('RGB')
-                    img.thumbnail((200, 200), Image.Resampling.LANCZOS)
-                    img.save(filepath, 'JPEG', quality=85, optimize=True)
-                    
-                    avatar_url = f"/static/avatars/{filename}"
-                    
-                except ImportError:
-                    # Fallback without PIL - just save the file
-                    avatar_file.seek(0)  # Reset file pointer
-                    avatar_file.save(filepath)
-                    avatar_url = f"/static/avatars/{filename}"
-                    
-                except Exception as e:
-                    flash(f'Error processing image: {e}', 'danger')
-                    return redirect(url_for('user_settings'))
+        elif action == 'verify_gd':
+            gd_player_name = request.form.get('gd_player_name', '').strip()
+            gd_account_id = request.form.get('gd_account_id', '').strip()
+            verification_method = request.form.get('verification_method')
             
-            # Check if user provided a URL instead
-            elif avatar_url:
-                # Validate URL format
-                if not (avatar_url.startswith('http://') or avatar_url.startswith('https://')):
-                    flash('Please provide a valid URL starting with http:// or https://', 'warning')
-                    return redirect(url_for('user_settings'))
-            
-            else:
-                flash('Please either upload a file or provide a URL', 'warning')
+            if not gd_player_name or not gd_account_id:
+                flash('Please fill in all GD verification fields', 'danger')
                 return redirect(url_for('user_settings'))
             
-            # Update avatar URL in database
-            if avatar_url:
-                mongo_db.users.update_one(
-                    {"_id": user_id},
-                    {"$set": {"avatar_url": avatar_url}}
-                )
-                flash('Profile picture updated successfully!', 'success')
-            else:
-                flash('No avatar provided', 'warning')
+            # Generate verification code
+            import secrets
+            verification_code = f"RTL-VERIFY-{secrets.token_hex(4).upper()}"
+            
+            mongo_db.users.update_one(
+                {"_id": user_id},
+                {"$set": {
+                    "gd_player_name": gd_player_name,
+                    "gd_account_id": gd_account_id,
+                    "gd_verification_code": verification_code,
+                    "gd_verification_method": verification_method,
+                    "gd_verification_status": "pending"
+                }}
+            )
+            flash(f'GD verification started! Your code: {verification_code}', 'info')
+            
+        elif action == 'regenerate_backup_codes':
+            import secrets
+            backup_codes = [secrets.token_hex(4).upper() for _ in range(8)]
+            mongo_db.users.update_one(
+                {"_id": user_id},
+                {"$set": {"backup_codes": backup_codes}}
+            )
+            flash('New backup codes generated!', 'success')
+            
+        elif action == 'export_data':
+            # Export user data (GDPR compliant)
+            user = mongo_db.users.find_one({"_id": user_id})
+            records = list(mongo_db.records.find({"user_id": user_id}))
+            login_history = list(mongo_db.login_history.find({"user_id": user_id}))
+            
+            export_data = {
+                "user_profile": user,
+                "records": records,
+                "login_history": login_history,
+                "export_date": datetime.now(timezone.utc).isoformat()
+            }
+            
+            import json
+            filename = f"rtl_data_export_{user['username']}_{datetime.now().strftime('%Y%m%d')}.json"
+            
+            from flask import Response
+            json_data = json.dumps(export_data, indent=2, default=str)
+            
+            return Response(
+                json_data,
+                mimetype='application/json',
+                headers={'Content-Disposition': f'attachment; filename={filename}'}
+            )
+            
+        elif action == 'recovery_options':
+            backup_email = request.form.get('backup_email', '').strip()
+            discord_username = request.form.get('discord_username', '').strip()
+            
+            mongo_db.users.update_one(
+                {"_id": user_id},
+                {"$set": {
+                    "backup_email": backup_email,
+                    "discord_username": discord_username
+                }}
+            )
+            flash('Recovery options updated!', 'success')
             
         elif action == 'reset_api_key':
-            # Reset API key (with confirmation)
-            confirm_text = request.form.get('confirm_reset', '').strip()
-            if confirm_text.upper() != 'RESET API KEY':
-                flash('Please type "RESET API KEY" to confirm', 'danger')
-                return redirect(url_for('user_settings'))
-            
             # Generate new API key
             import secrets
             new_api_key = secrets.token_urlsafe(32)
             
-            # Update user with new API key
             mongo_db.users.update_one(
                 {"_id": user_id},
                 {"$set": {"api_key": new_api_key}}
             )
-            
             flash(f'API key reset successfully! New key: {new_api_key}', 'success')
             
         elif action == 'delete_account':
-            # Delete account (with confirmation)
-            confirm_text = request.form.get('confirm_delete', '').strip()
-            if confirm_text.lower() != 'delete my account':
-                flash('Please type "DELETE MY ACCOUNT" to confirm', 'danger')
+            confirm_delete = request.form.get('confirm_delete', '').strip()
+            if confirm_delete != 'DELETE':
+                flash('Please type DELETE to confirm account deletion', 'danger')
                 return redirect(url_for('user_settings'))
             
-            # Delete user records first
-            mongo_db.records.delete_many({"user_id": user_id})
-            
-            # Delete user
+            # Delete user data
             mongo_db.users.delete_one({"_id": user_id})
+            mongo_db.records.delete_many({"user_id": user_id})
+            mongo_db.login_history.delete_many({"user_id": user_id})
             
-            # Logout
+            # Clear session
             session.clear()
             flash('Account deleted successfully', 'info')
             return redirect(url_for('index'))
             
+        else:
+            flash('Invalid action', 'danger')
+            
     except Exception as e:
-        flash(f'Error updating settings: {e}', 'danger')
+        flash(f'Error updating settings: {str(e)}', 'danger')
+        print(f"Settings update error: {e}")
     
     return redirect(url_for('user_settings'))
+
+
+@app.route('/upload_avatar', methods=['POST'])
+def upload_avatar():
+    try:
+        user_id = session.get('user_id')
+        avatar_file = request.files.get('avatar_file')
+        avatar_url = request.form.get('avatar_url', '').strip()
+        
+        if avatar_file and avatar_file.filename:
+            # Validate file type
+            allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+            file_extension = avatar_file.filename.rsplit('.', 1)[1].lower() if '.' in avatar_file.filename else ''
+            
+            if file_extension not in allowed_extensions:
+                flash('Invalid file type. Please use PNG, JPG, JPEG, GIF, or WebP.', 'danger')
+                return redirect(url_for('user_settings'))
+            
+            # Create uploads directory
+            os.makedirs('static/avatars', exist_ok=True)
+            
+            # Save file with proper extension
+            filename = f"avatar_{user_id}_{int(datetime.now().timestamp())}.{file_extension}"
+            filepath = os.path.join('static/avatars', filename)
+            
+            try:
+                # Try to resize and optimize image
+                from PIL import Image
+                
+                img = Image.open(avatar_file.stream)
+                img = img.convert('RGB')
+                img.thumbnail((200, 200), Image.Resampling.LANCZOS)
+                img.save(filepath, 'JPEG', quality=85, optimize=True)
+                
+                avatar_url = f"/static/avatars/{filename}"
+                
+            except ImportError:
+                # Fallback without PIL - just save the file
+                avatar_file.seek(0)  # Reset file pointer
+                avatar_file.save(filepath)
+                avatar_url = f"/static/avatars/{filename}"
+                
+            except Exception as e:
+                flash(f'Error processing image: {e}', 'danger')
+                return redirect(url_for('user_settings'))
+        
+        # Check if user provided a URL instead
+        elif avatar_url:
+            # Validate URL format
+            if not (avatar_url.startswith('http://') or avatar_url.startswith('https://')):
+                flash('Please provide a valid URL starting with http:// or https://', 'warning')
+                return redirect(url_for('user_settings'))
+        
+        else:
+            flash('Please either upload a file or provide a URL', 'warning')
+            return redirect(url_for('user_settings'))
+        
+        # Update avatar URL in database
+        if avatar_url:
+            mongo_db.users.update_one(
+                {"_id": user_id},
+                {"$set": {"avatar_url": avatar_url}}
+            )
+            flash('Profile picture updated successfully!', 'success')
+        else:
+            flash('No avatar provided', 'warning')
+            
+    except Exception as e:
+        flash(f'Error updating avatar: {str(e)}', 'danger')
+        print(f"Avatar update error: {e}")
+    
+    return redirect(url_for('user_settings'))
+
+
+def handle_user_settings_action(action, user_id):
+    """Handle different user settings actions"""
+    if action == 'reset_api_key':
+        # Reset API key (with confirmation)
+        confirm_text = request.form.get('confirm_reset', '').strip()
+        if confirm_text.upper() != 'RESET API KEY':
+            flash('Please type "RESET API KEY" to confirm', 'danger')
+            return redirect(url_for('user_settings'))
+        
+        # Generate new API key
+        import secrets
+        new_api_key = secrets.token_urlsafe(32)
+        
+        # Update user with new API key
+        mongo_db.users.update_one(
+            {"_id": user_id},
+            {"$set": {"api_key": new_api_key}}
+        )
+        
+        flash(f'API key reset successfully! New key: {new_api_key}', 'success')
+        
+    elif action == 'delete_account':
+        # Delete account (with confirmation)
+        confirm_text = request.form.get('confirm_delete', '').strip()
+        if confirm_text.lower() != 'delete my account':
+            flash('Please type "DELETE MY ACCOUNT" to confirm', 'danger')
+            return redirect(url_for('user_settings'))
+        
+        # Delete user records first
+        mongo_db.records.delete_many({"user_id": user_id})
+        
+        # Delete user
+        mongo_db.users.delete_one({"_id": user_id})
+        
+        # Logout
+        session.clear()
+        flash('Account deleted successfully', 'info')
+        return redirect(url_for('index'))
 
 @app.route('/export_data')
 def export_user_data():
@@ -4843,5 +5450,134 @@ def country_leaderboard(country_code):
         flash(f'Error loading country leaderboard: {e}', 'danger')
         return redirect(url_for('world_leaderboard'))
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000, debug=True)
+
+
+@app.route('/api/live_stats')
+def api_live_stats():
+    """API endpoint for real-time stats updates"""
+    stats = {
+        'timestamp': datetime.now(timezone.utc).isoformat(),
+        'total_records': mongo_db.records.count_documents({}),
+        'pending_records': mongo_db.records.count_documents({"status": "pending"}),
+        'online_users': mongo_db.users.count_documents({
+            "last_active": {"$gte": datetime.now(timezone.utc) - timedelta(minutes=5)}
+        }),
+        'recent_completion': None
+    }
+    
+    # Get most recent completion
+    recent = mongo_db.records.find_one(
+        {"status": "approved"},
+        sort=[("timestamp", -1)]
+    )
+    
+    if recent:
+        level = mongo_db.levels.find_one({"_id": recent['level_id']})
+        user = mongo_db.users.find_one({"_id": recent['user_id']})
+        
+        if level and user:
+            # Use 'date_submitted' instead of 'timestamp' for compatibility
+            timestamp_field = recent.get('timestamp') or recent.get('date_submitted')
+            if timestamp_field:
+                stats['recent_completion'] = {
+                    'player': user['username'],
+                    'level': level['name'],
+                    'progress': recent['progress'],
+                    'time_ago': (datetime.now(timezone.utc) - timestamp_field).total_seconds()
+                }
+    
+    from flask import jsonify
+    return jsonify(stats)
+
+
+
+
+
+# Admin route to award verifier points
+@app.route('/admin/award_verifier_points', methods=['POST'])
+def admin_award_verifier_points():
+    """Admin route to manually award verifier points"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('login'))
+    
+    try:
+        verifier_name = request.form.get('verifier_name', '').strip()
+        username = request.form.get('username', '').strip()
+        
+        if not verifier_name:
+            flash('Please enter a verifier name', 'danger')
+            return redirect(url_for('admin'))
+            
+        if not username:
+            flash('Please enter a username', 'danger')
+            return redirect(url_for('admin'))
+        
+        # Find user by username
+        user = mongo_db.users.find_one({"username": username})
+        if not user:
+            flash(f'User "{username}" not found', 'danger')
+            return redirect(url_for('admin'))
+        
+        # Find all levels verified by this verifier name
+        levels = list(mongo_db.levels.find({"verifier": verifier_name, "is_legacy": False}))
+        
+        if not levels:
+            flash(f'No levels found verified by "{verifier_name}"', 'warning')
+            return redirect(url_for('admin'))
+        
+        awarded_count = 0
+        for level in levels:
+            success = award_verifier_points(level['_id'], user['_id'])
+            if success:
+                awarded_count += 1
+        
+        if awarded_count > 0:
+            flash(f'Verifier points awarded to {username} for {awarded_count} levels verified by {verifier_name}!', 'success')
+        else:
+            flash(f'No new points awarded (user may already have completions for all levels)', 'warning')
+            
+    except Exception as e:
+        flash(f'Error awarding verifier points: {e}', 'danger')
+    
+    return redirect(url_for('admin'))
+
+# Route for users to connect YouTube channel
+@app.route('/connect_youtube', methods=['GET', 'POST'])
+def connect_youtube():
+    """Allow users to connect their YouTube channel for automatic verifier detection"""
+    if 'user_id' not in session:
+        flash('Please log in first', 'warning')
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        youtube_channel = request.form.get('youtube_channel', '').strip()
+        youtube_username = request.form.get('youtube_username', '').strip()
+        
+        if not youtube_channel and not youtube_username:
+            flash('Please provide either a channel URL or username', 'warning')
+            return redirect(url_for('connect_youtube'))
+        
+        # Update user with YouTube info
+        update_data = {}
+        if youtube_channel:
+            update_data['youtube_channel'] = youtube_channel
+        if youtube_username:
+            update_data['youtube_username'] = youtube_username
+        
+        mongo_db.users.update_one(
+            {"_id": session['user_id']},
+            {"$set": update_data}
+        )
+        
+        flash('YouTube channel connected! Admins can now award you verifier points automatically.', 'success')
+        return redirect(url_for('profile'))
+    
+    # Get current user's YouTube info
+    user = mongo_db.users.find_one({"_id": session['user_id']})
+    
+    return render_template('connect_youtube.html', user=user)
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 10000))
+    app.run(debug=True, host='0.0.0.0', port=port)

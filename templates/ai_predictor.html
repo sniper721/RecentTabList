@@ -1,0 +1,89 @@
+{% extends "layout.html" %}
+
+{% block title %}🤖 AI Difficulty Predictor - RTL{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="text-center mb-5">
+                <h1 class="display-4">🤖 AI Difficulty Predictor</h1>
+                <p class="lead text-muted">Let our AI analyze and predict the difficulty of any Geometry Dash level!</p>
+            </div>
+            
+            <div class="card shadow-lg">
+                <div class="card-header bg-gradient-primary text-white">
+                    <h5 class="mb-0">🔮 Predict Level Difficulty</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-4">
+                            <label class="form-label">Level Name *</label>
+                            <input type="text" name="level_name" class="form-control form-control-lg" 
+                                   placeholder="Enter the level name..." required>
+                            <small class="text-muted">The AI will analyze keywords and patterns in the name</small>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label">Creator (Optional)</label>
+                            <input type="text" name="creator" class="form-control" 
+                                   placeholder="Level creator's name...">
+                            <small class="text-muted">Famous creators can influence difficulty predictions</small>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label">Description (Optional)</label>
+                            <textarea name="description" class="form-control" rows="3" 
+                                      placeholder="Level description or any additional info..."></textarea>
+                            <small class="text-muted">More context helps improve prediction accuracy</small>
+                        </div>
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                🤖 Predict Difficulty
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            {% if recent_predictions %}
+            <div class="card mt-5">
+                <div class="card-header">
+                    <h5 class="mb-0">📊 Recent Predictions</h5>
+                </div>
+                <div class="card-body">
+                    {% for prediction in recent_predictions %}
+                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+                        <div>
+                            <strong>{{ prediction.level_name }}</strong>
+                            {% if prediction.creator %}
+                                <small class="text-muted">by {{ prediction.creator }}</small>
+                            {% endif %}
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-primary fs-6">{{ prediction.predicted_difficulty }}/10</span>
+                            <br>
+                            <small class="text-muted">{{ prediction.confidence }}% confidence</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h6>🧠 How It Works</h6>
+                    <ul class="mb-0">
+                        <li>Analyzes keywords in level names and descriptions</li>
+                        <li>Considers creator reputation and history</li>
+                        <li>Uses pattern recognition for difficulty indicators</li>
+                        <li>Provides confidence ratings and insights</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

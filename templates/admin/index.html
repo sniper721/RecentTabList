@@ -40,6 +40,35 @@
                                 <i class="fas fa-cog"></i> Settings
                             </a>
                         </div>
+                        
+
+
+                        <!-- Verifier Points Award Section -->
+                        <div class="card mt-3">
+                            <div class="card-header">
+                                <h5 class="mb-0">🏆 Award Verifier Points</h5>
+                            </div>
+                            <div class="card-body">
+                                <form method="POST" action="{{ url_for('admin_award_verifier_points') }}" class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="verifier_name" class="form-label">Verifier Name</label>
+                                        <input type="text" class="form-control" name="verifier_name" placeholder="e.g. miifin" required>
+                                        <small class="text-muted">Awards points for ALL levels verified by this person</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="username" class="form-label">Username</label>
+                                        <input type="text" class="form-control" name="username" placeholder="Enter username" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">&nbsp;</label>
+                                        <button type="submit" class="btn btn-success w-100">
+                                            🎖️ Award Verifier Points
+                                        </button>
+                                    </div>
+                                </form>
+                                <small class="text-muted">Award points to level verifiers (like first victors). They'll get full completion points.</small>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -1,0 +1,121 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ level.name }} - Future Level Details{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-8">
+            <!-- Level Info Card -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h3 class="mb-0">🚀 {{ level.name }}</h3>
+                    <small>Future Level #{{ level.position }}</small>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Creator:</strong> {{ level.creator }}</p>
+                            <p><strong>Verifier:</strong> {{ level.verifier }}</p>
+                            <p><strong>Difficulty:</strong> {{ level.difficulty }}/10</p>
+                            <p><strong>Points:</strong> {{ level.points }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            {% if level.level_id %}
+                                <p><strong>Level ID:</strong> {{ level.level_id }}</p>
+                            {% endif %}
+                            <p><strong>Status:</strong> <span class="badge bg-info">Future Level</span></p>
+                        </div>
+                    </div>
+                    
+                    {% if level.description %}
+                        <div class="mt-3">
+                            <h6>Description:</h6>
+                            <p class="text-muted">{{ level.description }}</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Video Section -->
+            {% if level.video_url %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">📹 Verification Video</h5>
+                </div>
+                <div class="card-body">
+                    {% if 'youtube.com' in level.video_url or 'youtu.be' in level.video_url %}
+                        {% if 'youtube.com' in level.video_url and 'v=' in level.video_url %}
+                            {% set video_id = level.video_url.split('v=')[1].split('&')[0] %}
+                        {% elif 'youtu.be' in level.video_url %}
+                            {% set video_id = level.video_url.split('youtu.be/')[1].split('?')[0] %}
+                        {% endif %}
+                        
+                        {% if video_id %}
+                            <div class="ratio ratio-16x9">
+                                <iframe src="https://www.youtube.com/embed/{{ video_id }}" 
+                                        title="YouTube video player" 
+                                        frameborder="0" 
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                        allowfullscreen>
+                                </iframe>
+                            </div>
+                        {% else %}
+                            <a href="{{ level.video_url }}" target="_blank" class="btn btn-primary">
+                                🎥 Watch Video
+                            </a>
+                        {% endif %}
+                    {% else %}
+                        <a href="{{ level.video_url }}" target="_blank" class="btn btn-primary">
+                            🎥 Watch Video
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-md-4">
+            <!-- Progress Section -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">📊 Progress</h5>
+                </div>
+                <div class="card-body text-center">
+                    <div class="alert alert-info">
+                        <h6>🚀 Future Level</h6>
+                        <p class="mb-0">This level is planned for future addition to the main list.</p>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <small class="text-muted">No progress tracking available for future levels</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Future Level Info -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">ℹ️ About Future Levels</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center text-muted">
+                        <p><strong>Future levels</strong> are planned additions to the main RTL.</p>
+                        <p>They represent upcoming content that will be added once verified and positioned.</p>
+                        <small>No records or progress tracking available yet.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Back Button -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <a href="{{ url_for('future_list') }}" class="btn btn-secondary">
+                ← Back to Future List
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
