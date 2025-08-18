@@ -216,11 +216,30 @@ def utility_processor():
         """Get active announcements that haven't expired"""
         try:
             now = datetime.now(timezone.utc)
-            return list(mongo_db.announcements.find({
-                "active": True,
-                "expires_at": {"$gt": now}
+            announcements = list(mongo_db.announcements.find({
+                "active": True
             }).sort("created_at", -1).limit(5))
-        except:
+            
+            # Filter and fix timezone issues
+            active_announcements = []
+            for announcement in announcements:
+                # Fix timezone if needed
+                expires_at = announcement.get('expires_at')
+                if expires_at:
+                    if expires_at.tzinfo is None:
+                        expires_at = expires_at.replace(tzinfo=timezone.utc)
+                    
+                    # Check if still active
+                    if expires_at > now:
+                        # Fix created_at timezone too
+                        if announcement.get('created_at') and announcement['created_at'].tzinfo is None:
+                            announcement['created_at'] = announcement['created_at'].replace(tzinfo=timezone.utc)
+                        announcement['expires_at'] = expires_at
+                        active_announcements.append(announcement)
+            
+            return active_announcements
+        except Exception as e:
+            print(f"Error getting active announcements: {e}")
             return []
     
     # Get current theme from session
@@ -3549,8 +3568,14 @@ def admin_announcements():
     # Get all announcements (active and expired)
     announcements = list(mongo_db.announcements.find({}).sort("created_at", -1))
     
-    # Add current time for template
+    # Fix timezone issues for existing announcements
     current_time = datetime.now(timezone.utc)
+    for announcement in announcements:
+        # Ensure all datetime fields are timezone-aware
+        if announcement.get('created_at') and announcement['created_at'].tzinfo is None:
+            announcement['created_at'] = announcement['created_at'].replace(tzinfo=timezone.utc)
+        if announcement.get('expires_at') and announcement['expires_at'].tzinfo is None:
+            announcement['expires_at'] = announcement['expires_at'].replace(tzinfo=timezone.utc)
     
     return render_template('admin/announcements.html', announcements=announcements, current_time=current_time)
 
