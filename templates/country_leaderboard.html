@@ -1,0 +1,237 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ country_name }} Leaderboard{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1>🏆 {{ country_name }} Leaderboard</h1>
+                    <p class="text-muted">Top players from {{ country_name }} ({{ country_code }})</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('world_leaderboard') }}" class="btn btn-outline-primary">
+                        🌍 Back to World Map
+                    </a>
+                </div>
+            </div>
+
+            <!-- Country Stats -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">👥 Total Players</h5>
+                            <h2 class="text-primary">{{ total_players }}</h2>
+                            <p class="text-muted">Active players</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">📄 Current Page</h5>
+                            <h2 class="text-info">{{ page }}</h2>
+                            <p class="text-muted">of {{ total_pages }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">🏅 Showing</h5>
+                            <h2 class="text-success">{{ players|length }}</h2>
+                            <p class="text-muted">players</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Leaderboard Table -->
+            <div class="card">
+                <div class="card-header">
+                    <h4>🏆 {{ country_name }} Rankings</h4>
+                </div>
+                <div class="card-body">
+                    {% if players %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Rank</th>
+                                        <th>Player</th>
+                                        <th>Points</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for player in players %}
+                                    <tr>
+                                        <td>
+                                            {% set rank = ((page - 1) * 20) + loop.index %}
+                                            {% if rank == 1 %}🥇 1st
+                                            {% elif rank == 2 %}🥈 2nd
+                                            {% elif rank == 3 %}🥉 3rd
+                                            {% else %}#{{ rank }}{% endif %}
+                                        </td>
+                                        <td>
+                                            <div>
+                                                <strong>{{ player.nickname or player.username }}</strong>
+                                                {% if player.nickname %}
+                                                    <br><small class="text-muted">@{{ player.username }}</small>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-primary fs-6">{{ "{:,}".format(player.points) }} pts</span>
+                                        </td>
+                                        <td>
+                                            {% if player.points >= 1000 %}
+                                                <span class="badge bg-success">🌟 Elite</span>
+                                            {% elif player.points >= 500 %}
+                                                <span class="badge bg-warning">⭐ Advanced</span>
+                                            {% elif player.points >= 100 %}
+                                                <span class="badge bg-info">🔥 Rising</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">🌱 Beginner</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination -->
+                        {% if total_pages > 1 %}
+                        <nav aria-label="Country leaderboard pagination" class="mt-4">
+                            <ul class="pagination justify-content-center">
+                                <!-- Previous button -->
+                                <li class="page-item {{ 'disabled' if not has_prev }}">
+                                    {% if has_prev %}
+                                        <a class="page-link" href="{{ url_for('country_leaderboard', country_code=country_code, page=prev_page) }}">
+                                            ← Previous
+                                        </a>
+                                    {% else %}
+                                        <span class="page-link">← Previous</span>
+                                    {% endif %}
+                                </li>
+
+                                <!-- Page numbers -->
+                                {% set start_page = [1, page - 2]|max %}
+                                {% set end_page = [total_pages, page + 2]|min %}
+                                
+                                {% if start_page > 1 %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('country_leaderboard', country_code=country_code, page=1) }}">1</a>
+                                    </li>
+                                    {% if start_page > 2 %}
+                                        <li class="page-item disabled">
+                                            <span class="page-link">...</span>
+                                        </li>
+                                    {% endif %}
+                                {% endif %}
+
+                                {% for page_num in range(start_page, end_page + 1) %}
+                                    <li class="page-item {{ 'active' if page_num == page }}">
+                                        <a class="page-link" href="{{ url_for('country_leaderboard', country_code=country_code, page=page_num) }}">
+                                            {{ page_num }}
+                                        </a>
+                                    </li>
+                                {% endfor %}
+
+                                {% if end_page < total_pages %}
+                                    {% if end_page < total_pages - 1 %}
+                                        <li class="page-item disabled">
+                                            <span class="page-link">...</span>
+                                        </li>
+                                    {% endif %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('country_leaderboard', country_code=country_code, page=total_pages) }}">{{ total_pages }}</a>
+                                    </li>
+                                {% endif %}
+
+                                <!-- Next button -->
+                                <li class="page-item {{ 'disabled' if not has_next }}">
+                                    {% if has_next %}
+                                        <a class="page-link" href="{{ url_for('country_leaderboard', country_code=country_code, page=next_page) }}">
+                                            Next →
+                                        </a>
+                                    {% else %}
+                                        <span class="page-link">Next →</span>
+                                    {% endif %}
+                                </li>
+                            </ul>
+                        </nav>
+                        {% endif %}
+
+                    {% else %}
+                        <div class="text-center py-5">
+                            <h4 class="text-muted">No players found</h4>
+                            <p>No players from {{ country_name }} have earned points yet.</p>
+                            <a href="{{ url_for('world_leaderboard') }}" class="btn btn-primary">
+                                🌍 View World Leaderboard
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Quick Navigation -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <h6>🚀 Quick Navigation</h6>
+                            <div class="btn-group" role="group">
+                                <a href="{{ url_for('country_leaderboard', country_code=country_code, page=1) }}" 
+                                   class="btn btn-outline-primary btn-sm">First Page</a>
+                                <a href="{{ url_for('country_leaderboard', country_code=country_code, page=total_pages) }}" 
+                                   class="btn btn-outline-primary btn-sm">Last Page</a>
+                                <a href="{{ url_for('leaderboard') }}" 
+                                   class="btn btn-outline-secondary btn-sm">Global Leaderboard</a>
+                                <a href="{{ url_for('world_leaderboard') }}" 
+                                   class="btn btn-outline-info btn-sm">World Map</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.table tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.1);
+}
+
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: none;
+}
+
+.card-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-bottom: none;
+}
+
+.badge {
+    font-size: 0.8em;
+}
+
+.pagination .page-link {
+    color: #667eea;
+    border-color: #667eea;
+}
+
+.pagination .page-item.active .page-link {
+    background-color: #667eea;
+    border-color: #667eea;
+}
+</style>
+{% endblock %}

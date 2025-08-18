@@ -1,0 +1,488 @@
+{% extends "layout.html" %}
+
+{% block title %}World Leaderboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="text-center mb-4">🌍 World Leaderboard</h1>
+            
+            <!-- World Map Section -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>🗺️ Interactive World Map</h3>
+                    <p class="mb-0">Click on countries to view their leaderboards</p>
+                </div>
+                <div class="card-body p-0">
+                    <div id="world-map" style="height: 500px; background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%); border-radius: 8px; position: relative; overflow: hidden;">
+                        <!-- Interactive World Map -->
+                        <svg width="100%" height="100%" viewBox="0 0 1000 500" style="position: absolute; top: 0; left: 0;">
+                            <!-- Ocean background -->
+                            <rect width="1000" height="500" fill="url(#oceanGradient)"/>
+                            
+                            <!-- Gradient definitions -->
+                            <defs>
+                                <linearGradient id="oceanGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#4a90e2;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#357abd;stop-opacity:1" />
+                                </linearGradient>
+                                <linearGradient id="landGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#8fbc8f;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#6b8e23;stop-opacity:1" />
+                                </linearGradient>
+                                <linearGradient id="activeLandGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                    <stop offset="0%" style="stop-color:#ffd700;stop-opacity:1" />
+                                    <stop offset="100%" style="stop-color:#daa520;stop-opacity:1" />
+                                </linearGradient>
+                            </defs>
+                            
+                            <!-- Simplified world map shapes -->
+                            <!-- North America -->
+                            <path id="country-US" d="M150 120 L280 110 L290 140 L320 150 L310 200 L280 210 L250 190 L200 200 L170 180 L150 160 Z" 
+                                  fill="url(#landGradient)" stroke="#2c5530" stroke-width="1" class="country-path" data-country="US" data-name="United States"/>
+                            
+                            <!-- Canada -->
+                            <path id="country-CA" d="M120 80 L350 70 L360 110 L280 110 L150 120 L120 100 Z" 
+                                  fill="url(#landGradient)" stroke="#2c5530" stroke-width="1" class="country-path" data-country="CA" data-name="Canada"/>
+                            
+                            <!-- Mexico -->
+                            <path id="country-MX" d="M150 200 L280 210 L290 240 L200 250 L150 230 Z" 
+                                  fill="url(#landGradient)" stroke="#2c5530" stroke-width="1" class="country-path" data-country="MX" data-name="Mexico"/>
+                            
+                            <!-- Brazil -->
+                            <path id="country-BR" d="M250 280 L350 270 L380 320 L360 380 L280 390 L250 350 Z" 
+                                  fill="url(#landGradient)" stroke="#2c5530" stroke-width="1" class="country-path" data-country="BR" data-name="Brazil"/>
+                            
+                            <!-- Argentina -->
+                            <path id="country-AR" d="M250 350 L280 390 L290 450 L260 460 L240 420 Z" 
+                                  fill="url(#landGradient)" stroke="#2c5530" stroke-width="1" class="country-path" data-country="AR" data-name="Argentina"/>
+                            
+                            <!-- United Kingdom -->
+                            <path id="country-GB" d="M480 140 L500 135 L505 155 L485 160 Z" 
+                                  fill="url(#landGradient)" stroke="#2c5530" stroke-width="1" class="country-path" data-country="GB" data-name="United Kingdom"/>
+                            
+                            <!-- France -->
+                            <path id="country-FR" d="M480 160 L510 155 L520 180 L490 185 Z" 
+                                  fill="url(#landGradient)" stroke="#2c5530" stroke-width="1" class="country-path" data-country="FR" data-name="France"/>
+                            
+                            <!-- Germany -->
+                            <path id="country-DE" d="M510 140 L540 135 L545 165 L515 170 Z" 
+                                  fill="url(#landGradient)" stroke="#2c5530" stroke-width="1" class="country-path" data-country="DE" data-name="Germany"/>
+                            
+                            <!-- Spain -->
+                            <path id="country-ES" d="M450 180 L490 175 L500 200 L460 205 Z" 
+                                  fill="url(#landGradient)" stroke="#2c5530" stroke-width="1" class="country-path" data-country="ES" data-name="Spain"/>
+                            
+                            <!-- Italy -->
+                            <path id="country-IT" d="M520 180 L540 175 L545 220 L525 225 Z" 
+                                  fill="url(#landGradient)" stroke="#2c5530" stroke-width="1" class="country-path" data-country="IT" data-name="Italy"/>
+                            
+                            <!-- Russia -->
+                            <path id="country-RU" d="M550 100 L800 90 L820 160 L570 170 Z" 
+                                  fill="url(#landGradient)" stroke="#2c5530" stroke-width="1" class="country-path" data-country="RU" data-name="Russia"/>
+                            
+                            <!-- China -->
+                            <path id="country-CN" d="M700 180 L800 170 L820 220 L720 230 Z" 
+                                  fill="url(#landGradient)" stroke="#2c5530" stroke-width="1" class="country-path" data-country="CN" data-name="China"/>
+                            
+                            <!-- Japan -->
+                            <path id="country-JP" d="M850 190 L880 185 L885 215 L855 220 Z" 
+                                  fill="url(#landGradient)" stroke="#2c5530" stroke-width="1" class="country-path" data-country="JP" data-name="Japan"/>
+                            
+                            <!-- India -->
+                            <path id="country-IN" d="M650 220 L720 210 L730 270 L660 280 Z" 
+                                  fill="url(#landGradient)" stroke="#2c5530" stroke-width="1" class="country-path" data-country="IN" data-name="India"/>
+                            
+                            <!-- Australia -->
+                            <path id="country-AU" d="M750 350 L850 340 L860 390 L760 400 Z" 
+                                  fill="url(#landGradient)" stroke="#2c5530" stroke-width="1" class="country-path" data-country="AU" data-name="Australia"/>
+                            
+                            <!-- South Africa -->
+                            <path id="country-ZA" d="M520 350 L580 345 L590 390 L530 395 Z" 
+                                  fill="url(#landGradient)" stroke="#2c5530" stroke-width="1" class="country-path" data-country="ZA" data-name="South Africa"/>
+                            
+                            <!-- Egypt -->
+                            <path id="country-EG" d="M520 250 L560 245 L565 280 L525 285 Z" 
+                                  fill="url(#landGradient)" stroke="#2c5530" stroke-width="1" class="country-path" data-country="EG" data-name="Egypt"/>
+                            
+                            <!-- Poland -->
+                            <path id="country-PL" d="M540 135 L570 130 L575 155 L545 160 Z" 
+                                  fill="url(#landGradient)" stroke="#2c5530" stroke-width="1" class="country-path" data-country="PL" data-name="Poland"/>
+                            
+                            <!-- Netherlands -->
+                            <path id="country-NL" d="M500 135 L520 130 L525 150 L505 155 Z" 
+                                  fill="url(#landGradient)" stroke="#2c5530" stroke-width="1" class="country-path" data-country="NL" data-name="Netherlands"/>
+                        </svg>
+                        
+                        <!-- Mobile country list overlay -->
+                        <div id="mobile-country-list" class="d-md-none position-absolute top-0 start-0 w-100 h-100 p-3" style="background: rgba(74, 144, 226, 0.95); display: none; overflow-y: auto;">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="text-white mb-0">🌍 Select Country</h5>
+                                <button class="btn btn-outline-light btn-sm" onclick="hideMobileCountryList()">✕</button>
+                            </div>
+                            <div class="mb-3">
+                                <input type="text" id="country-search" class="form-control" placeholder="🔍 Search countries..." style="background: rgba(255,255,255,0.9);">
+                            </div>
+                            <div class="row" id="mobile-countries">
+                                <!-- Countries will be populated by JavaScript -->
+                            </div>
+                        </div>
+                        
+                        <!-- Mobile map button -->
+                        <div class="d-md-none position-absolute bottom-0 end-0 p-3">
+                            <button class="btn btn-light btn-sm" onclick="showMobileCountryList()">
+                                🗺️ View Countries
+                            </button>
+                        </div>
+                        
+                        <!-- Map legend -->
+                        <div class="position-absolute top-0 start-0 p-3">
+                            <div class="bg-white rounded p-2 shadow-sm" style="font-size: 12px;">
+                                <div class="d-flex align-items-center mb-1">
+                                    <div style="width: 15px; height: 10px; background: linear-gradient(135deg, #8fbc8f, #6b8e23); margin-right: 5px; border-radius: 2px;"></div>
+                                    <span>Countries</span>
+                                </div>
+                                <div class="d-flex align-items-center mb-1">
+                                    <div style="width: 15px; height: 10px; background: linear-gradient(135deg, #ffd700, #daa520); margin-right: 5px; border-radius: 2px;"></div>
+                                    <span>Active Countries</span>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <div style="width: 15px; height: 10px; background: linear-gradient(135deg, #4a90e2, #357abd); margin-right: 5px; border-radius: 2px;"></div>
+                                    <span>Ocean</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Country Rankings -->
+            <div class="row">
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4>🏆 Top Countries by Total Points</h4>
+                        </div>
+                        <div class="card-body">
+                            {% if country_stats %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Rank</th>
+                                                <th>Country</th>
+                                                <th>Players</th>
+                                                <th>Total Points</th>
+                                                <th>Avg Points</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for country in country_stats[:10] %}
+                                            <tr onclick="window.location.href='{{ url_for('country_leaderboard', country_code=country._id) }}'" style="cursor: pointer;">
+                                                <td>
+                                                    {% if loop.index == 1 %}🥇
+                                                    {% elif loop.index == 2 %}🥈
+                                                    {% elif loop.index == 3 %}🥉
+                                                    {% else %}{{ loop.index }}{% endif %}
+                                                </td>
+                                                <td>
+                                                    <strong>{{ country_names.get(country._id, country._id) }}</strong>
+                                                    <small class="text-muted">({{ country._id }})</small>
+                                                </td>
+                                                <td>{{ country.player_count }}</td>
+                                                <td><strong>{{ "{:,}".format(country.total_points) }}</strong></td>
+                                                <td>{{ "{:.1f}".format(country.avg_points) }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <p class="text-muted text-center">No country data available yet.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h4>⭐ Global Top Players</h4>
+                        </div>
+                        <div class="card-body">
+                            {% if top_players %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Rank</th>
+                                                <th>Player</th>
+                                                <th>Country</th>
+                                                <th>Points</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for player in top_players[:15] %}
+                                            <tr>
+                                                <td>
+                                                    {% if loop.index == 1 %}🥇
+                                                    {% elif loop.index == 2 %}🥈
+                                                    {% elif loop.index == 3 %}🥉
+                                                    {% else %}{{ loop.index }}{% endif %}
+                                                </td>
+                                                <td>
+                                                    <strong>{{ player.nickname or player.username }}</strong>
+                                                    {% if player.nickname %}
+                                                        <small class="text-muted">({{ player.username }})</small>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if player.country %}
+                                                        <a href="{{ url_for('country_leaderboard', country_code=player.country) }}" class="text-decoration-none">
+                                                            {{ country_names.get(player.country, player.country) }}
+                                                        </a>
+                                                    {% else %}
+                                                        <span class="text-muted">Unknown</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td><strong>{{ "{:,}".format(player.points) }}</strong></td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <p class="text-muted text-center">No players found.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics Summary -->
+            <div class="row mt-4">
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">🌍 Countries</h5>
+                            <h2 class="text-primary">{{ country_stats|length }}</h2>
+                            <p class="text-muted">Active countries</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">👥 Players</h5>
+                            <h2 class="text-success">{{ top_players|length }}</h2>
+                            <p class="text-muted">Global players</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">🏆 Total Points</h5>
+                            <h2 class="text-warning">{{ "{:,}".format(country_stats|sum(attribute='total_points') if country_stats else 0) }}</h2>
+                            <p class="text-muted">Worldwide</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">📊 Avg Points</h5>
+                            <h2 class="text-info">{{ "{:.1f}".format((country_stats|sum(attribute='total_points') / top_players|length) if top_players else 0) }}</h2>
+                            <p class="text-muted">Per player</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.table tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.1);
+}
+
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: none;
+}
+
+.card-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-bottom: none;
+}
+
+#world-map {
+    background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+}
+</style>
+
+<script>
+// Interactive world map functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Country data from server
+    const countryStats = {{ country_stats|tojson if country_stats else '[]' }};
+    const countryNames = {{ country_names|tojson if country_names else '{}' }};
+    
+    // Make countries interactive
+    const countryPaths = document.querySelectorAll('.country-path');
+    
+    countryPaths.forEach(path => {
+        const countryCode = path.getAttribute('data-country');
+        const countryName = path.getAttribute('data-name');
+        
+        // Check if this country has players
+        const countryData = countryStats.find(c => c._id === countryCode);
+        
+        if (countryData) {
+            // Highlight active countries
+            path.setAttribute('fill', 'url(#activeLandGradient)');
+            path.style.cursor = 'pointer';
+            
+            // Add hover effects
+            path.addEventListener('mouseenter', function() {
+                this.style.filter = 'brightness(1.2)';
+                showCountryTooltip(this, countryName, countryData);
+            });
+            
+            path.addEventListener('mouseleave', function() {
+                this.style.filter = 'brightness(1)';
+                hideCountryTooltip();
+            });
+            
+            // Add click handler
+            path.addEventListener('click', function() {
+                window.location.href = `/country/${countryCode}`;
+            });
+        } else {
+            // Inactive countries
+            path.addEventListener('mouseenter', function() {
+                this.style.filter = 'brightness(1.1)';
+                showCountryTooltip(this, countryName, null);
+            });
+            
+            path.addEventListener('mouseleave', function() {
+                this.style.filter = 'brightness(1)';
+                hideCountryTooltip();
+            });
+        }
+    });
+    
+    // Populate mobile country list
+    populateMobileCountryList();
+});
+
+function showCountryTooltip(element, countryName, countryData) {
+    // Remove existing tooltip
+    hideCountryTooltip();
+    
+    const tooltip = document.createElement('div');
+    tooltip.id = 'country-tooltip';
+    tooltip.className = 'position-absolute bg-dark text-white p-2 rounded shadow';
+    tooltip.style.zIndex = '1000';
+    tooltip.style.pointerEvents = 'none';
+    tooltip.style.fontSize = '12px';
+    tooltip.style.maxWidth = '200px';
+    
+    if (countryData) {
+        tooltip.innerHTML = `
+            <strong>${countryName}</strong><br>
+            Players: ${countryData.player_count}<br>
+            Total Points: ${countryData.total_points.toLocaleString()}<br>
+            Avg Points: ${countryData.avg_points.toFixed(1)}<br>
+            <small class="text-info">Click to view leaderboard</small>
+        `;
+    } else {
+        tooltip.innerHTML = `
+            <strong>${countryName}</strong><br>
+            <span class="text-muted">No players yet</span>
+        `;
+    }
+    
+    document.body.appendChild(tooltip);
+    
+    // Position tooltip near mouse
+    document.addEventListener('mousemove', positionTooltip);
+}
+
+function hideCountryTooltip() {
+    const tooltip = document.getElementById('country-tooltip');
+    if (tooltip) {
+        tooltip.remove();
+        document.removeEventListener('mousemove', positionTooltip);
+    }
+}
+
+function positionTooltip(e) {
+    const tooltip = document.getElementById('country-tooltip');
+    if (tooltip) {
+        tooltip.style.left = (e.pageX + 10) + 'px';
+        tooltip.style.top = (e.pageY - 10) + 'px';
+    }
+}
+
+function showMobileCountryList() {
+    document.getElementById('mobile-country-list').style.display = 'block';
+}
+
+function hideMobileCountryList() {
+    document.getElementById('mobile-country-list').style.display = 'none';
+}
+
+function populateMobileCountryList() {
+    const container = document.getElementById('mobile-countries');
+    const countryStats = {{ country_stats|tojson if country_stats else '[]' }};
+    const countryNames = {{ country_names|tojson if country_names else '{}' }};
+    
+    if (countryStats && countryStats.length > 0) {
+        countryStats.forEach(country => {
+            const countryName = countryNames[country._id] || country._id;
+            const col = document.createElement('div');
+            col.className = 'col-6 mb-2';
+            col.innerHTML = `
+                <a href="/country/${country._id}" class="btn btn-outline-light btn-sm w-100 text-start">
+                    <strong>${countryName}</strong><br>
+                    <small>${country.player_count} players</small>
+                </a>
+            `;
+            container.appendChild(col);
+        });
+    } else {
+        container.innerHTML = '<div class="col-12 text-center text-white">No countries with players yet</div>';
+    }
+}
+
+// Search functionality
+function initializeSearch() {
+    const searchInput = document.getElementById('country-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const query = this.value.toLowerCase();
+            const countryButtons = document.querySelectorAll('#mobile-countries .btn');
+            
+            countryButtons.forEach(button => {
+                const text = button.textContent.toLowerCase();
+                const col = button.closest('.col-6');
+                if (text.includes(query)) {
+                    col.style.display = 'block';
+                } else {
+                    col.style.display = 'none';
+                }
+            });
+        });
+    }
+}
+
+// Initialize search when mobile list is shown
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(initializeSearch, 100);
+});
+</script>
+{% endblock %}

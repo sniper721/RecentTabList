@@ -13,7 +13,12 @@
                         <div class="col-auto">
                             {% if user.avatar_url %}
                                 <img src="{{ user.avatar_url }}" alt="{{ user.username }}" 
-                                     class="rounded-circle" width="80" height="80" style="object-fit: cover;">
+                                     class="rounded-circle" width="80" height="80" style="object-fit: cover;"
+                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
+                                <div class="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center text-white" 
+                                     style="width: 80px; height: 80px; font-size: 32px; display: none;">
+                                    {{ user.username[0].upper() }}
+                                </div>
                             {% else %}
                                 <div class="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center text-white" 
                                      style="width: 80px; height: 80px; font-size: 32px;">

@@ -45,10 +45,37 @@
                 <h3 class="mb-0">Pending Records</h3>
             </div>
             <div class="card-body p-0">
+                {% if pending_records %}
+                <!-- Bulk Actions -->
+                <div class="p-3 bg-light border-bottom">
+                    <form method="POST" action="{{ url_for('admin_bulk_records') }}" id="bulkForm">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="selectAll">
+                                    <label class="form-check-label" for="selectAll">
+                                        <strong>Select All Records</strong>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <button type="submit" name="action" value="approve" class="btn btn-success btn-sm me-2" onclick="return confirmBulk('approve')">
+                                    <i class="fas fa-check"></i> Bulk Approve
+                                </button>
+                                <button type="submit" name="action" value="reject" class="btn btn-danger btn-sm" onclick="return confirmBulk('reject')">
+                                    <i class="fas fa-times"></i> Bulk Reject
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                {% endif %}
+                
                 <div class="table-responsive">
                     <table class="table table-striped mb-0">
                         <thead class="table-dark">
                             <tr>
+                                {% if pending_records %}<th width="40"><input type="checkbox" id="selectAllHeader" class="form-check-input"></th>{% endif %}
                                 <th>User</th>
                                 <th>Level</th>
                                 <th>Progress</th>
@@ -60,54 +87,73 @@
                         <tbody>
                             {% for record in pending_records %}
                             <tr>
-                                <td>{{ record.user.username }}</td>
                                 <td>
-                                    <a href="{{ url_for('level_detail', level_id=record.level._id) }}">
-                                        {{ record.level.name }}
+                                    <input type="checkbox" name="record_ids" value="{{ record._id }}" 
+                                           class="form-check-input record-checkbox" form="bulkForm">
+                                </td>
+                                <td>
+                                    <strong>{{ record.user.username }}</strong>
+                                    <br><small class="text-muted">{{ record.user.points or 0 }} pts</small>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('level_detail', level_id=record.level._id) }}" class="text-decoration-none">
+                                        <strong>{{ record.level.name }}</strong>
                                     </a>
+                                    <br><small class="text-muted">Position #{{ record.level.position or '?' }}</small>
                                 </td>
                                 <td>
                                     {% if record.progress == 100 %}
-                                    <span class="badge bg-success">100%</span>
+                                    <span class="badge bg-success fs-6">100% ✓</span>
                                     {% else %}
-                                    <span class="badge bg-warning">{{ record.progress }}%</span>
+                                    <span class="badge bg-warning fs-6">{{ record.progress }}%</span>
                                     {% endif %}
                                 </td>
-                                <td>{{ record.date_submitted.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    <small>{{ record.date_submitted.strftime('%m/%d/%Y') }}</small>
+                                    <br><small class="text-muted">{{ record.date_submitted.strftime('%H:%M') }}</small>
+                                </td>
                                 <td>
                                     {% if record.video_url %}
                                         {% set video_info = get_video_embed_info(record.video_url) %}
                                         {% if video_info %}
                                             {% if video_info.platform == 'youtube' %}
-                                                <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-danger" title="YouTube">
-                                                    <i class="fab fa-youtube"></i> Watch
+                                                <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-danger" title="YouTube Video">
+                                                    <i class="fab fa-youtube"></i> YouTube
                                                 </a>
                                             {% elif video_info.platform == 'streamable' %}
-                                                <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-primary" title="Streamable">
-                                                    <i class="fas fa-play"></i> Watch
+                                                <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-primary" title="Streamable Video">
+                                                    <i class="fas fa-play"></i> Streamable
                                                 </a>
                                             {% elif video_info.platform == 'tiktok' %}
-                                                <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-dark" title="TikTok">
-                                                    <i class="fab fa-tiktok"></i> Watch
+                                                <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-dark" title="TikTok Video">
+                                                    <i class="fab fa-tiktok"></i> TikTok
+                                                </a>
+                                            {% else %}
+                                                <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-secondary" title="Video Link">
+                                                    <i class="fas fa-external-link-alt"></i> Video
                                                 </a>
                                             {% endif %}
                                         {% else %}
-                                            <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-secondary" title="Video">
-                                                <i class="fas fa-external-link-alt"></i> Watch
+                                            <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-secondary" title="Video Link">
+                                                <i class="fas fa-external-link-alt"></i> Video
                                             </a>
                                         {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">No video</span>
                                     {% endif %}
                                 </td>
                                 <td>
                                     <div class="btn-group" role="group">
                                         <form method="POST" action="{{ url_for('admin_approve_record', record_id=record._id) }}" class="d-inline">
-                                            <button type="submit" class="btn btn-sm btn-success">
-                                                <i class="fas fa-check"></i> Approve
+                                            <button type="submit" class="btn btn-sm btn-success" title="Approve Record" 
+                                                    onclick="return confirm('Approve this record?')">
+                                                <i class="fas fa-check"></i>
                                             </button>
                                         </form>
-                                        <form method="POST" action="{{ url_for('admin_reject_record', record_id=record._id) }}" class="d-inline ms-1">
-                                            <button type="submit" class="btn btn-sm btn-danger">
-                                                <i class="fas fa-times"></i> Reject
+                                        <form method="POST" action="{{ url_for('admin_reject_record', record_id=record._id) }}" class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-danger" title="Reject Record"
+                                                    onclick="return confirm('Reject this record?')">
+                                                <i class="fas fa-times"></i>
                                             </button>
                                         </form>
                                     </div>
@@ -115,12 +161,41 @@
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="6" class="text-center py-3">No pending records to review.</td>
+                                <td colspan="7" class="text-center py-4">
+                                    <div class="text-muted">
+                                        <i class="fas fa-check-circle fa-3x mb-3"></i>
+                                        <h5>No pending records!</h5>
+                                        <p>All records have been reviewed.</p>
+                                    </div>
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
+                
+                <script>
+                // Bulk selection functionality
+                document.getElementById('selectAll')?.addEventListener('change', function() {
+                    const checkboxes = document.querySelectorAll('.record-checkbox');
+                    checkboxes.forEach(cb => cb.checked = this.checked);
+                });
+                
+                document.getElementById('selectAllHeader')?.addEventListener('change', function() {
+                    const checkboxes = document.querySelectorAll('.record-checkbox');
+                    checkboxes.forEach(cb => cb.checked = this.checked);
+                    document.getElementById('selectAll').checked = this.checked;
+                });
+                
+                function confirmBulk(action) {
+                    const selected = document.querySelectorAll('.record-checkbox:checked').length;
+                    if (selected === 0) {
+                        alert('Please select at least one record.');
+                        return false;
+                    }
+                    return confirm(`Are you sure you want to ${action} ${selected} record(s)?`);
+                }
+                </script>
             </div>
         </div>
     </div>

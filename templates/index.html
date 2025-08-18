@@ -7,35 +7,51 @@
 <div class="row">
     <div class="col-lg-8">
         <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <h4 class="mb-0">📋 Main List</h4>
+                    </div>
+                    <div class="col-md-6">
+                        <form action="{{ url_for('search_levels') }}" method="GET" class="d-flex">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-white">🔍</span>
+                                <input type="text" name="q" class="form-control" placeholder="Search all levels..." value="{{ request.args.get('q', '') }}">
+                                <button class="btn btn-outline-light" type="submit">Search</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
             <div class="card-body p-0">
                 {% for level in levels %}
-                <div class="d-flex align-items-center p-3 border-bottom level-card mb-4" data-level-id="{{ level._id if level is not mapping else level['_id'] }}">
+                <div class="d-flex align-items-center p-3 border-bottom level-card mb-4" data-level-id="{{ level._id if level is not mapping else level['_id'] }}" style="cursor: pointer; transition: all 0.2s ease;">
                     <div class="me-4">
                         <div class="position-relative">
-                            {% set thumbnail_url = level.thumbnail_url if level is not mapping else level.get('thumbnail_url') %}
-                            {% set video_url = level.video_url if level is not mapping else level['video_url'] %}
-                            {% if thumbnail_url %}
-                                {% if 'youtube.com' in thumbnail_url or 'youtu.be' in thumbnail_url %}
-                                    <!-- YouTube thumbnail - use smaller version -->
-                                    {% if 'maxresdefault' in thumbnail_url %}
-                                        {% set small_thumb = thumbnail_url.replace('maxresdefault', 'mqdefault') %}
-                                    {% else %}
-                                        {% set small_thumb = thumbnail_url %}
-                                    {% endif %}
-                                    <img src="{{ small_thumb }}" alt="{{ level.name if level is not mapping else level['name'] }}" class="img-fluid rounded" width="206" height="116" loading="lazy" style="object-fit: cover;">
+                            {% set level_name = level.name if level is not mapping else level['name'] %}
+                            {% set video_url = level.video_url if level is not mapping else level.get('video_url', '') %}
+                            
+                            <div class="level-thumbnail" style="width: 206px; height: 116px; position: relative;">
+                                {% if video_url and 'youtube.com' in video_url and 'v=' in video_url %}
+                                    {% set video_id = video_url.split('v=')[1].split('&')[0] %}
+                                    <img src="https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg" 
+                                         alt="{{ level_name }}" 
+                                         class="img-fluid rounded"
+                                         style="width: 206px; height: 116px; object-fit: cover;">
+                                {% elif video_url and 'youtu.be' in video_url %}
+                                    {% set video_id = video_url.split('youtu.be/')[1].split('?')[0] %}
+                                    <img src="https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg" 
+                                         alt="{{ level_name }}" 
+                                         class="img-fluid rounded"
+                                         style="width: 206px; height: 116px; object-fit: cover;">
                                 {% else %}
-                                    <!-- Regular thumbnail -->
-                                    <img src="{{ thumbnail_url }}" alt="{{ level.name if level is not mapping else level['name'] }}" class="img-fluid rounded" width="206" height="116" loading="lazy" style="object-fit: cover;">
+                                    <div class="bg-light rounded d-flex align-items-center justify-content-center text-muted" 
+                                         style="width: 206px; height: 116px;">
+                                        📷 No Preview
+                                    </div>
                                 {% endif %}
-                            {% elif video_url and 'youtube.com' in video_url %}
-                                {% set video_id = video_url.split('v=')[1].split('&')[0] %}
-                                <img src="https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg" alt="{{ level.name if level is not mapping else level['name'] }}" class="img-fluid rounded" width="206" height="116" loading="lazy" style="object-fit: cover;">
-                            {% elif video_url and 'youtu.be' in video_url %}
-                                {% set video_id = video_url.split('/')[-1] %}
-                                <img src="https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg" alt="{{ level.name if level is not mapping else level['name'] }}" class="img-fluid rounded" width="206" height="116" loading="lazy" style="object-fit: cover;">
-                            {% else %}
-                                <div class="bg-secondary rounded d-flex align-items-center justify-content-center text-white" style="width: 206px; height: 116px; font-size: 12px;">No Image</div>
-                            {% endif %}
+                            </div>
+                            
                             <div class="position-absolute top-0 start-0 bg-dark text-white px-2 py-1 rounded">
                                 {{ level.position if level is not mapping else level['position'] }}
                             </div>
@@ -160,7 +176,7 @@
             </div>
             <div class="card-body">
                 <p><strong>List Admin:</strong> Miifin</p>
-                <p><strong>List Moderators:</strong> Kye, Monika, DetiousMage</p>
+                <p><strong>List Moderators:</strong> Kye, Monika, DetiousMage, DairyFarmer</p>
                 <p><strong>List Coder:</strong> ENGINE</p>
                 <p><strong>Server Moderator:</strong> Cesium</p>
             </div>
@@ -178,5 +194,11 @@
             window.location = '/level/' + levelId;
         });
     });
+    
+    // Simple thumbnail system - no complex fallbacks
+    
+
+    
+
 </script>
 {% endblock %}
