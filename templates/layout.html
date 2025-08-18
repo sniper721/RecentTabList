@@ -145,6 +145,7 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('guidelines') }}">📖 Guide</a>
                     </li>
+
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="statsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             📊 Stats
@@ -222,6 +223,74 @@
             </div>
         </div>
     </nav>
+
+    <!-- Mobile Navigation Menu (only visible on mobile) -->
+    <div class="d-block d-lg-none bg-light border-bottom">
+        <div class="container">
+            <div class="row g-2 py-3">
+                <div class="col-6">
+                    <a href="{{ url_for('index') }}" class="btn btn-outline-primary w-100 btn-sm">
+                        🏠 Main List
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('legacy') }}" class="btn btn-outline-secondary w-100 btn-sm">
+                        📜 Legacy List
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('world_leaderboard') }}" class="btn btn-outline-success w-100 btn-sm">
+                        🏆 Leaderboard
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('submit_record') }}" class="btn btn-outline-warning w-100 btn-sm">
+                        📝 Submit
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('changelog') }}" class="btn btn-outline-info w-100 btn-sm">
+                        📋 Changelog
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('guidelines') }}" class="btn btn-outline-dark w-100 btn-sm">
+                        📖 Guide
+                    </a>
+                </div>
+                {% if session.get('user_id') %}
+                <div class="col-6">
+                    <a href="{{ url_for('profile') }}" class="btn btn-outline-primary w-100 btn-sm">
+                        👤 Profile
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('user_settings') }}" class="btn btn-outline-secondary w-100 btn-sm">
+                        ⚙️ Settings
+                    </a>
+                </div>
+                {% if session.get('is_admin') %}
+                <div class="col-12">
+                    <a href="{{ url_for('admin') }}" class="btn btn-danger w-100 btn-sm">
+                        🔧 Admin Panel
+                    </a>
+                </div>
+                {% endif %}
+                {% else %}
+                <div class="col-6">
+                    <a href="{{ url_for('login') }}" class="btn btn-success w-100 btn-sm">
+                        🔑 Login
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('register') }}" class="btn btn-primary w-100 btn-sm">
+                        📝 Register
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 
     <div class="container mt-4">
         {% with messages = get_flashed_messages(with_categories=true) %}

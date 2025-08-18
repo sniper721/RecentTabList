@@ -75,9 +75,16 @@
                                 <td>
                                     <div class="btn-group" role="group">
                                         {% if not user.is_admin %}
-                                            <form method="POST" action="{{ url_for('admin_toggle_admin', user_id=user._id) }}" class="d-inline">
+                                            <form method="POST" action="{{ url_for('admin_toggle_admin', user_id=user._id) }}" class="d-inline" 
+                                                  onsubmit="return confirm('⚠️ SECURITY WARNING ⚠️\n\nYou are about to grant FULL ADMIN PRIVILEGES to {{ user.username }}.\n\nAdmins can:\n• Delete levels and records\n• Ban users\n• Access all admin functions\n• Make other users admins\n\nThis action cannot be undone!\n\nAre you absolutely sure you want to proceed?');">
                                                 <button type="submit" class="btn btn-sm btn-success" title="Make Admin">
                                                     <i class="fas fa-user-shield"></i>
+                                                </button>
+                                            </form>
+                                            <form method="POST" action="{{ url_for('admin_reset_user_api', user_id=user._id) }}" class="d-inline" 
+                                                  onsubmit="return confirm('Reset API key for {{ user.username }}? Their current API key will stop working.');">
+                                                <button type="submit" class="btn btn-sm btn-info" title="Reset API Key">
+                                                    <i class="fas fa-key"></i>
                                                 </button>
                                             </form>
                                             <form method="POST" action="{{ url_for('admin_reset_user', user_id=user._id) }}" class="d-inline" 

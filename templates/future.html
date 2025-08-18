@@ -25,7 +25,11 @@
                 </div>
                 <div class="card-body p-0">
                     {% for level in levels %}
-                    <div class="d-flex align-items-center p-3 border-bottom level-card" style="background: linear-gradient(90deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%);">
+                    <div class="d-flex align-items-center p-3 border-bottom level-card" 
+                         style="background: linear-gradient(90deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%); cursor: pointer; transition: all 0.2s ease;"
+                         onclick="window.location.href='{{ url_for('future_level_details', level_id=level._id) }}'"
+                         onmouseover="this.style.background='linear-gradient(90deg, rgba(102,126,234,0.2) 0%, rgba(118,75,162,0.2) 100%)'"
+                         onmouseout="this.style.background='linear-gradient(90deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%)'">
                         <div class="me-4">
                             <div class="position-relative">
                                 {% set thumbnail_url = level.thumbnail_url %}

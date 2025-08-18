@@ -12,8 +12,8 @@
             <div class="card-body">
                 <div class="text-center mb-4">
                     <div class="profile-avatar mb-3">
-                        {% if user.avatar_url %}
-                            <img src="{{ user.avatar_url }}" alt="Avatar" class="rounded-circle" width="120" height="120" style="object-fit: cover;"
+                        {% if user.profile_picture or user.avatar_url %}
+                            <img src="{{ user.profile_picture or user.avatar_url }}" alt="Avatar" class="rounded-circle" width="120" height="120" style="object-fit: cover;"
                                  onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
                             <div class="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center text-white" style="width: 120px; height: 120px; font-size: 48px; display: none;">
                                 {{ user.username[0].upper() }}
@@ -120,7 +120,26 @@
                 
                 <div class="d-grid gap-2">
                     <a href="{{ url_for('submit_record') }}" class="btn btn-primary">Submit New Record</a>
+                    <a href="{{ url_for('connect_youtube') }}" class="btn btn-outline-danger">
+                        🎥 Connect YouTube Channel
+                    </a>
                 </div>
+                
+                <!-- YouTube Channel Info -->
+                {% if user.youtube_channel or user.youtube_username %}
+                <div class="mt-3">
+                    <h6>🎥 YouTube Channel</h6>
+                    <div class="alert alert-success">
+                        {% if user.youtube_channel %}
+                        <p class="mb-1"><strong>Channel:</strong> <a href="{{ user.youtube_channel }}" target="_blank">{{ user.youtube_channel }}</a></p>
+                        {% endif %}
+                        {% if user.youtube_username %}
+                        <p class="mb-0"><strong>Username:</strong> {{ user.youtube_username }}</p>
+                        {% endif %}
+                        <small class="text-muted">✅ Connected for verifier points</small>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>

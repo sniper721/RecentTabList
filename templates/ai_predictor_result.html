@@ -1,0 +1,74 @@
+{% extends "layout.html" %}
+
+{% block title %}🤖 AI Prediction Result - RTL{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="text-center mb-4">
+                <h1 class="display-4">🤖 AI Prediction Result</h1>
+            </div>
+            
+            <div class="card shadow-lg">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">📊 Difficulty Analysis Complete</h5>
+                </div>
+                <div class="card-body text-center">
+                    <h2 class="mb-3">{{ prediction.level_name }}</h2>
+                    {% if prediction.creator %}
+                        <p class="lead text-muted">by {{ prediction.creator }}</p>
+                    {% endif %}
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body">
+                                    <h1 class="display-3">{{ prediction.predicted_difficulty }}</h1>
+                                    <p class="mb-0">Predicted Difficulty</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-info text-white">
+                                <div class="card-body">
+                                    <h1 class="display-3">{{ prediction.confidence }}%</h1>
+                                    <p class="mb-0">Confidence Level</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="progress mb-4" style="height: 30px;">
+                        <div class="progress-bar bg-gradient-primary" style="width: {{ (prediction.predicted_difficulty / 10) * 100 }}%">
+                            {{ prediction.predicted_difficulty }}/10
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🔍 AI Insights</h5>
+                </div>
+                <div class="card-body">
+                    {% for insight in prediction.insights %}
+                    <div class="alert alert-info d-flex align-items-center">
+                        <div>{{ insight }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <div class="text-center mt-4">
+                <a href="{{ url_for('ai_difficulty_predictor') }}" class="btn btn-primary btn-lg">
+                    🔮 Predict Another Level
+                </a>
+                <a href="{{ url_for('index') }}" class="btn btn-outline-secondary btn-lg">
+                    🏠 Back to Main List
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,200 @@
+{% extends "layout.html" %}
+
+{% block title %}📊 Live Tracker - RTL{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <h1 class="display-4">📊 Live Activity Tracker</h1>
+            <p class="lead text-muted">Real-time statistics and completions happening right now!</p>
+        </div>
+    </div>
+    
+    <!-- Live Stats Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h2 class="display-4" id="attempts-today">{{ stats.total_attempts_today }}</h2>
+                    <p class="mb-0">📝 Attempts Today</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h2 class="display-4" id="completions-hour">{{ stats.completions_last_hour }}</h2>
+                    <p class="mb-0">✅ Completions (1h)</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h2 class="display-4" id="active-players">{{ stats.active_players }}</h2>
+                    <p class="mb-0">🟢 Active Players</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body text-center">
+                    <h2 class="display-4" id="live-counter">0</h2>
+                    <p class="mb-0">⚡ Live Updates</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Recent Completions -->
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">🏆 Recent Completions</h5>
+                    <span class="badge bg-light text-dark" id="completion-count">{{ recent_completions|length }}</span>
+                </div>
+                <div class="card-body p-0" style="max-height: 500px; overflow-y: auto;">
+                    <div id="recent-completions">
+                        {% for completion in recent_completions %}
+                        <div class="d-flex align-items-center p-3 border-bottom completion-item">
+                            <div class="me-3">
+                                <div class="bg-success rounded-circle d-flex align-items-center justify-content-center" 
+                                     style="width: 40px; height: 40px;">
+                                    <span class="text-white fw-bold">{{ completion.progress }}%</span>
+                                </div>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">{{ completion.level.name }}</h6>
+                                <small class="text-muted">
+                                    by <strong>{{ completion.user.username }}</strong> • 
+                                    {{ completion.timestamp.strftime('%H:%M') }}
+                                </small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-primary">#{{ completion.level.position }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Trending Levels -->
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">🔥 Trending Levels Today</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% for trending in trending_levels %}
+                    <div class="d-flex align-items-center p-3 border-bottom">
+                        <div class="me-3">
+                            <div class="bg-warning rounded-circle d-flex align-items-center justify-content-center text-dark fw-bold" 
+                                 style="width: 40px; height: 40px;">
+                                {{ loop.index }}
+                            </div>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">{{ trending.level.name }}</h6>
+                            <small class="text-muted">
+                                {{ trending.attempt_count }} attempts • 
+                                {{ trending.completion_count }} completions
+                            </small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge bg-primary">#{{ trending.level.position }}</span>
+                            <br>
+                            <small class="text-muted">
+                                {{ ((trending.completion_count / trending.attempt_count) * 100)|round(1) }}% rate
+                            </small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Live Activity Feed -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">⚡ Live Activity Feed</h5>
+                </div>
+                <div class="card-body">
+                    <div id="live-feed" class="text-center text-muted">
+                        <p>Waiting for live updates...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let updateCounter = 0;
+
+function updateLiveStats() {
+    fetch('/api/live_stats')
+        .then(response => response.json())
+        .then(data => {
+            updateCounter++;
+            document.getElementById('live-counter').textContent = updateCounter;
+            
+            // Update recent completion if available
+            if (data.recent_completion) {
+                const feed = document.getElementById('live-feed');
+                const timeAgo = Math.floor(data.recent_completion.time_ago / 60);
+                feed.innerHTML = `
+                    <div class="alert alert-success">
+                        <strong>🎉 Latest completion:</strong> 
+                        <strong>${data.recent_completion.player}</strong> 
+                        completed <strong>${data.recent_completion.level}</strong> 
+                        (${data.recent_completion.progress}%) 
+                        ${timeAgo} minutes ago
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching live stats:', error);
+        });
+}
+
+// Update every 10 seconds
+setInterval(updateLiveStats, 10000);
+
+// Initial update
+updateLiveStats();
+
+// Add pulse animation to live counter
+setInterval(() => {
+    const counter = document.getElementById('live-counter');
+    counter.style.transform = 'scale(1.1)';
+    setTimeout(() => {
+        counter.style.transform = 'scale(1)';
+    }, 200);
+}, 5000);
+</script>
+
+<style>
+.completion-item {
+    transition: all 0.3s ease;
+}
+
+.completion-item:hover {
+    background-color: #f8f9fa;
+    transform: translateX(5px);
+}
+
+#live-counter {
+    transition: transform 0.2s ease;
+}
+</style>
+{% endblock %}
