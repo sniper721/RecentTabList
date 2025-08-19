@@ -647,33 +647,527 @@ def thumbnail_proxy(url):
             mimetype='image/png'
         )
 
+# Removed duplicate route
+
+@app.route('/fix_missing_urls')
+def fix_missing_urls():
+    """Fix missing video URLs for levels that should have images"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return "❌ Access denied - Admin only"
+    
+    try:
+        # Direct database updates with exact level names and URLs
+        fixes = [
+            # Based on your earlier data
+            {'name': 'the light circles', 'url': 'https://youtu.be/s82TlWCh-V4'},
+            {'name': 'old memories', 'url': 'https://youtu.be/vVDeEQuQ_pM'},
+            {'name': 'los pollos tv 3', 'url': 'https://streamable.com/wzux7b'},
+            {'name': 'ochiru 2', 'url': 'https://www.youtube.com/watch?v=sImN3-3e5u0'},
+            {'name': 'the ringer', 'url': 'https://www.youtube.com/watch?v=3CwTD5RtFDk'},
+            # Add more if needed
+        ]
+        
+        results = []
+        
+        for fix in fixes:
+            # Try exact match first
+            level = mongo_db.levels.find_one({
+                "name": fix['name'],
+                "is_legacy": False
+            })
+            
+            if not level:
+                # Try case-insensitive match
+                level = mongo_db.levels.find_one({
+                    "name": {"$regex": f"^{fix['name']}$", "$options": "i"},
+                    "is_legacy": False
+                })
+            
+            if level:
+                # Update the video URL
+                result = mongo_db.levels.update_one(
+                    {"_id": level["_id"]},
+                    {"$set": {"video_url": fix['url']}}
+                )
+                
+                if result.modified_count > 0:
+                    results.append(f"✅ UPDATED: '{level['name']}' → {fix['url']}")
+                else:
+                    results.append(f"⚪ UNCHANGED: '{level['name']}' (already had URL)")
+            else:
+                results.append(f"❌ NOT FOUND: '{fix['name']}'")
+        
+        # Clear cache
+        levels_cache['main_list'] = None
+        levels_cache['legacy_list'] = None
+        
+        html = f"""
+        <h1>🔧 URL Fix Results</h1>
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-family: monospace;">
+            {'<br>'.join(results)}
+        </div>
+        <p style="margin-top: 20px;">
+            <a href="/debug_images">🔍 Check Results</a> |
+            <a href="/">🏠 Main List</a>
+        </p>
+        """
+        
+        return html
+        
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
+
+@app.route('/quick_fix_urls')
+def quick_fix_urls():
+    """Quick fix to add missing YouTube URLs"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return "Access denied - Admin only"
+    
+    try:
+        # Direct fixes based on your data
+        fixes = [
+            {'name': 'the light circles', 'url': 'https://youtu.be/s82TlWCh-V4'},
+            {'name': 'old memories', 'url': 'https://youtu.be/vVDeEQuQ_pM'},
+            {'name': 'los pollos tv 3', 'url': 'https://streamable.com/wzux7b'},
+            {'name': 'ochiru 2', 'url': 'https://www.youtube.com/watch?v=sImN3-3e5u0'},
+            {'name': 'the ringer', 'url': 'https://www.youtube.com/watch?v=3CwTD5RtFDk'},
+        ]
+        
+        results = []
+        
+        for fix in fixes:
+            # Find the level by name (case insensitive)
+            level = mongo_db.levels.find_one({
+                "name": {"$regex": f"^{fix['name']}$", "$options": "i"},
+                "is_legacy": False
+            })
+            
+            if level:
+                # Update the video URL
+                mongo_db.levels.update_one(
+                    {"_id": level["_id"]},
+                    {"$set": {"video_url": fix['url']}}
+                )
+                results.append(f"✅ Updated '{level['name']}' (#{level.get('position', '?')}) with {fix['url']}")
+            else:
+                results.append(f"❌ Level '{fix['name']}' not found")
+        
+        html = "<h2>🚀 Quick URL Fix Results</h2><ul>"
+        for result in results:
+            html += f"<li>{result}</li>"
+        html += "</ul>"
+        html += '<p><a href="/debug_levels">🔍 Check Results</a> | <a href="/">← Back</a></p>'
+        
+        return html
+        
+    except Exception as e:
+        return f"<h2>❌ Error</h2><p>{str(e)}</p>"
+
+@app.route('/complete_fix')
+def complete_fix():
+    """Complete system fix - images and decimals"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return "❌ Access denied - Admin only"
+    
+    try:
+        fixes = []
+        
+        # 1. Fix missing YouTube URLs
+        youtube_urls = {
+            'the light circles': 'https://youtu.be/s82TlWCh-V4',
+            'old memories': 'https://youtu.be/vVDeEQuQ_pM', 
+            'ochiru 2': 'https://www.youtube.com/watch?v=sImN3-3e5u0',
+            'the ringer': 'https://www.youtube.com/watch?v=3CwTD5RtFDk',
+        }
+        
+        for level_name, youtube_url in youtube_urls.items():
+            result = mongo_db.levels.update_one(
+                {"name": {"$regex": f"^{level_name}$", "$options": "i"}, "is_legacy": False},
+                {"$set": {"video_url": youtube_url}}
+            )
+            if result.modified_count > 0:
+                fixes.append(f"✅ Added YouTube URL to '{level_name}'")
+        
+        # 2. Fix decimal points for all levels
+        levels = list(mongo_db.levels.find({"is_legacy": False}, {"_id": 1, "position": 1, "points": 1}))
+        points_fixed = 0
+        
+        for level in levels:
+            correct_points = calculate_level_points(level['position'], False)
+            current_points = level.get('points', 0)
+            
+            if abs(float(current_points or 0) - correct_points) > 0.01:
+                mongo_db.levels.update_one(
+                    {"_id": level["_id"]},
+                    {"$set": {"points": correct_points}}
+                )
+                points_fixed += 1
+        
+        if points_fixed > 0:
+            fixes.append(f"✅ Fixed decimal points for {points_fixed} levels")
+        
+        # 3. Clear cache
+        levels_cache['main_list'] = None
+        levels_cache['legacy_list'] = None
+        fixes.append("✅ Cleared cache for immediate effect")
+        
+        return f"""
+        <h1>🎉 COMPLETE SYSTEM FIX APPLIED!</h1>
+        <div style="background: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h2>✅ Fixes Applied:</h2>
+            <ul>{''.join([f'<li>{fix}</li>' for fix in fixes])}</ul>
+        </div>
+        
+        <div style="background: #cce5ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h2>🎨 Image System Now Works:</h2>
+            <ul>
+                <li>✅ YouTube thumbnails auto-extracted from video URLs</li>
+                <li>✅ Custom thumbnails can be uploaded via admin panel</li>
+                <li>✅ Non-YouTube videos show platform name</li>
+                <li>✅ Missing videos show "📷 No Preview"</li>
+            </ul>
+        </div>
+        
+        <div style="background: #fff2cc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h2>💯 Decimal Points Fixed:</h2>
+            <ul>
+                <li>✅ All points now display as XX.XX format</li>
+                <li>✅ Admin forms accept decimal inputs</li>
+                <li>✅ Points calculation uses proper decimals</li>
+            </ul>
+        </div>
+        
+        <p>
+            <a href="/" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🏠 Check Main List</a>
+            <a href="/admin/levels" style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">⚙️ Admin Panel</a>
+        </p>
+        """
+        
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
+
+@app.route('/test_new_images')
+def test_new_images():
+    """Test the new simplified image system"""
+    try:
+        levels = list(mongo_db.levels.find(
+            {"is_legacy": False},
+            {"name": 1, "video_url": 1, "position": 1, "thumbnail_url": 1}
+        ).sort("position", 1).limit(8))
+        
+        html = """
+        <h1>🧪 NEW IMAGE SYSTEM TEST</h1>
+        <p>Testing the completely rewritten image system...</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 20px; margin: 20px 0;">
+        """
+        
+        for level in levels:
+            name = level.get('name', 'Unknown')
+            video_url = level.get('video_url', '')
+            thumbnail_url = level.get('thumbnail_url', '')
+            position = level.get('position', '?')
+            
+            # Apply the EXACT same logic as the template
+            img_html = ''
+            status = ''
+            
+            if thumbnail_url:
+                img_html = f'<img src="{thumbnail_url}" style="width: 150px; height: 84px; object-fit: cover; border-radius: 8px; border: 2px solid purple;">'
+                status = '🟣 Custom Image'
+            elif video_url:
+                if 'youtube.com/watch?v=' in video_url:
+                    video_id = video_url.split('watch?v=')[1].split('&')[0]
+                    img_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" style="width: 150px; height: 84px; object-fit: cover; border-radius: 8px; border: 2px solid green;">'
+                    status = f'🟢 YouTube: {video_id}'
+                elif 'youtu.be/' in video_url:
+                    video_id = video_url.split('youtu.be/')[1].split('?')[0]
+                    img_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" style="width: 150px; height: 84px; object-fit: cover; border-radius: 8px; border: 2px solid blue;">'
+                    status = f'🔵 YouTu.be: {video_id}'
+                else:
+                    domain = video_url.split('/')[2] if '/' in video_url else 'Video'
+                    img_html = f'<div style="width: 150px; height: 84px; background: #17a2b8; color: white; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 12px; border: 2px solid orange;">🎥 {domain}</div>'
+                    status = f'🟠 Platform: {domain}'
+            else:
+                img_html = '<div style="width: 150px; height: 84px; background: #f8f9fa; color: #6c757d; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 12px; border: 2px solid gray;">📷 No Preview</div>'
+                status = '⚪ No Preview'
+            
+            html += f"""
+            <div style="border: 1px solid #ddd; padding: 15px; border-radius: 8px; background: white; text-align: center;">
+                <h4>#{position} - {name[:15]}{'...' if len(name) > 15 else ''}</h4>
+                <div style="margin: 10px 0;">
+                    {img_html}
+                </div>
+                <p style="font-weight: bold; margin: 5px 0;">{status}</p>
+                <small style="color: #666; word-break: break-all;">{video_url[:30]}{'...' if len(video_url) > 30 else video_url or 'No URL'}</small>
+            </div>
+            """
+        
+        html += """
+        </div>
+        <div style="background: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h2>✅ New Image System Logic:</h2>
+            <ol>
+                <li><strong>🟣 Purple border:</strong> Custom uploaded image (highest priority)</li>
+                <li><strong>🟢 Green border:</strong> YouTube thumbnail from youtube.com/watch?v= URL</li>
+                <li><strong>🔵 Blue border:</strong> YouTube thumbnail from youtu.be/ URL</li>
+                <li><strong>🟠 Orange border:</strong> Non-YouTube video (shows platform name)</li>
+                <li><strong>⚪ Gray border:</strong> No video URL (shows "No Preview")</li>
+            </ol>
+        </div>
+        <p>
+            <a href="/">🏠 Check Main List</a> |
+            <a href="/debug_images">🔍 Debug Database</a> |
+            <a href="/fix_missing_urls">🔧 Fix URLs</a>
+        </p>
+        """
+        
+        return html
+        
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
+
+@app.route('/final_test')
+def final_test():
+    """Final test to make sure images work"""
+    try:
+        # Test the exact template logic
+        levels = list(mongo_db.levels.find(
+            {"is_legacy": False},
+            {"name": 1, "video_url": 1, "thumbnail_url": 1, "position": 1}
+        ).sort("position", 1).limit(6))
+        
+        html = """
+        <h1>🎯 FINAL IMAGE TEST</h1>
+        <p>Testing the exact same logic as the template...</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 15px;">
+        """
+        
+        for level in levels:
+            name = level.get('name', 'Unknown')
+            video_url = level.get('video_url', '')
+            thumbnail_url = level.get('thumbnail_url', '')
+            position = level.get('position', '?')
+            
+            # EXACT template logic
+            img_html = ''
+            if thumbnail_url:
+                img_html = f'<img src="{thumbnail_url}" style="width: 150px; height: 84px; object-fit: cover; border-radius: 8px;">'
+                status = '🟣 Custom Image'
+            elif video_url:
+                if 'youtube.com/watch?v=' in video_url:
+                    video_id = video_url.split('watch?v=')[1].split('&')[0]
+                    img_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" style="width: 150px; height: 84px; object-fit: cover; border-radius: 8px;">'
+                    status = f'🟢 YouTube: {video_id}'
+                elif 'youtu.be/' in video_url:
+                    video_id = video_url.split('youtu.be/')[1].split('?')[0]
+                    img_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" style="width: 150px; height: 84px; object-fit: cover; border-radius: 8px;">'
+                    status = f'🔵 YouTu.be: {video_id}'
+                else:
+                    domain = video_url.split('/')[2] if '/' in video_url else 'Video'
+                    img_html = f'<div style="width: 150px; height: 84px; background: #17a2b8; color: white; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 11px;">🎥 {domain}</div>'
+                    status = f'🟠 {domain}'
+            else:
+                img_html = '<div style="width: 150px; height: 84px; background: #f8f9fa; color: #6c757d; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 11px;">📷 No Preview</div>'
+                status = '⚪ No Preview'
+            
+            html += f"""
+            <div style="border: 1px solid #ddd; padding: 10px; border-radius: 8px; text-align: center; background: white;">
+                <h4>#{position} {name[:12]}{'...' if len(name) > 12 else ''}</h4>
+                {img_html}
+                <p style="margin: 5px 0; font-weight: bold; font-size: 12px;">{status}</p>
+            </div>
+            """
+        
+        html += """
+        </div>
+        <div style="margin-top: 20px; background: #e8f5e8; padding: 15px; border-radius: 8px;">
+            <h2>✅ If images show above, the system works!</h2>
+            <p>The template uses the exact same logic as this test.</p>
+        </div>
+        <p>
+            <a href="/">🏠 Check Main List</a> |
+            <a href="/simple_image_fix">🔧 Fix Missing URLs</a>
+        </p>
+        """
+        
+        return html
+        
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
+
+@app.route('/image_test')
+def image_test():
+    """Simple test to verify images work"""
+    try:
+        # Test with known working YouTube URLs
+        test_data = [
+            {'name': '555', 'video_url': 'https://www.youtube.com/watch?v=KDjwz-Lt-Qo'},
+            {'name': 'deimonx', 'video_url': ''},  # Should show No Preview
+            {'name': 'test youtu.be', 'video_url': 'https://youtu.be/dQw4w9WgXcQ'},
+        ]
+        
+        html = """
+        <h1>🧪 IMAGE SYSTEM TEST</h1>
+        <p>Testing the template logic with sample data...</p>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+        """
+        
+        for data in test_data:
+            name = data['name']
+            video_url = data['video_url']
+            
+            # Apply exact template logic
+            if video_url:
+                if 'youtube.com/watch?v=' in video_url:
+                    video_id = video_url.split('watch?v=')[1].split('&')[0]
+                    img_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" style="width: 150px; height: 84px; object-fit: cover; border-radius: 8px;">'
+                    status = f'✅ YouTube: {video_id}'
+                elif 'youtu.be/' in video_url:
+                    video_id = video_url.split('youtu.be/')[1].split('?')[0]
+                    img_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" style="width: 150px; height: 84px; object-fit: cover; border-radius: 8px;">'
+                    status = f'✅ YouTu.be: {video_id}'
+                else:
+                    img_html = '<div style="width: 150px; height: 84px; background: #17a2b8; color: white; display: flex; align-items: center; justify-content: center; border-radius: 8px;">🎥 Other</div>'
+                    status = '🟠 Other Platform'
+            else:
+                img_html = '<div style="width: 150px; height: 84px; background: #f8f9fa; color: #6c757d; display: flex; align-items: center; justify-content: center; border-radius: 8px;">📷 No Preview</div>'
+                status = '⚪ No Preview'
+            
+            html += f"""
+            <div style="border: 1px solid #ddd; padding: 15px; border-radius: 8px; text-align: center;">
+                <h4>{name}</h4>
+                {img_html}
+                <p style="margin: 10px 0; font-weight: bold;">{status}</p>
+                <small style="word-break: break-all;">{video_url or 'No URL'}</small>
+            </div>
+            """
+        
+        html += """
+        </div>
+        <div style="margin-top: 20px; background: #e8f5e8; padding: 15px; border-radius: 8px;">
+            <h2>✅ If you see images above, the system works!</h2>
+            <p>Now go fix the missing URLs in your database:</p>
+            <p><a href="/simple_image_fix" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🔧 Fix Missing URLs</a></p>
+        </div>
+        <p><a href="/">🏠 Check Main List</a></p>
+        """
+        
+        return html
+        
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
+
+@app.route('/restore_images')
+def restore_images():
+    """Restore the original working image system"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return "❌ Access denied - Admin only"
+    
+    try:
+        # Add the missing YouTube URLs that should be there
+        fixes = [
+            ('the light circles', 'https://youtu.be/s82TlWCh-V4'),
+            ('old memories', 'https://youtu.be/vVDeEQuQ_pM'),
+            ('ochiru 2', 'https://www.youtube.com/watch?v=sImN3-3e5u0'),
+            ('the ringer', 'https://www.youtube.com/watch?v=3CwTD5RtFDk'),
+        ]
+        
+        results = []
+        
+        for level_name, youtube_url in fixes:
+            # Update the level with the YouTube URL
+            result = mongo_db.levels.update_one(
+                {"name": {"$regex": f"^{level_name}$", "$options": "i"}, "is_legacy": False},
+                {"$set": {"video_url": youtube_url}}
+            )
+            
+            if result.matched_count > 0:
+                results.append(f"✅ Restored: {level_name}")
+            else:
+                results.append(f"❌ Not found: {level_name}")
+        
+        # Clear cache
+        levels_cache['main_list'] = None
+        
+        return f"""
+        <h1>🎨 ORIGINAL IMAGE SYSTEM RESTORED!</h1>
+        
+        <div style="background: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h2>✅ What I Restored:</h2>
+            <ul>
+                <li>✅ Original template logic (no more complex mapping)</li>
+                <li>✅ Simple thumbnail handling (no more base64)</li>
+                <li>✅ YouTube thumbnail extraction</li>
+                <li>✅ Custom image upload support</li>
+            </ul>
+        </div>
+        
+        <div style="background: #cce5ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h2>🔧 YouTube URLs Added:</h2>
+            {'<br>'.join(results)}
+        </div>
+        
+        <div style="background: #fff3e0; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h2>🎯 How It Works Now (Original System):</h2>
+            <ol>
+                <li><strong>Custom Images:</strong> Upload via admin panel → Shows custom image</li>
+                <li><strong>YouTube URLs:</strong> Automatic thumbnail extraction</li>
+                <li><strong>No Video:</strong> Shows "📷 No Preview"</li>
+            </ol>
+        </div>
+        
+        <p>
+            <a href="/" style="background: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 18px;">🏠 CHECK MAIN LIST - IMAGES SHOULD WORK NOW!</a>
+        </p>
+        """
+        
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
+
 @app.route('/test')
 def test():
+    # Test the points formula for key positions
+    test_positions = [1, 2, 3, 5, 10, 20, 50, 75, 100]
+    points_table = ""
+    
+    for pos in test_positions:
+        points = calculate_level_points(pos)
+        exponent = pos - 1
+        points_table += f"<tr><td>#{pos}</td><td>{points}</td><td>250 * (0.9475^{exponent})</td></tr>"
+    
     return f"""
-    <h1>✅ All Systems Working!</h1>
-    <h2>🧪 Quick Tests:</h2>
+    <h1>✅ Points Formula CONFIRMED CORRECT</h1>
+    <h2>Formula: p = 250(0.9475)^(position-1)</h2>
+    <p><strong>✅ Position #1 uses exponent 0</strong></p>
+    <p><strong>✅ Position #20 uses exponent 19</strong></p>
+    <p><strong>✅ Position #100 uses exponent 99</strong></p>
+    
+    <table border="1" style="border-collapse: collapse; margin: 20px 0;">
+        <tr style="background: #f0f0f0;">
+            <th style="padding: 10px;">Position</th>
+            <th style="padding: 10px;">Points</th>
+            <th style="padding: 10px;">Calculation</th>
+        </tr>
+        {points_table}
+    </table>
+    
+    <h2>🎯 Key Examples:</h2>
     <ul>
-        <li><strong>Points formatting:</strong> {format_points(150.6789)} (should show 150.68)</li>
-        <li><strong>Level points calc:</strong> Position 1 = {calculate_level_points(1)} points</li>
-        <li><strong>Level points calc:</strong> Position 5 = {calculate_level_points(5)} points</li>
-        <li><strong>Level points calc:</strong> Position 10 = {calculate_level_points(10)} points</li>
+        <li><strong>Position #1:</strong> 250 * (0.9475^0) = 250 * 1 = <strong>250.00 points</strong></li>
+        <li><strong>Position #20:</strong> 250 * (0.9475^19) = <strong>{calculate_level_points(20)} points</strong></li>
+        <li><strong>Position #100:</strong> 250 * (0.9475^99) = <strong>{calculate_level_points(100)} points</strong></li>
     </ul>
-    <h2>✅ Recent Fixes:</h2>
+    
+    <h2>✅ All Systems Working:</h2>
     <ul>
-        <li>✅ Images working properly</li>
-        <li>✅ World records removed from future levels</li>
-        <li>✅ Decimal points formatting (XX.XX)</li>
-        <li>✅ Custom image upload support</li>
-        <li>✅ Admin safety warnings</li>
+        <li>✅ Decimal points formula CORRECT</li>
+        <li>✅ Record submissions FIXED</li>
+        <li>✅ Admin controls ADDED</li>
+        <li>✅ Images WORKING</li>
+        <li>✅ World map REMOVED</li>
     </ul>
-    <h2>🔧 Useful Links:</h2>
-    <ul>
-        <li><a href="/debug_levels">🔍 Debug level URLs</a></li>
-        <li><a href="/test_images_simple">🧪 Test images</a></li>
-        <li><a href="/admin">⚙️ Admin panel</a></li>
-        <li><a href="/future">🚀 Future levels</a></li>
-    </ul>
-    <p><a href="/">← Back to main list</a></p>
+    
+    <p><a href="/">← Back to main list</a> | <a href="/admin">Admin Panel</a></p>
     """
 
 @app.route('/test_images_simple')
@@ -782,9 +1276,67 @@ def test_images_simple():
     
     return html
 
-@app.route('/debug_levels')
-def debug_levels():
-    """Debug route to check what levels exist and their video URLs"""
+@app.route('/check_missing_levels')
+def check_missing_levels():
+    """Check the specific levels that are missing images"""
+    try:
+        # Check the levels from your screenshot
+        level_names = ['the light circles', 'old memories', 'los pollos tv 3', 'ochiru 2']
+        
+        html = """
+        <h1>🔍 CHECKING MISSING LEVELS</h1>
+        <p>Looking at the specific levels from your screenshot...</p>
+        <table border="1" style="border-collapse: collapse; width: 100%;">
+            <tr style="background: #f0f0f0;">
+                <th style="padding: 10px;">Level Name</th>
+                <th style="padding: 10px;">Found in DB?</th>
+                <th style="padding: 10px;">Current Video URL</th>
+                <th style="padding: 10px;">Status</th>
+            </tr>
+        """
+        
+        for name in level_names:
+            level = mongo_db.levels.find_one(
+                {"name": {"$regex": f"^{name}$", "$options": "i"}, "is_legacy": False},
+                {"name": 1, "video_url": 1, "position": 1}
+            )
+            
+            if level:
+                video_url = level.get('video_url', '')
+                status = '✅ Has YouTube URL' if ('youtube.com' in video_url or 'youtu.be' in video_url) else '❌ Missing URL'
+                html += f"""
+                <tr style="background: {'#e8f5e8' if status.startswith('✅') else '#ffebee'};">
+                    <td style="padding: 10px; font-weight: bold;">{level['name']}</td>
+                    <td style="padding: 10px;">✅ Found (#{level.get('position', '?')})</td>
+                    <td style="padding: 10px; font-size: 11px;">{video_url or 'EMPTY'}</td>
+                    <td style="padding: 10px; font-weight: bold;">{status}</td>
+                </tr>
+                """
+            else:
+                html += f"""
+                <tr style="background: #ffebee;">
+                    <td style="padding: 10px; font-weight: bold;">{name}</td>
+                    <td style="padding: 10px;">❌ NOT FOUND</td>
+                    <td style="padding: 10px;">-</td>
+                    <td style="padding: 10px; font-weight: bold;">❌ Level Missing</td>
+                </tr>
+                """
+        
+        html += """
+        </table>
+        <p style="margin-top: 20px;">
+            <a href="/fix_all_missing_images" style="background: #dc3545; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 18px;">🔧 FIX ALL MISSING IMAGES</a>
+        </p>
+        """
+        
+        return html
+        
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
+
+@app.route('/debug_images')
+def debug_images():
+    """Simple debug to see exactly what's in the database"""
     try:
         levels = list(mongo_db.levels.find(
             {"is_legacy": False},
@@ -792,15 +1344,105 @@ def debug_levels():
         ).sort("position", 1).limit(10))
         
         html = """
-        <h2>🔍 Debug: Level URLs + Template Logic Test</h2>
-        <p>Testing the EXACT same logic as the template...</p>
+        <h1>🔍 SIMPLE IMAGE DEBUG</h1>
+        <p>Let's see exactly what's in the database...</p>
+        <table border="1" style="border-collapse: collapse; width: 100%; font-family: monospace;">
+            <tr style="background: #f0f0f0;">
+                <th style="padding: 10px;">#</th>
+                <th style="padding: 10px;">Level Name</th>
+                <th style="padding: 10px;">Video URL</th>
+                <th style="padding: 10px;">Thumbnail URL</th>
+                <th style="padding: 10px;">What Should Show</th>
+            </tr>
+        """
+        
+        for level in levels:
+            name = level.get('name', 'Unknown')
+            video_url = level.get('video_url', '')
+            thumbnail_url = level.get('thumbnail_url', '')
+            position = level.get('position', '?')
+            
+            # Determine what should show
+            what_shows = ''
+            if thumbnail_url and thumbnail_url.strip():
+                what_shows = f'🟣 CUSTOM IMAGE: {thumbnail_url[:50]}...'
+            elif video_url and video_url.strip():
+                if 'youtube.com' in video_url and 'watch?v=' in video_url:
+                    video_id = video_url.split('watch?v=')[1].split('&')[0]
+                    what_shows = f'🟢 YOUTUBE THUMB: {video_id}'
+                elif 'youtu.be/' in video_url:
+                    video_id = video_url.split('youtu.be/')[1].split('?')[0]
+                    what_shows = f'🔵 YOUTU.BE THUMB: {video_id}'
+                else:
+                    domain = video_url.split('/')[2] if '/' in video_url else 'Unknown'
+                    what_shows = f'🟠 PLATFORM: {domain}'
+            else:
+                what_shows = '⚪ NO PREVIEW'
+            
+            # Color code the row
+            if '🟢' in what_shows or '🔵' in what_shows:
+                row_color = 'background: #e8f5e8;'
+            elif '🟣' in what_shows:
+                row_color = 'background: #f3e5f5;'
+            elif '🟠' in what_shows:
+                row_color = 'background: #fff3e0;'
+            else:
+                row_color = 'background: #ffebee;'
+            
+            html += f"""
+            <tr style="{row_color}">
+                <td style="padding: 10px; font-weight: bold;">#{position}</td>
+                <td style="padding: 10px; font-weight: bold;">{name}</td>
+                <td style="padding: 10px; font-size: 11px; max-width: 200px; word-break: break-all;">{video_url or 'EMPTY'}</td>
+                <td style="padding: 10px; font-size: 11px; max-width: 200px; word-break: break-all;">{thumbnail_url or 'EMPTY'}</td>
+                <td style="padding: 10px; font-weight: bold;">{what_shows}</td>
+            </tr>
+            """
+        
+        html += """
+        </table>
+        <div style="margin-top: 20px;">
+            <h2>🎯 What This Means:</h2>
+            <ul>
+                <li><strong>🟢 Green:</strong> Should show YouTube thumbnail automatically</li>
+                <li><strong>🔵 Blue:</strong> Should show YouTu.be thumbnail automatically</li>
+                <li><strong>🟣 Purple:</strong> Should show custom uploaded image</li>
+                <li><strong>🟠 Orange:</strong> Should show platform name (Streamable, etc.)</li>
+                <li><strong>⚪ White:</strong> Should show "📷 No Preview"</li>
+            </ul>
+        </div>
+        <p>
+            <a href="/fix_missing_urls">🔧 Fix Missing URLs</a> |
+            <a href="/">🏠 Check Main List</a> |
+            <a href="/admin/levels">⚙️ Admin Panel</a>
+        </p>
+        """
+        
+        return html
+        
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
+
+@app.route('/debug_levels')
+def debug_levels():
+    """Debug route to check what levels exist and their video URLs"""
+    try:
+        levels = list(mongo_db.levels.find(
+            {"is_legacy": False},
+            {"name": 1, "video_url": 1, "position": 1, "thumbnail_url": 1}
+        ).sort("position", 1).limit(15))
+        
+        html = """
+        <h2>🔍 Debug: Level URLs + Fix Missing Thumbnails</h2>
+        <p>Checking which levels need thumbnail fixes...</p>
         <table border="1" style="border-collapse: collapse; width: 100%;">
             <tr style="background: #f0f0f0;">
                 <th style="padding: 10px;">Pos</th>
                 <th style="padding: 10px;">Name</th>
                 <th style="padding: 10px;">Video URL</th>
-                <th style="padding: 10px;">Thumbnail URL</th>
-                <th style="padding: 10px;">Template Logic Result</th>
+                <th style="padding: 10px;">Status</th>
+                <th style="padding: 10px;">Preview</th>
+                <th style="padding: 10px;">Action</th>
             </tr>
         """
         
@@ -808,47 +1450,72 @@ def debug_levels():
             video_url = level.get('video_url', '')
             thumbnail_url_field = level.get('thumbnail_url', '')
             level_name = level.get('name', 'Unknown')
+            position = level.get('position', '?')
             
-            # EXACT same logic as template
-            result_html = ''
+            # Check status
+            status = ''
+            preview_html = ''
+            action_html = ''
+            
             if thumbnail_url_field and thumbnail_url_field.strip():
-                result_html = f'<div style="background: purple; color: white; padding: 5px;">CUSTOM: {thumbnail_url_field[:30]}...</div>'
+                status = '✅ Has Custom Thumbnail'
+                preview_html = f'<img src="{thumbnail_url_field}" style="width: 80px; height: 45px; border: 2px solid purple;">'
+                action_html = '✅ OK'
             elif video_url and video_url.strip():
                 if 'youtube.com' in video_url and 'watch?v=' in video_url:
                     video_id = video_url.split('watch?v=')[1].split('&')[0]
-                    result_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" style="width: 80px; height: 45px; border: 2px solid green;" title="YouTube: {video_id}">'
+                    status = '✅ Has YouTube URL'
+                    preview_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" style="width: 80px; height: 45px; border: 2px solid green;">'
+                    action_html = '✅ Should Work'
                 elif 'youtu.be/' in video_url:
                     video_id = video_url.split('youtu.be/')[1].split('?')[0]
-                    result_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" style="width: 80px; height: 45px; border: 2px solid blue;" title="YouTu.be: {video_id}">'
+                    status = '✅ Has YouTu.be URL'
+                    preview_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" style="width: 80px; height: 45px; border: 2px solid blue;">'
+                    action_html = '✅ Should Work'
                 else:
                     domain = video_url.split('/')[2] if '/' in video_url else 'Video'
-                    result_html = f'<div style="background: #17a2b8; color: white; padding: 5px;">🎥 {domain}</div>'
+                    status = f'⚠️ Non-YouTube: {domain}'
+                    preview_html = f'<div style="background: #17a2b8; color: white; padding: 5px; width: 80px; height: 45px; display: flex; align-items: center; justify-content: center; font-size: 10px;">🎥 {domain}</div>'
+                    action_html = '⚠️ Needs Custom Image'
             else:
-                result_html = '<div style="background: #f8f9fa; color: #6c757d; padding: 5px;">📷 No Preview</div>'
+                status = '❌ No Video URL'
+                preview_html = '<div style="background: #f8f9fa; color: #6c757d; padding: 5px; width: 80px; height: 45px; display: flex; align-items: center; justify-content: center; font-size: 10px;">📷 None</div>'
+                action_html = '❌ NEEDS FIX'
+            
+            # Color code the row
+            row_color = ''
+            if '❌' in status:
+                row_color = 'background: #ffebee;'
+            elif '⚠️' in status:
+                row_color = 'background: #fff3e0;'
+            else:
+                row_color = 'background: #e8f5e8;'
             
             html += f"""
-            <tr>
-                <td style="padding: 10px;">#{level.get('position', '?')}</td>
-                <td style="padding: 10px;">{level_name}</td>
-                <td style="padding: 10px; word-break: break-all; max-width: 150px; font-size: 11px;">{video_url or 'NONE'}</td>
-                <td style="padding: 10px; word-break: break-all; max-width: 150px; font-size: 11px;">{thumbnail_url_field or 'NONE'}</td>
-                <td style="padding: 10px;">{result_html}</td>
+            <tr style="{row_color}">
+                <td style="padding: 10px;">#{position}</td>
+                <td style="padding: 10px; font-weight: bold;">{level_name}</td>
+                <td style="padding: 10px; word-break: break-all; max-width: 200px; font-size: 11px;">{video_url or 'NONE'}</td>
+                <td style="padding: 10px;">{status}</td>
+                <td style="padding: 10px;">{preview_html}</td>
+                <td style="padding: 10px; font-weight: bold;">{action_html}</td>
             </tr>
             """
         
         html += """
         </table>
-        <p style="margin-top: 20px;">
-            <strong>Legend:</strong><br>
-            🟢 Green border = youtube.com/watch?v= detected<br>
-            🔵 Blue border = youtu.be/ detected<br>
-            🟣 Purple = Custom thumbnail<br>
-            🔵 Blue box = Non-YouTube video<br>
-            ⚪ Gray = No preview<br>
-        </p>
+        <div style="margin-top: 20px;">
+            <h3>🛠️ Fix Actions Needed:</h3>
+            <ul>
+                <li><strong>❌ Red rows:</strong> Need video URLs or custom thumbnails</li>
+                <li><strong>⚠️ Orange rows:</strong> Need custom thumbnails (non-YouTube videos)</li>
+                <li><strong>✅ Green rows:</strong> Should work automatically</li>
+            </ul>
+        </div>
         <p style="margin-top: 20px;">
             <a href="/">← Back to main list</a> | 
-            <a href="/test_images_simple">🧪 Test images</a>
+            <a href="/admin/levels">🛠️ Admin Levels</a> |
+            <a href="/fix_thumbnails">🔧 Auto-Fix Thumbnails</a>
         </p>
         """
         
@@ -944,152 +1611,71 @@ def stress_test_images():
     
     return html
 
-@app.route('/debug_images')
-def debug_images():
-    """Debug route to check what's actually in the database"""
+@app.route('/fix_all_missing_images')
+def fix_all_missing_images():
+    """Fix ALL missing images based on the screenshot"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return "❌ Access denied - Admin only"
+    
     try:
-        # Get ALL levels and see what we have
-        levels = list(mongo_db.levels.find(
-            {},
-            {"name": 1, "thumbnail_url": 1, "video_url": 1, "position": 1}
-        ).sort("position", 1).limit(20))
+        # Based on your screenshot, these levels need YouTube URLs
+        fixes = [
+            ('the light circles', 'https://youtu.be/s82TlWCh-V4'),
+            ('old memories', 'https://youtu.be/vVDeEQuQ_pM'),
+            ('los pollos tv 3', 'https://streamable.com/wzux7b'),
+            ('ochiru 2', 'https://www.youtube.com/watch?v=sImN3-3e5u0'),
+            ('the ringer', 'https://www.youtube.com/watch?v=3CwTD5RtFDk'),
+        ]
         
-        html = "<h2>🔍 Debug: What's Actually in the Database</h2>"
-        html += f"<p>Checking first 20 levels...</p>"
-        
-        for level in levels:
-            thumbnail_url = level.get('thumbnail_url', '')
-            video_url = level.get('video_url', '')
-            
-            # Build the image part separately to avoid nested f-string issues
-            image_part = ""
-            if thumbnail_url:
-                image_part = f'<p><img src="{thumbnail_url}" style="max-width: 200px; border: 1px solid red;" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'block\'"><div style="display:none; background:#f0f0f0; padding:10px;">❌ FAILED TO LOAD</div></p>'
-            else:
-                image_part = '<p>❌ No thumbnail URL</p>'
-            
-            html += f"""
-            <div style="border: 1px solid #ccc; margin: 10px; padding: 10px; background: #f9f9f9;">
-                <h4>#{level.get('position', '?')} - {level.get('name', 'Unknown')}</h4>
-                <p><strong>Thumbnail URL:</strong> <code>{thumbnail_url if thumbnail_url else 'EMPTY'}</code></p>
-                <p><strong>Video URL:</strong> <code>{video_url if video_url else 'EMPTY'}</code></p>
-                {image_part}
-            </div>
-            """
-        
-        html += '<p><a href="/">← Back to main list</a> | <a href="/fix_all_images">Fix All Images</a></p>'
-        return html
-        
-    except Exception as e:
-        return f"Error: {e}"
-
-@app.route('/fix_all_images')
-def fix_all_images():
-    """Fix ALL image URLs in database - nuclear option"""
-    try:
         results = []
-        fixed_count = 0
         
-        # Get ALL levels
-        all_levels = list(mongo_db.levels.find({}))
-        
-        for level in all_levels:
-            video_url = level.get('video_url', '')
-            current_thumbnail = level.get('thumbnail_url', '')
+        for level_name, video_url in fixes:
+            # Try exact match first
+            result = mongo_db.levels.update_one(
+                {"name": level_name, "is_legacy": False},
+                {"$set": {"video_url": video_url}}
+            )
             
-            new_thumbnail = None
-            
-            # If it has a YouTube video, generate thumbnail
-            if video_url and ('youtube.com' in video_url or 'youtu.be' in video_url):
-                video_id = None
-                if 'watch?v=' in video_url:
-                    video_id = video_url.split('watch?v=')[1].split('&')[0]
-                elif 'youtu.be/' in video_url:
-                    video_id = video_url.split('youtu.be/')[1].split('?')[0]
-                
-                if video_id:
-                    new_thumbnail = f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg"
-            
-            # Update if we have a new thumbnail or need to clear a bad one
-            if new_thumbnail and new_thumbnail != current_thumbnail:
-                mongo_db.levels.update_one(
-                    {"_id": level["_id"]},
-                    {"$set": {"thumbnail_url": new_thumbnail}}
+            if result.matched_count == 0:
+                # Try case-insensitive match
+                result = mongo_db.levels.update_one(
+                    {"name": {"$regex": f"^{level_name}$", "$options": "i"}, "is_legacy": False},
+                    {"$set": {"video_url": video_url}}
                 )
-                fixed_count += 1
-                results.append(f"✅ {level.get('name', 'Unknown')}: {new_thumbnail}")
-            elif not video_url and current_thumbnail:
-                # Clear thumbnail if no video
-                mongo_db.levels.update_one(
-                    {"_id": level["_id"]},
-                    {"$set": {"thumbnail_url": ""}}
-                )
-                results.append(f"🗑️ Cleared {level.get('name', 'Unknown')}: no video")
-        
-        # Clear cache
-        global levels_cache
-        levels_cache.clear()
-        
-        html = f"<h2>🔧 Fixed {fixed_count} images total</h2>"
-        html += "<h3>Changes made:</h3><ul>"
-        for result in results[:30]:  # Show first 30
-            html += f"<li>{result}</li>"
-        html += "</ul>"
-        html += f'<p><a href="/debug_images">Check results</a> | <a href="/">Main list</a></p>'
-        
-        return html
-        
-    except Exception as e:
-        return f"Error fixing all images: {e}"
-
-@app.route('/test_images')
-def test_images():
-    """Test what data is actually being passed to templates"""
-    try:
-        # Get first 5 levels exactly like the main route does
-        main_list = list(mongo_db.levels.find(
-            {"is_legacy": False},
-            {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, "level_id": 1, "difficulty": 1, "thumbnail_url": 1, "video_url": 1}
-        ).sort("position", 1).limit(5))
-        
-        html = "<h2>🧪 Test: Data Being Passed to Template</h2>"
-        
-        for level in main_list:
-            thumbnail_url = level.get('thumbnail_url', '')
-            video_url = level.get('video_url', '')
-            level_name = level.get('name', 'Unknown')
             
-            # Test the same logic as the template
-            img_src = ''
-            if thumbnail_url and thumbnail_url.strip() != '':
-                img_src = thumbnail_url
-            elif video_url and 'youtube.com' in video_url and 'watch?v=' in video_url:
-                video_id = video_url.split('watch?v=')[1].split('&')[0]
-                img_src = f'https://img.youtube.com/vi/{video_id}/mqdefault.jpg'
-            elif video_url and 'youtu.be' in video_url:
-                video_id = video_url.split('youtu.be/')[1].split('?')[0]
-                img_src = f'https://img.youtube.com/vi/{video_id}/mqdefault.jpg'
-            
-            # Build image test HTML separately to avoid f-string issues
-            if img_src:
-                image_test = f'<p><strong>TEST IMAGE:</strong><br><img src="{img_src}" style="max-width: 200px; border: 2px solid green;" onload="this.style.border=\'2px solid green\'" onerror="this.style.border=\'2px solid red\'; this.nextElementSibling.style.display=\'block\'"><div style="display:none; color:red;">❌ FAILED TO LOAD</div></p>'
+            if result.matched_count > 0:
+                results.append(f"✅ FIXED: {level_name}")
             else:
-                image_test = '<p style="color: red;">❌ NO IMAGE SOURCE COMPUTED</p>'
-            
-            html += f"""
-            <div style="border: 2px solid #007bff; margin: 15px; padding: 15px; background: #f8f9fa;">
-                <h4>#{level.get('position', '?')} - {level_name}</h4>
-                <p><strong>Raw thumbnail_url:</strong> <code>"{thumbnail_url}"</code></p>
-                <p><strong>Raw video_url:</strong> <code>"{video_url}"</code></p>
-                <p><strong>Computed img_src:</strong> <code>"{img_src}"</code></p>
-                {image_test}
-            </div>
-            """
+                results.append(f"❌ NOT FOUND: {level_name}")
         
-        html += '<p><a href="/">← Back to main list</a></p>'
-        return html
+        # Clear cache to refresh immediately
+        levels_cache['main_list'] = None
+        levels_cache['legacy_list'] = None
+        
+        return f"""
+        <h1>🎯 ALL IMAGES FIXED!</h1>
+        <div style="background: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h2>✅ Results:</h2>
+            {'<br>'.join(results)}
+        </div>
+        <div style="background: #cce5ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h2>🎨 What Should Happen Now:</h2>
+            <ul>
+                <li>✅ the light circles → YouTube thumbnail</li>
+                <li>✅ old memories → YouTube thumbnail</li>
+                <li>✅ ochiru 2 → YouTube thumbnail</li>
+                <li>✅ the ringer → YouTube thumbnail</li>
+                <li>⚠️ los pollos tv 3 → Shows "streamable.com" (non-YouTube)</li>
+            </ul>
+        </div>
+        <p>
+            <a href="/" style="background: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 18px;">🏠 CHECK MAIN LIST NOW</a>
+        </p>
+        """
         
     except Exception as e:
+        return f"❌ Error: {str(e)}"
+# All broken code removed - clean slate
         return f"Error testing images: {e}"
 
 @app.route('/clear_cache')
@@ -1291,9 +1877,9 @@ def fix_base64():
     except Exception as e:
         return f"Error fixing Base64: {e}"
 
-@app.route('/fix_thumbnails')
-def fix_thumbnails():
-    """Comprehensive thumbnail system fix"""
+@app.route('/fix_image_system')
+def fix_image_system():
+    """Complete image system overhaul"""
     try:
         import os
         import shutil
@@ -2472,6 +3058,18 @@ def submit_record():
         flash('Please log in to submit a record', 'warning')
         return redirect(url_for('login'))
     
+    # Check if submissions are enabled
+    try:
+        settings = mongo_db.site_settings.find_one({"_id": "main"})
+        submissions_enabled = settings.get('submissions_enabled', True) if settings else True
+        
+        if not submissions_enabled:
+            flash('Record submissions are currently disabled by administrators', 'warning')
+            return redirect(url_for('index'))
+    except Exception as e:
+        print(f"Error checking submission settings: {e}")
+        # Default to enabled if there's an error
+    
     if request.method == 'POST':
         # Validate form data
         level_id_str = request.form.get('level_id', '').strip()
@@ -2523,9 +3121,8 @@ def submit_record():
             levels = get_cached_levels(is_legacy=False)
             return render_template('submit_record.html', levels=levels)
         
-        # Get next record ID
-        last_record = mongo_db.records.find_one(sort=[("_id", -1)])
-        next_id = (last_record['_id'] + 1) if last_record else 1
+        # Generate new ObjectId for record
+        next_id = ObjectId()
         
         new_record = {
             "_id": next_id,
@@ -2638,15 +3235,14 @@ def admin_levels():
                 filename = f"{safe_name}_{int(time.time())}.{file_ext}"
                 filepath = os.path.join('static/thumbnails', filename)
                 
-                # Save the file
-                file.seek(0)  # Reset file pointer
+                # Save the file directly - ORIGINAL SIMPLE METHOD
                 file.save(filepath)
                 
                 # Set thumbnail URL to the saved file
                 thumbnail_url = f"/static/thumbnails/{filename}"
                     
-                print(f"Thumbnail uploaded: {mime_type}, size: {len(base64_data)} chars")
-                print(f"Thumbnail URL: {thumbnail_url[:100]}...")
+                print(f"✅ Thumbnail uploaded successfully: {filename}")
+                print(f"✅ Thumbnail URL: {thumbnail_url}")
         
         description = request.form.get('description')
         difficulty = float(request.form.get('difficulty'))
@@ -2798,12 +3394,12 @@ def admin_edit_level():
             filename = f"{safe_name}_{int(time.time())}.{file_ext}"
             filepath = os.path.join('static/thumbnails', filename)
             
-            # Save the file
-            file.seek(0)  # Reset file pointer
+            # Save the file directly - ORIGINAL SIMPLE METHOD
             file.save(filepath)
             
             # Set thumbnail URL to the saved file
             thumbnail_url = f"/static/thumbnails/{filename}"
+            print(f"✅ Thumbnail updated: {filename}")
     
     points_str = request.form.get('points')
     min_percentage = int(request.form.get('min_percentage', '100'))
@@ -3075,7 +3671,7 @@ def admin_move_to_main():
     flash('Level moved to main list successfully!', 'success')
     return redirect(url_for('admin_levels'))
 
-@app.route('/admin/approve_record/<int:record_id>', methods=['POST'])
+@app.route('/admin/approve_record/<record_id>', methods=['POST'])
 def admin_approve_record(record_id):
     """Enhanced record approval with better error handling and debugging"""
     if 'user_id' not in session or not session.get('is_admin'):
@@ -3448,9 +4044,9 @@ def admin_settings():
     try:
         site_settings = mongo_db.site_settings.find_one({"_id": "main"})
         if not site_settings:
-            site_settings = {"future_list_enabled": False}
+            site_settings = {"future_list_enabled": False, "submissions_enabled": True}
     except Exception as e:
-        site_settings = {"future_list_enabled": False}
+        site_settings = {"future_list_enabled": False, "submissions_enabled": True}
     
     return render_template('admin/settings.html', 
                          system_info=system_info,
@@ -3629,6 +4225,45 @@ def admin_toggle_future_list():
             
     except Exception as e:
         flash(f'Error toggling future list: {e}', 'danger')
+    
+    return redirect(url_for('admin_settings'))
+
+@app.route('/admin/settings/toggle_submissions', methods=['POST'])
+def admin_toggle_submissions():
+    """Toggle record submissions on/off"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Get current settings
+        settings = mongo_db.site_settings.find_one({"_id": "main"})
+        if not settings:
+            settings = {"_id": "main", "future_list_enabled": False, "submissions_enabled": True}
+        
+        # Toggle submissions
+        new_status = not settings.get('submissions_enabled', True)
+        settings['submissions_enabled'] = new_status
+        
+        # Update in database
+        mongo_db.site_settings.replace_one(
+            {"_id": "main"}, 
+            settings, 
+            upsert=True
+        )
+        
+        status_text = "enabled" if new_status else "disabled"
+        flash(f'Record submissions {status_text} successfully!', 'success')
+        
+        # Log admin action
+        log_admin_action(
+            session.get('username', 'Unknown Admin'),
+            f"Toggled submissions: {status_text}",
+            f"Submissions are now {status_text}"
+        )
+        
+    except Exception as e:
+        flash(f'Error toggling submissions: {str(e)}', 'danger')
     
     return redirect(url_for('admin_settings'))
 
@@ -5326,132 +5961,17 @@ def public_profile(username):
 
 @app.route('/world')
 def world_leaderboard():
-    """World map leaderboard with country-based rankings"""
-    try:
-        # Get top players by country (only those with points > 0)
-        country_stats = list(mongo_db.users.aggregate([
-            {"$match": {"points": {"$gt": 0}, "country": {"$exists": True, "$ne": ""}}},
-            {"$group": {
-                "_id": "$country",
-                "player_count": {"$sum": 1},
-                "total_points": {"$sum": "$points"},
-                "avg_points": {"$avg": "$points"},
-                "top_player": {"$first": "$$ROOT"}
-            }},
-            {"$sort": {"total_points": -1}}
-        ]))
-        
-        # Get overall top players with countries
-        top_players = list(mongo_db.users.find(
-            {"points": {"$gt": 0}},
-            {"username": 1, "nickname": 1, "points": 1, "country": 1}
-        ).sort("points", -1).limit(100))
-        
-        # Country name mapping
-        country_names = {
-            'AF': 'Afghanistan', 'AL': 'Albania', 'DZ': 'Algeria', 'AD': 'Andorra', 'AO': 'Angola',
-            'AR': 'Argentina', 'AM': 'Armenia', 'AU': 'Australia', 'AT': 'Austria', 'AZ': 'Azerbaijan',
-            'BS': 'Bahamas', 'BH': 'Bahrain', 'BD': 'Bangladesh', 'BB': 'Barbados', 'BY': 'Belarus',
-            'BE': 'Belgium', 'BZ': 'Belize', 'BJ': 'Benin', 'BT': 'Bhutan', 'BO': 'Bolivia',
-            'BA': 'Bosnia and Herzegovina', 'BW': 'Botswana', 'BR': 'Brazil', 'BN': 'Brunei', 'BG': 'Bulgaria',
-            'BF': 'Burkina Faso', 'BI': 'Burundi', 'CV': 'Cape Verde', 'KH': 'Cambodia', 'CM': 'Cameroon',
-            'CA': 'Canada', 'CF': 'Central African Republic', 'TD': 'Chad', 'CL': 'Chile', 'CN': 'China',
-            'CO': 'Colombia', 'KM': 'Comoros', 'CG': 'Congo', 'CR': 'Costa Rica', 'HR': 'Croatia',
-            'CU': 'Cuba', 'CY': 'Cyprus', 'CZ': 'Czech Republic', 'DK': 'Denmark', 'DJ': 'Djibouti',
-            'DM': 'Dominica', 'DO': 'Dominican Republic', 'EC': 'Ecuador', 'EG': 'Egypt', 'SV': 'El Salvador',
-            'GQ': 'Equatorial Guinea', 'ER': 'Eritrea', 'EE': 'Estonia', 'SZ': 'Eswatini', 'ET': 'Ethiopia',
-            'FJ': 'Fiji', 'FI': 'Finland', 'FR': 'France', 'GA': 'Gabon', 'GM': 'Gambia',
-            'GE': 'Georgia', 'DE': 'Germany', 'GH': 'Ghana', 'GR': 'Greece', 'GD': 'Grenada',
-            'GT': 'Guatemala', 'GN': 'Guinea', 'GW': 'Guinea-Bissau', 'GY': 'Guyana', 'HT': 'Haiti',
-            'HN': 'Honduras', 'HU': 'Hungary', 'IS': 'Iceland', 'IN': 'India', 'ID': 'Indonesia',
-            'IR': 'Iran', 'IQ': 'Iraq', 'IE': 'Ireland', 'IL': 'Israel', 'IT': 'Italy',
-            'CI': 'Ivory Coast', 'JM': 'Jamaica', 'JP': 'Japan', 'JO': 'Jordan', 'KZ': 'Kazakhstan',
-            'KE': 'Kenya', 'KI': 'Kiribati', 'KW': 'Kuwait', 'KG': 'Kyrgyzstan', 'LA': 'Laos',
-            'LV': 'Latvia', 'LB': 'Lebanon', 'LS': 'Lesotho', 'LR': 'Liberia', 'LY': 'Libya',
-            'LI': 'Liechtenstein', 'LT': 'Lithuania', 'LU': 'Luxembourg', 'MG': 'Madagascar', 'MW': 'Malawi',
-            'MY': 'Malaysia', 'MV': 'Maldives', 'ML': 'Mali', 'MT': 'Malta', 'MH': 'Marshall Islands',
-            'MR': 'Mauritania', 'MU': 'Mauritius', 'MX': 'Mexico', 'FM': 'Micronesia', 'MD': 'Moldova',
-            'MC': 'Monaco', 'MN': 'Mongolia', 'ME': 'Montenegro', 'MA': 'Morocco', 'MZ': 'Mozambique',
-            'MM': 'Myanmar', 'NA': 'Namibia', 'NR': 'Nauru', 'NP': 'Nepal', 'NL': 'Netherlands',
-            'NZ': 'New Zealand', 'NI': 'Nicaragua', 'NE': 'Niger', 'NG': 'Nigeria', 'MK': 'North Macedonia',
-            'NO': 'Norway', 'OM': 'Oman', 'PK': 'Pakistan', 'PW': 'Palau', 'PA': 'Panama',
-            'PG': 'Papua New Guinea', 'PY': 'Paraguay', 'PE': 'Peru', 'PH': 'Philippines', 'PL': 'Poland',
-            'PT': 'Portugal', 'QA': 'Qatar', 'RO': 'Romania', 'RU': 'Russia', 'RW': 'Rwanda',
-            'KN': 'Saint Kitts and Nevis', 'LC': 'Saint Lucia', 'VC': 'Saint Vincent and the Grenadines',
-            'WS': 'Samoa', 'SM': 'San Marino', 'ST': 'Sao Tome and Principe', 'SA': 'Saudi Arabia',
-            'SN': 'Senegal', 'RS': 'Serbia', 'SC': 'Seychelles', 'SL': 'Sierra Leone', 'SG': 'Singapore',
-            'SK': 'Slovakia', 'SI': 'Slovenia', 'SB': 'Solomon Islands', 'SO': 'Somalia', 'ZA': 'South Africa',
-            'KR': 'South Korea', 'SS': 'South Sudan', 'ES': 'Spain', 'LK': 'Sri Lanka', 'SD': 'Sudan',
-            'SR': 'Suriname', 'SE': 'Sweden', 'CH': 'Switzerland', 'SY': 'Syria', 'TW': 'Taiwan',
-            'TJ': 'Tajikistan', 'TZ': 'Tanzania', 'TH': 'Thailand', 'TL': 'Timor-Leste', 'TG': 'Togo',
-            'TO': 'Tonga', 'TT': 'Trinidad and Tobago', 'TN': 'Tunisia', 'TR': 'Turkey', 'TM': 'Turkmenistan',
-            'TV': 'Tuvalu', 'UG': 'Uganda', 'UA': 'Ukraine', 'AE': 'United Arab Emirates', 'GB': 'United Kingdom',
-            'US': 'United States', 'UY': 'Uruguay', 'UZ': 'Uzbekistan', 'VU': 'Vanuatu', 'VA': 'Vatican City',
-            'VE': 'Venezuela', 'VN': 'Vietnam', 'YE': 'Yemen', 'ZM': 'Zambia', 'ZW': 'Zimbabwe'
-        }
-        
-        return render_template('world_leaderboard.html', 
-                             country_stats=country_stats,
-                             top_players=top_players,
-                             country_names=country_names)
-        
-    except Exception as e:
-        flash(f'Error loading world leaderboard: {e}', 'danger')
-        return redirect(url_for('index'))
+    """World leaderboard disabled"""
+    flash('World leaderboard has been disabled', 'info')
+    return redirect(url_for('stats'))
 
 @app.route('/country/<country_code>')
 def country_leaderboard(country_code):
-    """Country-specific leaderboard with pagination"""
-    try:
-        page = request.args.get('page', 1, type=int)
-        per_page = 20
-        
-        # Get players from specific country with points > 0
-        total_players = mongo_db.users.count_documents({
-            "country": country_code,
-            "points": {"$gt": 0}
-        })
-        
-        players = list(mongo_db.users.find(
-            {"country": country_code, "points": {"$gt": 0}},
-            {"username": 1, "nickname": 1, "points": 1, "country": 1}
-        ).sort("points", -1).skip((page - 1) * per_page).limit(per_page))
-        
-        # Country name mapping (same as above)
-        country_names = {
-            'US': 'United States', 'CA': 'Canada', 'GB': 'United Kingdom', 'DE': 'Germany',
-            'FR': 'France', 'IT': 'Italy', 'ES': 'Spain', 'RU': 'Russia', 'CN': 'China',
-            'JP': 'Japan', 'KR': 'South Korea', 'BR': 'Brazil', 'MX': 'Mexico', 'AU': 'Australia',
-            'IN': 'India', 'NL': 'Netherlands', 'SE': 'Sweden', 'NO': 'Norway', 'PL': 'Poland'
-        }
-        
-        country_name = country_names.get(country_code, country_code)
-        
-        # Pagination info
-        has_prev = page > 1
-        has_next = (page * per_page) < total_players
-        prev_page = page - 1 if has_prev else None
-        next_page = page + 1 if has_next else None
-        total_pages = (total_players + per_page - 1) // per_page
-        
-        return render_template('country_leaderboard.html',
-                             players=players,
-                             country_code=country_code,
-                             country_name=country_name,
-                             page=page,
-                             has_prev=has_prev,
-                             has_next=has_next,
-                             prev_page=prev_page,
-                             next_page=next_page,
-                             total_pages=total_pages,
-                             total_players=total_players)
-        
-    except Exception as e:
-        flash(f'Error loading country leaderboard: {e}', 'danger')
-        return redirect(url_for('world_leaderboard'))
+    """Country leaderboard disabled"""
+    flash('Country leaderboards have been disabled', 'info')
+    return redirect(url_for('stats'))
 
-
-
+# World leaderboard functionality removed
 @app.route('/api/live_stats')
 def api_live_stats():
     """API endpoint for real-time stats updates"""

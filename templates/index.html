@@ -33,24 +33,26 @@
                             {% set thumbnail_url = level.thumbnail_url if level is not mapping else level.get('thumbnail_url', '') %}
                             
                             <div class="level-thumbnail" style="width: 206px; height: 116px; position: relative;">
-                                {% set thumbnail_url_field = level.thumbnail_url if level is not mapping else level.get('thumbnail_url', '') %}
+                                {% set level_name = level.name if level is not mapping else level['name'] %}
+                                {% set video_url = level.video_url if level is not mapping else level.get('video_url', '') %}
+                                {% set thumbnail_url = level.thumbnail_url if level is not mapping else level.get('thumbnail_url', '') %}
                                 
-                                {% if thumbnail_url_field and thumbnail_url_field.strip() %}
+                                {% if thumbnail_url and thumbnail_url.strip() %}
                                     <!-- Custom uploaded image -->
-                                    <img src="{{ thumbnail_url_field }}" 
+                                    <img src="{{ thumbnail_url }}" 
                                          alt="{{ level_name }}" 
                                          class="img-fluid rounded"
                                          style="width: 206px; height: 116px; object-fit: cover;"
                                          loading="lazy">
                                 {% elif video_url and video_url.strip() %}
-                                    {% if 'youtube.com' in video_url and 'watch?v=' in video_url %}
-                                        {% set video_id = video_url.split('watch?v=')[1].split('&')[0] %}
+                                    {% if 'youtube.com' in video_url and 'v=' in video_url %}
+                                        {% set video_id = video_url.split('v=')[1].split('&')[0] %}
                                         <img src="https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg" 
                                              alt="{{ level_name }}" 
                                              class="img-fluid rounded"
                                              style="width: 206px; height: 116px; object-fit: cover;"
                                              loading="lazy">
-                                    {% elif 'youtu.be/' in video_url %}
+                                    {% elif 'youtu.be' in video_url %}
                                         {% set video_id = video_url.split('youtu.be/')[1].split('?')[0] %}
                                         <img src="https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg" 
                                              alt="{{ level_name }}" 
@@ -59,13 +61,13 @@
                                              loading="lazy">
                                     {% else %}
                                         <!-- Non-YouTube video -->
-                                        <div class="bg-info rounded d-flex align-items-center justify-content-center text-white" 
-                                             style="width: 206px; height: 116px; font-size: 12px;">
-                                            🎥 {{ video_url.split('/')[2] if '/' in video_url else 'Video' }}
+                                        <div class="bg-light rounded d-flex align-items-center justify-content-center text-muted" 
+                                             style="width: 206px; height: 116px;">
+                                            📷 No Preview
                                         </div>
                                     {% endif %}
                                 {% else %}
-                                    <!-- No video URL or custom image -->
+                                    <!-- No video URL -->
                                     <div class="bg-light rounded d-flex align-items-center justify-content-center text-muted" 
                                          style="width: 206px; height: 116px;">
                                         📷 No Preview
