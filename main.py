@@ -3681,8 +3681,15 @@ def admin_approve_record(record_id):
     try:
         print(f"DEBUG: Attempting to approve record {record_id}")
         
+        # Convert string record_id to ObjectId
+        try:
+            record_object_id = ObjectId(record_id)
+        except InvalidId:
+            flash('Invalid record ID', 'danger')
+            return redirect(url_for('admin'))
+        
         # Get record with detailed error checking
-        record = mongo_db.records.find_one({"_id": record_id})
+        record = mongo_db.records.find_one({"_id": record_object_id})
         if not record:
             flash('Record not found', 'danger')
             print(f"DEBUG: Record {record_id} not found in database")
@@ -3723,7 +3730,7 @@ def admin_approve_record(record_id):
         # Approve the record with timestamp
         approval_time = datetime.now(timezone.utc)
         update_result = mongo_db.records.update_one(
-            {"_id": record_id},
+            {"_id": record_object_id},
             {"$set": {
                 "status": "approved",
                 "approved_by": admin_username,
@@ -3782,7 +3789,7 @@ def admin_approve_record(record_id):
     
     return redirect(url_for('admin'))
 
-@app.route('/admin/reject_record/<int:record_id>', methods=['POST'])
+@app.route('/admin/reject_record/<record_id>', methods=['POST'])
 def admin_reject_record(record_id):
     """Enhanced record rejection with better error handling"""
     if 'user_id' not in session or not session.get('is_admin'):
@@ -3790,8 +3797,15 @@ def admin_reject_record(record_id):
         return redirect(url_for('index'))
     
     try:
+        # Convert string record_id to ObjectId
+        try:
+            record_object_id = ObjectId(record_id)
+        except InvalidId:
+            flash('Invalid record ID', 'danger')
+            return redirect(url_for('admin'))
+        
         # Get record info before rejecting
-        record = mongo_db.records.find_one({"_id": record_id})
+        record = mongo_db.records.find_one({"_id": record_object_id})
         if not record:
             flash('Record not found', 'danger')
             return redirect(url_for('admin'))
@@ -3811,7 +3825,7 @@ def admin_reject_record(record_id):
         # Reject the record with timestamp and reason
         rejection_time = datetime.now(timezone.utc)
         mongo_db.records.update_one(
-            {"_id": record_id},
+            {"_id": record_object_id},
             {"$set": {
                 "status": "rejected",
                 "rejected_by": admin_username,
