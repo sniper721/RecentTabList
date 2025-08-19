@@ -184,7 +184,7 @@
                             </div>
                             <div class="mb-3">
                                 <label for="points" class="form-label">Points (leave empty for auto-calculation)</label>
-                                <input type="number" class="form-control" id="points" name="points" min="0" step="0.1">
+                                <input type="number" class="form-control" id="points" name="points" min="0" step="0.01">
                                 <small class="form-text text-muted">If left empty, points will be calculated based on position</small>
                             </div>
                             <div class="mb-3">
@@ -265,7 +265,7 @@
                             </div>
                             <div class="mb-3">
                                 <label for="edit_points" class="form-label">Points (leave empty for auto-calculation)</label>
-                                <input type="number" class="form-control" id="edit_points" name="points" min="0" step="0.1">
+                                <input type="number" class="form-control" id="edit_points" name="points" min="0" step="0.01">
                                 <small class="form-text text-muted">If left empty, points will be calculated based on position</small>
                             </div>
                             <div class="mb-3">
@@ -400,7 +400,7 @@
             document.getElementById('edit_description').value = levelDescription || '';
             document.getElementById('edit_game_level_id').value = levelGameId || '';
             document.getElementById('edit_thumbnail_url').value = this.getAttribute('data-level-thumbnail') || '';
-            document.getElementById('edit_points').value = levelPoints || '';
+            document.getElementById('edit_points').value = levelPoints ? parseFloat(levelPoints).toFixed(2) : '';
             document.getElementById('edit_min_percentage').value = levelMinPercentage || '100';
         });
     });
