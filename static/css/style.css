@@ -393,6 +393,30 @@ p {
         padding: 0.5rem 0.25rem;
     }
     
+    /* Mobile leaderboard improvements */
+    .stats-card .table {
+        margin-bottom: 0;
+    }
+    
+    .stats-card .table td {
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+    
+    .stats-card .table .badge {
+        font-size: 0.7rem;
+        padding: 0.2rem 0.4rem;
+    }
+    
+    /* Mobile navigation button improvements */
+    .mobile-nav-buttons .btn {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.6rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
     /* Mobile world map improvements */
     #world-map {
         height: 300px !important;

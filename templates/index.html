@@ -37,41 +37,40 @@
                                 {% set video_url = level.video_url if level is not mapping else level.get('video_url', '') %}
                                 {% set thumbnail_url = level.thumbnail_url if level is not mapping else level.get('thumbnail_url', '') %}
                                 
+                                <!-- Simple image logic: Custom image first, then YouTube thumbnail, then placeholder -->
                                 {% if thumbnail_url and thumbnail_url.strip() %}
-                                    <!-- Custom uploaded image -->
+                                    <!-- Admin set custom image -->
                                     <img src="{{ thumbnail_url }}" 
                                          alt="{{ level_name }}" 
                                          class="img-fluid rounded"
                                          style="width: 206px; height: 116px; object-fit: cover;"
                                          loading="lazy">
-                                {% elif video_url and video_url.strip() %}
-                                    {% if 'youtube.com' in video_url and 'v=' in video_url %}
-                                        {% set video_id = video_url.split('v=')[1].split('&')[0] %}
-                                        <img src="https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg" 
-                                             alt="{{ level_name }}" 
-                                             class="img-fluid rounded"
-                                             style="width: 206px; height: 116px; object-fit: cover;"
-                                             loading="lazy">
-                                    {% elif 'youtu.be' in video_url %}
-                                        {% set video_id = video_url.split('youtu.be/')[1].split('?')[0] %}
-                                        <img src="https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg" 
+                                {% else %}
+                                    <!-- Try to get YouTube thumbnail -->
+                                    {% set youtube_id = '' %}
+                                    {% if video_url and 'youtu.be/' in video_url %}
+                                        {% set youtube_id = video_url.split('youtu.be/')[1].split('?')[0].split('&')[0] %}
+                                    {% elif video_url and 'youtube.com/watch?v=' in video_url %}
+                                        {% set youtube_id = video_url.split('v=')[1].split('&')[0] %}
+                                    {% endif %}
+                                    
+                                    {% if youtube_id %}
+                                        <!-- YouTube thumbnail -->
+                                        <img src="https://img.youtube.com/vi/{{ youtube_id }}/mqdefault.jpg" 
                                              alt="{{ level_name }}" 
                                              class="img-fluid rounded"
                                              style="width: 206px; height: 116px; object-fit: cover;"
                                              loading="lazy">
                                     {% else %}
-                                        <!-- Non-YouTube video -->
-                                        <div class="bg-light rounded d-flex align-items-center justify-content-center text-muted" 
+                                        <!-- No image available -->
+                                        <div class="bg-secondary rounded d-flex align-items-center justify-content-center text-white" 
                                              style="width: 206px; height: 116px;">
-                                            📷 No Preview
+                                            <div class="text-center">
+                                                <i class="fas fa-image fa-2x mb-2"></i>
+                                                <div>No Image</div>
+                                            </div>
                                         </div>
                                     {% endif %}
-                                {% else %}
-                                    <!-- No video URL -->
-                                    <div class="bg-light rounded d-flex align-items-center justify-content-center text-muted" 
-                                         style="width: 206px; height: 116px;">
-                                        📷 No Preview
-                                    </div>
                                 {% endif %}
                             </div>
                             

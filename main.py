@@ -218,8 +218,12 @@ def get_video_embed_info(video_url):
 def utility_processor():
     def format_points(points):
         if points is None or points == 0:
-            return "0.00"
-        return f"{float(points):.2f}"
+            return "0"
+        # Return integer if it's a whole number, otherwise show minimal decimals
+        points_float = float(points)
+        if points_float == int(points_float):
+            return str(int(points_float))
+        return f"{points_float:.1f}".rstrip('0').rstrip('.')
     
     def get_active_announcements():
         """Get active announcements that haven't expired"""
@@ -609,7 +613,7 @@ print("Setting up routes...")
 
 @app.route('/thumb/<path:url>')
 def thumbnail_proxy(url):
-    """SIMPLE thumbnail proxy - just pass through the URL"""
+    """Enhanced thumbnail proxy with better error handling"""
     import requests
     from flask import Response
     from urllib.parse import unquote
@@ -617,23 +621,37 @@ def thumbnail_proxy(url):
     try:
         # Decode the URL
         url = unquote(url)
+        print(f"Thumbnail request for: {url}")
         
-        # Simple headers
+        # Enhanced headers to avoid blocking
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
         }
         
-        # Just fetch and return the image
-        response = requests.get(url, headers=headers, timeout=5)
+        # Fetch the image with longer timeout
+        response = requests.get(url, headers=headers, timeout=10, stream=True)
         
         if response.status_code == 200:
+            # Get content type from response
+            content_type = response.headers.get('content-type', 'image/jpeg')
+            
             return Response(
                 response.content,
-                mimetype='image/jpeg',
-                headers={'Cache-Control': 'public, max-age=3600'}
+                mimetype=content_type,
+                headers={
+                    'Cache-Control': 'public, max-age=3600',
+                    'Access-Control-Allow-Origin': '*'
+                }
             )
         else:
-            # Return 1x1 transparent pixel as fallback
+            print(f"Thumbnail fetch failed: {response.status_code}")
+            # Return placeholder image
             return Response(
                 b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xdb\x00\x00\x00\x00IEND\xaeB`\x82',
                 mimetype='image/png'
@@ -641,7 +659,7 @@ def thumbnail_proxy(url):
             
     except Exception as e:
         print(f"Thumbnail error: {e}")
-        # Return 1x1 transparent pixel
+        # Return placeholder image
         return Response(
             b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xdb\x00\x00\x00\x00IEND\xaeB`\x82',
             mimetype='image/png'
@@ -763,6 +781,59 @@ def quick_fix_urls():
     except Exception as e:
         return f"<h2>❌ Error</h2><p>{str(e)}</p>"
 
+@app.route('/admin/set_thumbnail/<level_id>', methods=['GET', 'POST'])
+def set_thumbnail(level_id):
+    """Admin route to set custom thumbnail for a level"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        from bson.objectid import ObjectId
+        level = mongo_db.levels.find_one({"_id": ObjectId(level_id)})
+        if not level:
+            flash('Level not found', 'danger')
+            return redirect(url_for('admin'))
+        
+        if request.method == 'POST':
+            thumbnail_url = request.form.get('thumbnail_url', '').strip()
+            
+            # Update the level with new thumbnail URL
+            mongo_db.levels.update_one(
+                {"_id": ObjectId(level_id)},
+                {"$set": {"thumbnail_url": thumbnail_url}}
+            )
+            
+            # Clear cache
+            levels_cache['main_list'] = None
+            levels_cache['legacy_list'] = None
+            
+            flash(f'Thumbnail updated for {level["name"]}', 'success')
+            return redirect(url_for('admin'))
+        
+        # GET request - show form
+        return f"""
+        <h2>Set Thumbnail for: {level['name']}</h2>
+        <form method="POST">
+            <div class="mb-3">
+                <label>Current Video URL:</label>
+                <input type="text" class="form-control" value="{level.get('video_url', '')}" readonly>
+            </div>
+            <div class="mb-3">
+                <label>Custom Thumbnail URL (leave empty to use YouTube thumbnail):</label>
+                <input type="url" name="thumbnail_url" class="form-control" 
+                       value="{level.get('thumbnail_url', '')}" 
+                       placeholder="https://example.com/image.jpg">
+            </div>
+            <button type="submit" class="btn btn-primary">Update Thumbnail</button>
+            <a href="/admin" class="btn btn-secondary">Cancel</a>
+        </form>
+        """
+        
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'danger')
+        return redirect(url_for('admin'))
+
 @app.route('/complete_fix')
 def complete_fix():
     """Complete system fix - images and decimals"""
@@ -778,6 +849,7 @@ def complete_fix():
             'old memories': 'https://youtu.be/vVDeEQuQ_pM', 
             'ochiru 2': 'https://www.youtube.com/watch?v=sImN3-3e5u0',
             'the ringer': 'https://www.youtube.com/watch?v=3CwTD5RtFDk',
+            'los pollos tv 3': 'https://streamable.com/wzux7b',
         }
         
         for level_name, youtube_url in youtube_urls.items():
@@ -786,7 +858,7 @@ def complete_fix():
                 {"$set": {"video_url": youtube_url}}
             )
             if result.modified_count > 0:
-                fixes.append(f"✅ Added YouTube URL to '{level_name}'")
+                fixes.append(f"✅ Added video URL to '{level_name}'")
         
         # 2. Fix decimal points for all levels
         levels = list(mongo_db.levels.find({"is_legacy": False}, {"_id": 1, "position": 1, "points": 1}))
@@ -796,52 +868,133 @@ def complete_fix():
             correct_points = calculate_level_points(level['position'], False)
             current_points = level.get('points', 0)
             
-            if abs(float(current_points or 0) - correct_points) > 0.01:
+            if abs(float(current_points) - float(correct_points)) > 0.01:
                 mongo_db.levels.update_one(
                     {"_id": level["_id"]},
                     {"$set": {"points": correct_points}}
                 )
                 points_fixed += 1
         
-        if points_fixed > 0:
-            fixes.append(f"✅ Fixed decimal points for {points_fixed} levels")
+        fixes.append(f"✅ Fixed points for {points_fixed} levels")
         
-        # 3. Clear cache
+        # 3. Update all user points
+        users_updated = 0
+        for user in mongo_db.users.find({"points": {"$exists": True}}):
+            update_user_points(user["_id"])
+            users_updated += 1
+        
+        fixes.append(f"✅ Updated points for {users_updated} users")
+        
+        # Clear cache
         levels_cache['main_list'] = None
         levels_cache['legacy_list'] = None
-        fixes.append("✅ Cleared cache for immediate effect")
         
-        return f"""
-        <h1>🎉 COMPLETE SYSTEM FIX APPLIED!</h1>
-        <div style="background: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h2>✅ Fixes Applied:</h2>
-            <ul>{''.join([f'<li>{fix}</li>' for fix in fixes])}</ul>
+        html = f"""
+        <h1>🔧 Complete Fix Results</h1>
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-family: monospace;">
+            {'<br>'.join(fixes)}
         </div>
-        
-        <div style="background: #cce5ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h2>🎨 Image System Now Works:</h2>
-            <ul>
-                <li>✅ YouTube thumbnails auto-extracted from video URLs</li>
-                <li>✅ Custom thumbnails can be uploaded via admin panel</li>
-                <li>✅ Non-YouTube videos show platform name</li>
-                <li>✅ Missing videos show "📷 No Preview"</li>
-            </ul>
-        </div>
-        
-        <div style="background: #fff2cc; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h2>💯 Decimal Points Fixed:</h2>
-            <ul>
-                <li>✅ All points now display as XX.XX format</li>
-                <li>✅ Admin forms accept decimal inputs</li>
-                <li>✅ Points calculation uses proper decimals</li>
-            </ul>
-        </div>
-        
-        <p>
-            <a href="/" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🏠 Check Main List</a>
-            <a href="/admin/levels" style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">⚙️ Admin Panel</a>
+        <p style="margin-top: 20px;">
+            <a href="/">🏠 Main List</a> |
+            <a href="/stats/players">🏆 Leaderboard</a>
         </p>
         """
+        
+        return html
+        
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
+
+@app.route('/test_thumbnails')
+def test_thumbnails():
+    """Test route to verify thumbnail system is working"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return "Access denied - Admin only"
+    
+    try:
+        # Get first 10 levels
+        levels = list(mongo_db.levels.find(
+            {"is_legacy": False}, 
+            {"name": 1, "video_url": 1, "thumbnail_url": 1, "position": 1}
+        ).sort("position", 1).limit(10))
+        
+        html = """
+        <h1>🧪 Thumbnail System Test</h1>
+        <style>
+            .test-card { 
+                border: 1px solid #ddd; 
+                margin: 10px; 
+                padding: 15px; 
+                display: inline-block; 
+                width: 250px;
+                vertical-align: top;
+            }
+            .test-img { 
+                width: 206px; 
+                height: 116px; 
+                object-fit: cover; 
+                border: 2px solid #007bff;
+                border-radius: 8px;
+            }
+            .placeholder {
+                width: 206px; 
+                height: 116px; 
+                background: #6c757d; 
+                color: white; 
+                display: flex; 
+                align-items: center; 
+                justify-content: center;
+                border-radius: 8px;
+            }
+        </style>
+        """
+        
+        for level in levels:
+            name = level.get('name', 'Unknown')
+            video_url = level.get('video_url', '')
+            thumbnail_url = level.get('thumbnail_url', '')
+            position = level.get('position', '?')
+            
+            # Determine what image to show
+            img_html = ''
+            status = ''
+            
+            if thumbnail_url and thumbnail_url.strip():
+                img_html = f'<img src="{thumbnail_url}" class="test-img" alt="{name}">'
+                status = '🟢 Custom Image'
+            else:
+                # Try YouTube
+                youtube_id = ''
+                if video_url and 'youtu.be/' in video_url:
+                    youtube_id = video_url.split('youtu.be/')[1].split('?')[0].split('&')[0]
+                elif video_url and 'youtube.com/watch?v=' in video_url:
+                    youtube_id = video_url.split('v=')[1].split('&')[0]
+                
+                if youtube_id:
+                    img_html = f'<img src="https://img.youtube.com/vi/{youtube_id}/mqdefault.jpg" class="test-img" alt="{name}">'
+                    status = f'🔵 YouTube: {youtube_id}'
+                else:
+                    img_html = '<div class="placeholder">No Image</div>'
+                    status = '⚪ No Image'
+            
+            html += f"""
+            <div class="test-card">
+                <h4>#{position} {name}</h4>
+                {img_html}
+                <p><strong>Status:</strong> {status}</p>
+                <p><strong>Video URL:</strong> {video_url[:50]}{'...' if len(video_url) > 50 else ''}</p>
+                <a href="/admin/set_thumbnail/{level['_id']}" class="btn btn-sm btn-primary">Set Custom Image</a>
+            </div>
+            """
+        
+        html += """
+        <div style="clear: both; margin-top: 20px;">
+            <a href="/" class="btn btn-success">Test Main List</a>
+            <a href="/admin" class="btn btn-secondary">Admin Panel</a>
+        </div>
+        """
+        
+        return html
         
     except Exception as e:
         return f"❌ Error: {str(e)}"
@@ -1978,52 +2131,7 @@ def fix_image_system():
     except Exception as e:
         return f"❌ Error fixing thumbnails: {e}"
 
-@app.route('/test_thumbnails')
-def test_thumbnails():
-    """Test thumbnail system with sample URLs"""
-    try:
-        import requests
-        
-        test_urls = [
-            "https://img.youtube.com/vi/dQw4w9WgXcQ/mqdefault.jpg",  # Rick Roll
-            "https://img.youtube.com/vi/9bZkp7q19f0/mqdefault.jpg",  # Gangnam Style
-            "https://example.com/nonexistent.jpg",  # Should fail gracefully
-        ]
-        
-        results = []
-        
-        for url in test_urls:
-            try:
-                # Test our thumbnail proxy
-                proxy_url = f"/thumb/{url}"
-                results.append(f"✅ Proxy URL: <a href='{proxy_url}' target='_blank'>{proxy_url}</a>")
-                
-                # Test direct access
-                response = requests.head(url, timeout=5)
-                if response.status_code == 200:
-                    results.append(f"✅ Direct access OK: {url}")
-                else:
-                    results.append(f"⚠️ Direct access failed ({response.status_code}): {url}")
-                    
-            except Exception as e:
-                results.append(f"❌ Error testing {url}: {e}")
-        
-        return f"""
-        <h2>🧪 Thumbnail System Test</h2>
-        <div style="font-family: monospace; background: #f8f9fa; padding: 20px; border-radius: 8px;">
-            {'<br>'.join(results)}
-        </div>
-        <br>
-        <h3>Sample Thumbnails:</h3>
-        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            {' '.join([f'<img src="/thumb/{url}" style="max-width: 200px; border: 1px solid #ddd;" onerror="this.style.display=\'none\'">' for url in test_urls])}
-        </div>
-        <br>
-        <p><a href="/" style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🏠 Back to Main</a></p>
-        """
-        
-    except Exception as e:
-        return f"❌ Error testing thumbnails: {e}"
+
 
 @app.route('/debug_records')
 def debug_records():

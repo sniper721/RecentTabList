@@ -50,7 +50,7 @@
                                                 {{ player.nickname or player.username }}
                                             </a>
                                         </td>
-                                        <td><strong>{{ player.points }}</strong></td>
+                                        <td><strong>{{ format_points(player.points) }}</strong></td>
                                         <td>
                                             <small class="text-muted">
                                                 {{ player.date_joined.strftime('%b %Y') if player.date_joined else 'Unknown' }}
@@ -99,7 +99,7 @@
                                             <span class="badge bg-primary">{{ player.record_count }}</span>
                                         </td>
                                         <td>
-                                            <strong>{{ player.user.points or 0 }}</strong>
+                                            <strong>{{ format_points(player.user.points or 0) }}</strong>
                                         </td>
                                     </tr>
                                     {% endfor %}
