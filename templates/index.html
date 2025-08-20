@@ -55,8 +55,8 @@
                                     {% endif %}
                                     
                                     {% if youtube_id %}
-                                        <!-- YouTube thumbnail -->
-                                        <img src="https://img.youtube.com/vi/{{ youtube_id }}/mqdefault.jpg" 
+                                        <!-- Simple YouTube thumbnail - most reliable format -->
+                                        <img src="https://img.youtube.com/vi/{{ youtube_id }}/default.jpg" 
                                              alt="{{ level_name }}" 
                                              class="img-fluid rounded"
                                              style="width: 206px; height: 116px; object-fit: cover;"

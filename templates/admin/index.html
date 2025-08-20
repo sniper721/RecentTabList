@@ -25,13 +25,13 @@
                                 <i class="fas fa-list"></i> Manage Levels
                             </a>
                             <a href="{{ url_for('admin_future_levels') }}" class="btn btn-success">
-                                🚀 Future Levels
+                                Future Levels
                             </a>
                             <a href="{{ url_for('admin_announcements') }}" class="btn btn-warning">
-                                📢 Announcements
+                                Announcements
                             </a>
                             <a href="{{ url_for('admin_level_stats') }}" class="btn btn-success">
-                                📊 Statistics
+                                Statistics
                             </a>
                             <a href="{{ url_for('admin_users') }}" class="btn btn-secondary">
                                 <i class="fas fa-users"></i> Manage Users
@@ -40,6 +40,196 @@
                                 <i class="fas fa-cog"></i> Settings
                             </a>
                         </div>
+                        
+                        <!-- Admin Power Tools -->
+                        <div class="card mb-3 border-danger">
+                            <div class="card-header bg-danger text-white">
+                                <h5 class="mb-0">Admin Power Tools</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <form method="POST" action="{{ url_for('admin_reset_own_points') }}" onsubmit="return confirm('Are you sure you want to reset your own points and delete all your records? This cannot be undone!')">
+                                            <button type="submit" class="btn btn-warning w-100">
+                                                <i class="fas fa-redo"></i> Reset My Points & Records
+                                            </button>
+                                        </form>
+                                        <small class="text-muted">Reset your own points to 0 and delete all your records</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <button type="button" class="btn btn-danger w-100" onclick="showIpBanForm()">
+                                            <i class="fas fa-ban"></i> IP Ban User
+                                        </button>
+                                        <small class="text-muted">Permanently ban a user and their IP address</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <button type="button" class="btn btn-dark w-100" onclick="showResetPointsForm()">
+                                            <i class="fas fa-trash"></i> Reset User Points
+                                        </button>
+                                        <small class="text-muted">Reset any user's points and delete their records</small>
+                                    </div>
+                                </div>
+                                
+                                <!-- IP Ban Form (Hidden by default) -->
+                                <div id="ipBanForm" style="display: none;" class="mt-4 p-3 border border-danger rounded bg-light">
+                                    <h6 class="text-danger">IP Ban User</h6>
+                                    <div class="alert alert-danger">
+                                        <strong>WARNING:</strong> This will permanently ban the user's IP address and delete all their data!
+                                    </div>
+                                    <form id="ipBanFormReal" method="POST">
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <label class="form-label">Username to Ban:</label>
+                                                <input type="text" class="form-control" id="banUsername" name="username" placeholder="Enter username" required>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">Ban Reason:</label>
+                                                <select class="form-select" id="banReason" name="reason" required>
+                                                    <option value="Hacking/Cheating">Hacking/Cheating</option>
+                                                    <option value="Speedhacking">Speedhacking</option>
+                                                    <option value="Noclip Usage">Noclip Usage</option>
+                                                    <option value="Macro/Bot Usage">Macro/Bot Usage</option>
+                                                    <option value="Fake Records">Fake Records</option>
+                                                    <option value="Multiple Accounts">Multiple Accounts</option>
+                                                    <option value="Severe Rule Violation">Severe Rule Violation</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label">&nbsp;</label>
+                                                <div>
+                                                    <button type="button" class="btn btn-danger" onclick="executeIpBan()">Execute IP Ban</button>
+                                                    <button type="button" class="btn btn-secondary" onclick="hideIpBanForm()">Cancel</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                                
+                                <!-- Reset Points Form (Hidden by default) -->
+                                <div id="resetPointsForm" style="display: none;" class="mt-4 p-3 border border-dark rounded bg-light">
+                                    <h6 class="text-dark">Reset User Points</h6>
+                                    <div class="alert alert-warning">
+                                        <strong>WARNING:</strong> This will reset the user's points to 0 and delete all their records!
+                                    </div>
+                                    <form id="resetPointsFormReal" method="POST">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Username to Reset:</label>
+                                                <input type="text" class="form-control" id="resetUsername" name="username" placeholder="Enter username" required>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">&nbsp;</label>
+                                                <div>
+                                                    <button type="button" class="btn btn-dark" onclick="executeResetPoints()">Reset Points</button>
+                                                    <button type="button" class="btn btn-secondary" onclick="hideResetPointsForm()">Cancel</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <script>
+                        function showIpBanForm() {
+                            document.getElementById('ipBanForm').style.display = 'block';
+                            document.getElementById('resetPointsForm').style.display = 'none';
+                            document.getElementById('banUsername').focus();
+                        }
+                        
+                        function hideIpBanForm() {
+                            document.getElementById('ipBanForm').style.display = 'none';
+                        }
+                        
+                        function showResetPointsForm() {
+                            document.getElementById('resetPointsForm').style.display = 'block';
+                            document.getElementById('ipBanForm').style.display = 'none';
+                            document.getElementById('resetUsername').focus();
+                        }
+                        
+                        function hideResetPointsForm() {
+                            document.getElementById('resetPointsForm').style.display = 'none';
+                        }
+                        
+                        function executeIpBan() {
+                            const username = document.getElementById('banUsername').value.trim();
+                            const reason = document.getElementById('banReason').value;
+                            
+                            if (!username) {
+                                alert('Please enter a username');
+                                return;
+                            }
+                            
+                            if (confirm(`Are you sure you want to IP BAN "${username}"? This action is PERMANENT and IRREVERSIBLE!\n\nThis will:\n- Permanently ban their IP address\n- Delete ALL their records\n- Reset their points to 0\n- Prevent them from creating new accounts`)) {
+                                // Find user and execute ban
+                                fetch('/admin/find_user', {
+                                    method: 'POST',
+                                    headers: {'Content-Type': 'application/json'},
+                                    body: JSON.stringify({username: username})
+                                })
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.user_id) {
+                                        // Create form and submit
+                                        const form = document.createElement('form');
+                                        form.method = 'POST';
+                                        form.action = `/admin/ip_ban/${data.user_id}`;
+                                        
+                                        const reasonInput = document.createElement('input');
+                                        reasonInput.type = 'hidden';
+                                        reasonInput.name = 'reason';
+                                        reasonInput.value = reason;
+                                        form.appendChild(reasonInput);
+                                        
+                                        document.body.appendChild(form);
+                                        form.submit();
+                                    } else {
+                                        alert(`User "${username}" not found. Please check the spelling.`);
+                                    }
+                                })
+                                .catch(error => {
+                                    alert('Error finding user. Please try again.');
+                                    console.error(error);
+                                });
+                            }
+                        }
+                        
+                        function executeResetPoints() {
+                            const username = document.getElementById('resetUsername').value.trim();
+                            
+                            if (!username) {
+                                alert('Please enter a username');
+                                return;
+                            }
+                            
+                            if (confirm(`Are you sure you want to reset "${username}"'s points and delete all their records?\n\nThis will:\n- Reset their points to 0\n- Delete ALL their records\n- This action cannot be undone`)) {
+                                // Find user and execute reset
+                                fetch('/admin/find_user', {
+                                    method: 'POST',
+                                    headers: {'Content-Type': 'application/json'},
+                                    body: JSON.stringify({username: username})
+                                })
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.user_id) {
+                                        // Create form and submit
+                                        const form = document.createElement('form');
+                                        form.method = 'POST';
+                                        form.action = `/admin/reset_points/${data.user_id}`;
+                                        
+                                        document.body.appendChild(form);
+                                        form.submit();
+                                    } else {
+                                        alert(`User "${username}" not found. Please check the spelling.`);
+                                    }
+                                })
+                                .catch(error => {
+                                    alert('Error finding user. Please try again.');
+                                    console.error(error);
+                                });
+                            }
+                        }
+                        </script>
                         
 
 

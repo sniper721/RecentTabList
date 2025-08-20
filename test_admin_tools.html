@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Admin Tools</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>Test Admin Tools</h1>
+        
+        <!-- IP Ban Test -->
+        <div class="card mb-4 border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5>IP Ban User Test</h5>
+            </div>
+            <div class="card-body">
+                <button class="btn btn-danger" onclick="showIpBanForm()">Show IP Ban Form</button>
+                
+                <div id="ipBanForm" style="display: none;" class="mt-3 p-3 border rounded bg-light">
+                    <h6>IP Ban User</h6>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label>Username:</label>
+                            <input type="text" class="form-control" id="banUsername" placeholder="Enter username">
+                        </div>
+                        <div class="col-md-4">
+                            <label>Reason:</label>
+                            <select class="form-select" id="banReason">
+                                <option value="Hacking/Cheating">Hacking/Cheating</option>
+                                <option value="Speedhacking">Speedhacking</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label>&nbsp;</label>
+                            <div>
+                                <button class="btn btn-danger" onclick="testIpBan()">Test IP Ban</button>
+                                <button class="btn btn-secondary" onclick="hideIpBanForm()">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Reset Points Test -->
+        <div class="card mb-4 border-dark">
+            <div class="card-header bg-dark text-white">
+                <h5>Reset Points Test</h5>
+            </div>
+            <div class="card-body">
+                <button class="btn btn-dark" onclick="showResetForm()">Show Reset Form</button>
+                
+                <div id="resetForm" style="display: none;" class="mt-3 p-3 border rounded bg-light">
+                    <h6>Reset User Points</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label>Username:</label>
+                            <input type="text" class="form-control" id="resetUsername" placeholder="Enter username">
+                        </div>
+                        <div class="col-md-6">
+                            <label>&nbsp;</label>
+                            <div>
+                                <button class="btn btn-dark" onclick="testReset()">Test Reset</button>
+                                <button class="btn btn-secondary" onclick="hideResetForm()">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showIpBanForm() {
+            document.getElementById('ipBanForm').style.display = 'block';
+            document.getElementById('resetForm').style.display = 'none';
+            document.getElementById('banUsername').focus();
+        }
+        
+        function hideIpBanForm() {
+            document.getElementById('ipBanForm').style.display = 'none';
+        }
+        
+        function showResetForm() {
+            document.getElementById('resetForm').style.display = 'block';
+            document.getElementById('ipBanForm').style.display = 'none';
+            document.getElementById('resetUsername').focus();
+        }
+        
+        function hideResetForm() {
+            document.getElementById('resetForm').style.display = 'none';
+        }
+        
+        function testIpBan() {
+            const username = document.getElementById('banUsername').value;
+            const reason = document.getElementById('banReason').value;
+            
+            if (!username) {
+                alert('Please enter a username');
+                return;
+            }
+            
+            alert(`Would IP ban: ${username} for ${reason}`);
+        }
+        
+        function testReset() {
+            const username = document.getElementById('resetUsername').value;
+            
+            if (!username) {
+                alert('Please enter a username');
+                return;
+            }
+            
+            alert(`Would reset points for: ${username}`);
+        }
+    </script>
+</body>
+</html>
