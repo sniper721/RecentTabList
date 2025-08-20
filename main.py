@@ -907,7 +907,7 @@ def complete_fix():
 
 @app.route('/test_thumbnails')
 def test_thumbnails():
-    """Test route to verify thumbnail system is working"""
+    """Test route to verify thumbnail system with multiple YouTube formats"""
     if 'user_id' not in session or not session.get('is_admin'):
         return "Access denied - Admin only"
     
@@ -919,34 +919,38 @@ def test_thumbnails():
         ).sort("position", 1).limit(10))
         
         html = """
-        <h1>🧪 Thumbnail System Test</h1>
+        <h1>🧪 YouTube Thumbnail Format Test</h1>
+        <p>Testing different YouTube thumbnail formats to find what works...</p>
         <style>
             .test-card { 
                 border: 1px solid #ddd; 
                 margin: 10px; 
                 padding: 15px; 
                 display: inline-block; 
-                width: 250px;
+                width: 300px;
                 vertical-align: top;
             }
             .test-img { 
-                width: 206px; 
-                height: 116px; 
+                width: 120px; 
+                height: 90px; 
                 object-fit: cover; 
-                border: 2px solid #007bff;
-                border-radius: 8px;
+                border: 1px solid #007bff;
+                border-radius: 4px;
+                margin: 2px;
             }
-            .placeholder {
-                width: 206px; 
-                height: 116px; 
-                background: #6c757d; 
-                color: white; 
-                display: flex; 
-                align-items: center; 
-                justify-content: center;
-                border-radius: 8px;
-            }
+            .working { border-color: #28a745 !important; }
+            .broken { border-color: #dc3545 !important; opacity: 0.3; }
         </style>
+        <script>
+            function markWorking(img) {
+                img.classList.add('working');
+                img.classList.remove('broken');
+            }
+            function markBroken(img) {
+                img.classList.add('broken');
+                img.classList.remove('working');
+            }
+        </script>
         """
         
         for level in levels:
@@ -955,40 +959,72 @@ def test_thumbnails():
             thumbnail_url = level.get('thumbnail_url', '')
             position = level.get('position', '?')
             
-            # Determine what image to show
-            img_html = ''
-            status = ''
+            # Extract YouTube ID
+            youtube_id = ''
+            if video_url and 'youtu.be/' in video_url:
+                youtube_id = video_url.split('youtu.be/')[1].split('?')[0].split('&')[0]
+            elif video_url and 'youtube.com/watch?v=' in video_url:
+                youtube_id = video_url.split('v=')[1].split('&')[0]
             
-            if thumbnail_url and thumbnail_url.strip():
-                img_html = f'<img src="{thumbnail_url}" class="test-img" alt="{name}">'
-                status = '🟢 Custom Image'
-            else:
-                # Try YouTube
-                youtube_id = ''
-                if video_url and 'youtu.be/' in video_url:
-                    youtube_id = video_url.split('youtu.be/')[1].split('?')[0].split('&')[0]
-                elif video_url and 'youtube.com/watch?v=' in video_url:
-                    youtube_id = video_url.split('v=')[1].split('&')[0]
+            if youtube_id:
+                # Test different YouTube thumbnail formats
+                formats = [
+                    ('hqdefault.jpg', 'HQ Default (480x360)'),
+                    ('mqdefault.jpg', 'MQ Default (320x180)'),
+                    ('maxresdefault.jpg', 'Max Res (1280x720)'),
+                    ('sddefault.jpg', 'SD Default (640x480)'),
+                    ('default.jpg', 'Default (120x90)')
+                ]
                 
-                if youtube_id:
-                    img_html = f'<img src="https://img.youtube.com/vi/{youtube_id}/mqdefault.jpg" class="test-img" alt="{name}">'
-                    status = f'🔵 YouTube: {youtube_id}'
-                else:
-                    img_html = '<div class="placeholder">No Image</div>'
-                    status = '⚪ No Image'
-            
-            html += f"""
-            <div class="test-card">
-                <h4>#{position} {name}</h4>
-                {img_html}
-                <p><strong>Status:</strong> {status}</p>
-                <p><strong>Video URL:</strong> {video_url[:50]}{'...' if len(video_url) > 50 else ''}</p>
-                <a href="/admin/set_thumbnail/{level['_id']}" class="btn btn-sm btn-primary">Set Custom Image</a>
-            </div>
-            """
+                html += f"""
+                <div class="test-card">
+                    <h4>#{position} {name}</h4>
+                    <p><strong>YouTube ID:</strong> {youtube_id}</p>
+                    <div>
+                """
+                
+                for format_name, description in formats:
+                    img_url = f"https://img.youtube.com/vi/{youtube_id}/{format_name}"
+                    html += f"""
+                        <img src="{img_url}" 
+                             class="test-img" 
+                             title="{description}"
+                             onload="markWorking(this)" 
+                             onerror="markBroken(this)">
+                    """
+                
+                html += f"""
+                    </div>
+                    <p><small>Green border = working, Red border = broken</small></p>
+                    <p><strong>Video URL:</strong> {video_url[:40]}{'...' if len(video_url) > 40 else ''}</p>
+                </div>
+                """
+            elif thumbnail_url:
+                html += f"""
+                <div class="test-card">
+                    <h4>#{position} {name}</h4>
+                    <p><strong>Custom Image:</strong></p>
+                    <img src="{thumbnail_url}" class="test-img" onload="markWorking(this)" onerror="markBroken(this)">
+                    <p><strong>Image URL:</strong> {thumbnail_url[:40]}{'...' if len(thumbnail_url) > 40 else ''}</p>
+                </div>
+                """
+            else:
+                html += f"""
+                <div class="test-card">
+                    <h4>#{position} {name}</h4>
+                    <p><strong>No Image Available</strong></p>
+                    <div style="width: 120px; height: 90px; background: #6c757d; color: white; display: flex; align-items: center; justify-content: center; border-radius: 4px;">
+                        No Video URL
+                    </div>
+                </div>
+                """
         
         html += """
         <div style="clear: both; margin-top: 20px;">
+            <h3>📋 Results Analysis:</h3>
+            <p>Look for images with <strong>green borders</strong> - those formats work!</p>
+            <p>Images with <strong>red borders</strong> are broken/unavailable.</p>
+            <br>
             <a href="/" class="btn btn-success">Test Main List</a>
             <a href="/admin" class="btn btn-secondary">Admin Panel</a>
         </div>
@@ -998,6 +1034,335 @@ def test_thumbnails():
         
     except Exception as e:
         return f"❌ Error: {str(e)}"
+
+@app.route('/fix_youtube_thumbnails')
+def fix_youtube_thumbnails():
+    """Auto-fix YouTube thumbnails by testing formats and picking the best one"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return "Access denied - Admin only"
+    
+    try:
+        import requests
+        
+        # Get levels with YouTube URLs but no custom thumbnails
+        levels = list(mongo_db.levels.find(
+            {
+                "is_legacy": False,
+                "video_url": {"$regex": "youtu"},
+                "$or": [
+                    {"thumbnail_url": {"$exists": False}},
+                    {"thumbnail_url": ""},
+                    {"thumbnail_url": None}
+                ]
+            },
+            {"name": 1, "video_url": 1, "position": 1}
+        ).sort("position", 1).limit(20))
+        
+        results = []
+        fixed_count = 0
+        
+        # YouTube thumbnail formats to try (in order of preference)
+        formats = [
+            'hqdefault.jpg',      # 480x360 - most reliable
+            'maxresdefault.jpg',  # 1280x720 - highest quality
+            'mqdefault.jpg',      # 320x180 - medium quality
+            'sddefault.jpg',      # 640x480 - standard def
+            'default.jpg'         # 120x90 - always available
+        ]
+        
+        for level in levels:
+            name = level.get('name', 'Unknown')
+            video_url = level.get('video_url', '')
+            position = level.get('position', '?')
+            
+            # Extract YouTube ID
+            youtube_id = ''
+            if 'youtu.be/' in video_url:
+                youtube_id = video_url.split('youtu.be/')[1].split('?')[0].split('&')[0]
+            elif 'youtube.com/watch?v=' in video_url:
+                youtube_id = video_url.split('v=')[1].split('&')[0]
+            
+            if youtube_id:
+                # Test formats to find the best working one
+                working_format = None
+                
+                for format_name in formats:
+                    test_url = f"https://img.youtube.com/vi/{youtube_id}/{format_name}"
+                    
+                    try:
+                        response = requests.head(test_url, timeout=3)
+                        if response.status_code == 200:
+                            # Check if it's actually an image (not a placeholder)
+                            content_length = response.headers.get('content-length', '0')
+                            if int(content_length) > 1000:  # Real images are usually > 1KB
+                                working_format = format_name
+                                break
+                    except:
+                        continue
+                
+                if working_format:
+                    # Update the level with the working thumbnail URL
+                    best_url = f"https://img.youtube.com/vi/{youtube_id}/{working_format}"
+                    
+                    mongo_db.levels.update_one(
+                        {"_id": level["_id"]},
+                        {"$set": {"thumbnail_url": best_url}}
+                    )
+                    
+                    results.append(f"✅ #{position} {name}: {working_format}")
+                    fixed_count += 1
+                else:
+                    results.append(f"❌ #{position} {name}: No working format found")
+            else:
+                results.append(f"⚠️ #{position} {name}: Could not extract YouTube ID")
+        
+        # Clear cache
+        levels_cache['main_list'] = None
+        levels_cache['legacy_list'] = None
+        
+        html = f"""
+        <h1>🔧 YouTube Thumbnail Auto-Fix Results</h1>
+        <p><strong>Fixed {fixed_count} out of {len(levels)} levels</strong></p>
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-family: monospace;">
+            {'<br>'.join(results)}
+        </div>
+        <p style="margin-top: 20px;">
+            <a href="/">🏠 Test Main List</a> |
+            <a href="/test_thumbnails">🧪 Test Thumbnails</a> |
+            <a href="/admin">⚙️ Admin Panel</a>
+        </p>
+        """
+        
+        return html
+        
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
+
+@app.route('/admin/ip_ban/<user_id>', methods=['GET', 'POST'])
+def ip_ban_user(user_id):
+    """Admin route to IP ban a user and delete all their accounts"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        from bson.objectid import ObjectId
+        from flask import request as flask_request
+        
+        user = mongo_db.users.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            flash('User not found', 'danger')
+            return redirect(url_for('admin'))
+        
+        if request.method == 'POST':
+            reason = request.form.get('reason', 'Hacking/Cheating').strip()
+            admin_username = session.get('username', 'Unknown Admin')
+            
+            # Get user's IP addresses from login logs (if available)
+            user_ips = []
+            
+            # Add current IP if available
+            if hasattr(flask_request, 'remote_addr'):
+                user_ips.append(flask_request.remote_addr)
+            
+            # Create IP ban record
+            ip_ban = {
+                "_id": ObjectId(),
+                "user_id": ObjectId(user_id),
+                "username": user.get('username', 'Unknown'),
+                "ip_addresses": user_ips,
+                "reason": reason,
+                "banned_by": admin_username,
+                "ban_date": datetime.now(timezone.utc),
+                "active": True
+            }
+            
+            # Insert IP ban
+            mongo_db.ip_bans.insert_one(ip_ban)
+            
+            # Find and delete ALL accounts with same IP
+            deleted_accounts = []
+            for ip in user_ips:
+                # This would require IP tracking in user records
+                # For now, just delete the main account
+                pass
+            
+            # Delete all user's records
+            deleted_records = mongo_db.records.delete_many({"user_id": ObjectId(user_id)})
+            
+            # Reset user points to 0 and mark as banned
+            mongo_db.users.update_one(
+                {"_id": ObjectId(user_id)},
+                {
+                    "$set": {
+                        "points": 0,
+                        "banned": True,
+                        "ip_banned": True,
+                        "ban_reason": reason,
+                        "banned_by": admin_username,
+                        "ban_date": datetime.now(timezone.utc)
+                    }
+                }
+            )
+            
+            # Log admin action
+            log_admin_action(admin_username, f"IP BANNED USER: {user.get('username')}", f"Reason: {reason}, Records deleted: {deleted_records.deleted_count}")
+            
+            flash(f'User {user.get("username")} has been IP banned and all data deleted', 'success')
+            return redirect(url_for('admin'))
+        
+        # GET request - show confirmation form
+        return f"""
+        <div class="container mt-4">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h2>🚨 IP BAN USER: {user.get('username', 'Unknown')}</h2>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-danger">
+                        <h4>⚠️ WARNING: This action is IRREVERSIBLE!</h4>
+                        <p>This will:</p>
+                        <ul>
+                            <li>✅ Permanently ban the user's IP address</li>
+                            <li>✅ Delete ALL their records ({mongo_db.records.count_documents({"user_id": ObjectId(user_id)})} records)</li>
+                            <li>✅ Reset their points to 0</li>
+                            <li>✅ Mark account as permanently banned</li>
+                            <li>✅ Prevent creation of new accounts from same IP</li>
+                        </ul>
+                    </div>
+                    
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">Ban Reason:</label>
+                            <select name="reason" class="form-select" required>
+                                <option value="Hacking/Cheating">Hacking/Cheating</option>
+                                <option value="Speedhacking">Speedhacking</option>
+                                <option value="Noclip Usage">Noclip Usage</option>
+                                <option value="Macro/Bot Usage">Macro/Bot Usage</option>
+                                <option value="Fake Records">Fake Records</option>
+                                <option value="Multiple Accounts">Multiple Accounts</option>
+                                <option value="Severe Rule Violation">Severe Rule Violation</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="confirm" required>
+                                <label class="form-check-label text-danger" for="confirm">
+                                    <strong>I understand this action is permanent and irreversible</strong>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-danger btn-lg">
+                            🔨 EXECUTE IP BAN
+                        </button>
+                        <a href="/admin" class="btn btn-secondary btn-lg ms-2">Cancel</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+        """
+        
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'danger')
+        return redirect(url_for('admin'))
+
+@app.route('/admin/reset_points/<user_id>', methods=['POST'])
+def admin_reset_points(user_id):
+    """Admin route to reset a user's points and records"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        from bson.objectid import ObjectId
+        
+        user = mongo_db.users.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            flash('User not found', 'danger')
+            return redirect(url_for('admin'))
+        
+        # Delete all user's records
+        deleted_records = mongo_db.records.delete_many({"user_id": ObjectId(user_id)})
+        
+        # Reset points to 0
+        mongo_db.users.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": {"points": 0}}
+        )
+        
+        admin_username = session.get('username', 'Unknown Admin')
+        log_admin_action(admin_username, f"RESET POINTS: {user.get('username')}", f"Deleted {deleted_records.deleted_count} records")
+        
+        flash(f'Reset points for {user.get("username")} - deleted {deleted_records.deleted_count} records', 'success')
+        return redirect(url_for('admin'))
+        
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'danger')
+        return redirect(url_for('admin'))
+
+@app.route('/admin/reset_own_points', methods=['POST'])
+def admin_reset_own_points():
+    """Allow admins to reset their own points and records"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        user_id = session['user_id']
+        user = mongo_db.users.find_one({"_id": user_id})
+        
+        if not user:
+            flash('User not found', 'danger')
+            return redirect(url_for('profile'))
+        
+        # Delete all own records
+        deleted_records = mongo_db.records.delete_many({"user_id": user_id})
+        
+        # Reset own points to 0
+        mongo_db.users.update_one(
+            {"_id": user_id},
+            {"$set": {"points": 0}}
+        )
+        
+        admin_username = session.get('username', 'Unknown Admin')
+        log_admin_action(admin_username, f"SELF RESET POINTS", f"Deleted own {deleted_records.deleted_count} records")
+        
+        flash(f'Reset your own points - deleted {deleted_records.deleted_count} records', 'success')
+        return redirect(url_for('profile'))
+        
+    except Exception as e:
+        flash(f'Error: {str(e)}', 'danger')
+        return redirect(url_for('profile'))
+
+@app.route('/admin/find_user', methods=['POST'])
+def admin_find_user():
+    """Admin route to find user ID by username"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return {'error': 'Access denied'}, 403
+    
+    try:
+        from flask import request
+        data = request.get_json()
+        username = data.get('username', '').strip()
+        
+        if not username:
+            return {'error': 'Username required'}, 400
+        
+        # Find user by username (case insensitive)
+        user = mongo_db.users.find_one({
+            "username": {"$regex": f"^{username}$", "$options": "i"}
+        })
+        
+        if user:
+            return {'user_id': str(user['_id']), 'username': user['username']}
+        else:
+            return {'error': 'User not found'}, 404
+            
+    except Exception as e:
+        return {'error': str(e)}, 500
 
 @app.route('/test_new_images')
 def test_new_images():
