@@ -134,7 +134,7 @@
         <div class="col-lg-6 mb-3">
             <div class="card h-100">
                 <div class="card-header bg-info text-white">
-                    <h5 class="mb-0">🎨 Preferences</h5>
+                    <h5 class="mb-0">Preferences & Gaming</h5>
                 </div>
                 <div class="card-body">
                     <form method="POST" action="{{ url_for('update_user_settings') }}">
@@ -143,9 +143,34 @@
                         <div class="mb-3">
                             <label for="theme" class="form-label">Theme</label>
                             <select class="form-select form-select-sm" id="theme" name="theme">
-                                <option value="light" {% if not user.theme or user.theme == 'light' %}selected{% endif %}>☀️ Light</option>
-                                <option value="dark" {% if user.theme == 'dark' %}selected{% endif %}>🌙 Dark</option>
-                                <option value="auto" {% if user.theme == 'auto' %}selected{% endif %}>🔄 Auto</option>
+                                <option value="light" {% if not user.theme or user.theme == 'light' %}selected{% endif %}>Light</option>
+                                <option value="dark" {% if user.theme == 'dark' %}selected{% endif %}>Dark</option>
+                                <option value="auto" {% if user.theme == 'auto' %}selected{% endif %}>Auto</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="difficulty_range" class="form-label">Difficulty Range</label>
+                            <select class="form-select form-select-sm" id="difficulty_range" name="difficulty_range">
+                                <option value="easy_demon" {% if user.difficulty_range == 'easy_demon' %}selected{% endif %}>Easy Demon</option>
+                                <option value="medium_demon" {% if user.difficulty_range == 'medium_demon' %}selected{% endif %}>Medium Demon</option>
+                                <option value="hard_demon" {% if user.difficulty_range == 'hard_demon' %}selected{% endif %}>Hard Demon</option>
+                                <option value="insane_demon" {% if user.difficulty_range == 'insane_demon' %}selected{% endif %}>Insane Demon</option>
+                                <option value="extreme_demon" {% if user.difficulty_range == 'extreme_demon' %}selected{% endif %}>Extreme Demon</option>
+                            </select>
+                            <div class="form-text">Your preferred difficulty range for level recommendations</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="refresh_rate" class="form-label">Monitor Refresh Rate</label>
+                            <select class="form-select form-select-sm" id="refresh_rate" name="refresh_rate">
+                                <option value="60" {% if user.refresh_rate == '60' %}selected{% endif %}>60Hz</option>
+                                <option value="75" {% if user.refresh_rate == '75' %}selected{% endif %}>75Hz</option>
+                                <option value="120" {% if user.refresh_rate == '120' %}selected{% endif %}>120Hz</option>
+                                <option value="144" {% if user.refresh_rate == '144' %}selected{% endif %}>144Hz</option>
+                                <option value="165" {% if user.refresh_rate == '165' %}selected{% endif %}>165Hz</option>
+                                <option value="240" {% if user.refresh_rate == '240' %}selected{% endif %}>240Hz</option>
+                                <option value="360" {% if user.refresh_rate == '360' %}selected{% endif %}>360Hz</option>
                             </select>
                         </div>
                         
@@ -154,7 +179,7 @@
                                 <input class="form-check-input" type="checkbox" id="email_notifications" 
                                        name="email_notifications" {% if user.email_notifications %}checked{% endif %}>
                                 <label class="form-check-label" for="email_notifications">
-                                    📧 Email notifications
+                                    Email notifications
                                 </label>
                             </div>
                         </div>
@@ -164,12 +189,22 @@
                                 <input class="form-check-input" type="checkbox" id="public_profile" 
                                        name="public_profile" {% if user.public_profile != False %}checked{% endif %}>
                                 <label class="form-check-label" for="public_profile">
-                                    🌐 Public profile
+                                    Public profile
                                 </label>
                             </div>
                         </div>
                         
-                        <button type="submit" class="btn btn-info btn-sm w-100">💾 Save Preferences</button>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="show_progress" 
+                                       name="show_progress" {% if user.show_progress != False %}checked{% endif %}>
+                                <label class="form-check-label" for="show_progress">
+                                    Show progress on incomplete records
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-info btn-sm w-100">Save Preferences</button>
                     </form>
                 </div>
             </div>
@@ -223,12 +258,106 @@
         </div>
     </div>
 
-    <!-- Row 3: Change Password and Account Info -->
+    <!-- Row 3: GD Account Verification -->
+    <div class="row">
+        <div class="col-12 mb-3">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Geometry Dash Account Verification</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <form method="POST" action="{{ url_for('update_user_settings') }}">
+                                <input type="hidden" name="action" value="gd_verification">
+                                
+                                <div class="mb-3">
+                                    <label for="gd_username" class="form-label">GD Username</label>
+                                    <input type="text" class="form-control form-control-sm" id="gd_username" name="gd_username" 
+                                           value="{{ user.gd_username or '' }}" placeholder="Your Geometry Dash username">
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="gd_player_id" class="form-label">GD Player ID</label>
+                                    <input type="number" class="form-control form-control-sm" id="gd_player_id" name="gd_player_id" 
+                                           value="{{ user.gd_player_id or '' }}" placeholder="Your player ID (optional)">
+                                    <div class="form-text">Found in your GD profile URL</div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Verification Method</label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="verification_method" id="method_comment" value="comment" checked>
+                                        <label class="form-check-label" for="method_comment">
+                                            <strong>Comment Method:</strong> Post a comment with code on any level
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="verification_method" id="method_level" value="level">
+                                        <label class="form-check-label" for="method_level">
+                                            <strong>Level Method:</strong> Create a level with verification code in description
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="verification_method" id="method_profile" value="profile">
+                                        <label class="form-check-label" for="method_profile">
+                                            <strong>Profile Method:</strong> Add verification code to your GD profile description
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-success btn-sm">Generate Verification Code</button>
+                            </form>
+                        </div>
+                        <div class="col-md-6">
+                            {% if user.gd_verification_code %}
+                            <div class="alert alert-info">
+                                <h6>Your Verification Code:</h6>
+                                <code class="fs-5">{{ user.gd_verification_code }}</code>
+                                <hr>
+                                <p class="mb-2"><strong>Instructions:</strong></p>
+                                <ol class="mb-0">
+                                    <li>Copy the code above</li>
+                                    <li>{% if user.gd_verification_method == 'comment' %}Post it as a comment on any GD level{% elif user.gd_verification_method == 'level' %}Create a level and put it in the description{% else %}Add it to your GD profile description{% endif %}</li>
+                                    <li>Click "Verify Account" below</li>
+                                </ol>
+                            </div>
+                            <form method="POST" action="{{ url_for('update_user_settings') }}">
+                                <input type="hidden" name="action" value="verify_gd_account">
+                                <button type="submit" class="btn btn-primary btn-sm w-100">Verify GD Account</button>
+                            </form>
+                            {% else %}
+                            <div class="alert alert-secondary">
+                                <h6>Why verify your GD account?</h6>
+                                <ul class="mb-0">
+                                    <li>Prove you own the GD account</li>
+                                    <li>Get verified badge on your profile</li>
+                                    <li>Prevent impersonation</li>
+                                    <li>Access to exclusive features</li>
+                                    <li>Higher trust level for submissions</li>
+                                </ul>
+                            </div>
+                            {% endif %}
+                            
+                            {% if user.gd_verified %}
+                            <div class="alert alert-success">
+                                <h6>Account Verified!</h6>
+                                <p class="mb-0">Your GD account <strong>{{ user.gd_username }}</strong> has been verified.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 4: Change Password and Account Info -->
     <div class="row">
         <div class="col-lg-6 mb-3">
             <div class="card h-100">
                 <div class="card-header bg-danger text-white">
-                    <h5 class="mb-0">🔒 Change Password</h5>
+                    <h5 class="mb-0">Change Password</h5>
                 </div>
                 <div class="card-body">
                     <form method="POST" action="{{ url_for('update_user_settings') }}">

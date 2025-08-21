@@ -37,37 +37,68 @@
                                 {% set video_url = level.video_url if level is not mapping else level.get('video_url', '') %}
                                 {% set thumbnail_url = level.thumbnail_url if level is not mapping else level.get('thumbnail_url', '') %}
                                 
-                                <!-- Simple image logic: Custom image first, then YouTube thumbnail, then placeholder -->
+                                <!-- Robust image system with multiple fallbacks -->
                                 {% if thumbnail_url and thumbnail_url.strip() %}
                                     <!-- Admin set custom image -->
                                     <img src="{{ thumbnail_url }}" 
                                          alt="{{ level_name }}" 
-                                         class="img-fluid rounded"
+                                         class="level-image img-fluid rounded"
                                          style="width: 206px; height: 116px; object-fit: cover;"
-                                         loading="lazy">
+                                         loading="lazy"
+                                         onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                    <div class="bg-secondary rounded d-flex align-items-center justify-content-center text-white" 
+                                         style="width: 206px; height: 116px; display: none;">
+                                        <div class="text-center">
+                                            <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
+                                            <div>Image Error</div>
+                                        </div>
+                                    </div>
                                 {% else %}
-                                    <!-- Try to get YouTube thumbnail -->
+                                    <!-- Auto-generate thumbnail from video URL -->
                                     {% set youtube_id = '' %}
-                                    {% if video_url and 'youtu.be/' in video_url %}
-                                        {% set youtube_id = video_url.split('youtu.be/')[1].split('?')[0].split('&')[0] %}
-                                    {% elif video_url and 'youtube.com/watch?v=' in video_url %}
-                                        {% set youtube_id = video_url.split('v=')[1].split('&')[0] %}
+                                    {% set streamable_id = '' %}
+                                    
+                                    {% if video_url and video_url.strip() %}
+                                        {% if 'youtu.be/' in video_url %}
+                                            {% set youtube_id = video_url.split('youtu.be/')[1].split('?')[0].split('&')[0] %}
+                                        {% elif 'youtube.com/watch?v=' in video_url %}
+                                            {% set youtube_id = video_url.split('v=')[1].split('&')[0] %}
+                                        {% elif 'streamable.com/' in video_url %}
+                                            {% set streamable_id = video_url.split('/')[-1] %}
+                                        {% endif %}
                                     {% endif %}
                                     
                                     {% if youtube_id %}
-                                        <!-- Simple YouTube thumbnail - most reliable format -->
-                                        <img src="https://img.youtube.com/vi/{{ youtube_id }}/default.jpg" 
+                                        <!-- Demon list style - simple and reliable -->
+                                        <img src="https://img.youtube.com/vi/{{ youtube_id }}/maxresdefault.jpg" 
                                              alt="{{ level_name }}" 
                                              class="img-fluid rounded"
                                              style="width: 206px; height: 116px; object-fit: cover;"
+                                             onload="this.style.opacity='1';"
+                                             onerror="this.src='https://img.youtube.com/vi/{{ youtube_id }}/hqdefault.jpg'; this.onerror=function(){this.src='https://img.youtube.com/vi/{{ youtube_id }}/mqdefault.jpg';};"
                                              loading="lazy">
+                                    {% elif streamable_id %}
+                                        <!-- Streamable thumbnail -->
+                                        <img src="https://cdn-cf-east.streamable.com/image/{{ streamable_id }}.jpg" 
+                                             alt="{{ level_name }}" 
+                                             class="level-image img-fluid rounded"
+                                             style="width: 206px; height: 116px; object-fit: cover;"
+                                             loading="lazy"
+                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="bg-info rounded d-flex align-items-center justify-content-center text-white" 
+                                             style="width: 206px; height: 116px; display: none;">
+                                            <div class="text-center">
+                                                <i class="fas fa-play fa-2x mb-2"></i>
+                                                <div>Streamable</div>
+                                            </div>
+                                        </div>
                                     {% else %}
-                                        <!-- No image available -->
-                                        <div class="bg-secondary rounded d-flex align-items-center justify-content-center text-white" 
+                                        <!-- No video URL available -->
+                                        <div class="bg-dark rounded d-flex align-items-center justify-content-center text-white" 
                                              style="width: 206px; height: 116px;">
                                             <div class="text-center">
-                                                <i class="fas fa-image fa-2x mb-2"></i>
-                                                <div>No Image</div>
+                                                <i class="fas fa-video-slash fa-2x mb-2"></i>
+                                                <div>No Video</div>
                                             </div>
                                         </div>
                                     {% endif %}
@@ -89,7 +120,8 @@
                     </div>
                     <div class="text-end">
                         {% set difficulty = (level.difficulty|default(5.0))|round|int if level is not mapping else (level['difficulty']|default(5.0))|round|int %}
-                        <div class="text-muted"><strong>{{ difficulty }}/10</strong></div>
+                        {% set demon_type = level.demon_type if level is not mapping else level.get('demon_type') %}
+                        <div class="text-muted"><strong>{{ get_demon_difficulty_display(difficulty, demon_type) }}</strong></div>
                         {% set position = level.position if level is not mapping else level['position'] %}
                         {% set points = level.points if level is not mapping else level['points'] %}
                         <small class="text-muted">{{ format_points(points or ((100 - position + 1) / 10)|round(2)) }} points</small>
