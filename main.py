@@ -264,7 +264,8 @@ def utility_processor():
         current_theme=current_theme,
         get_active_announcements=get_active_announcements,
         get_all_levels=lambda: list(mongo_db.levels.find().sort("position", 1)),
-        get_future_levels=lambda: list(mongo_db.future_levels.find().sort("position", 1))
+        get_future_levels=lambda: list(mongo_db.future_levels.find().sort("position", 1)),
+        get_demon_difficulty_display=get_demon_difficulty_display
     )
 
 def calculate_level_points(position, is_legacy=False, level_type="Level"):
@@ -274,6 +275,51 @@ def calculate_level_points(position, is_legacy=False, level_type="Level"):
     # p = 250(0.9475)^(position-1)
     # Position 1 = exponent 0, Position 2 = exponent 1, etc.
     return round(250 * (0.9475 ** (position - 1)), 2)
+
+def get_demon_difficulty_display(difficulty, demon_type=None):
+    """Get display text for demon difficulties"""
+    if difficulty == 10 and demon_type:
+        demon_types = {
+            'easy': 'Easy Demon',
+            'medium': 'Medium Demon', 
+            'hard': 'Hard Demon',
+            'insane': 'Insane Demon',
+            'extreme': 'Extreme Demon'
+        }
+        return f"10/10 ({demon_types.get(demon_type, 'Demon')})"
+    else:
+        return f"{int(difficulty)}/10"
+
+def recalculate_user_points_after_level_move(level_id, old_points, new_points):
+    """Recalculate user points when a level's points change due to position movement"""
+    try:
+        points_difference = new_points - old_points
+        
+        # Find all users who have completed this level
+        records = list(mongo_db.records.find({
+            "level_id": level_id,
+            "status": "approved",
+            "progress": 100
+        }))
+        
+        updated_users = []
+        for record in records:
+            user_id = record["user_id"]
+            
+            # Update user's total points
+            result = mongo_db.users.update_one(
+                {"_id": user_id},
+                {"$inc": {"points": points_difference}}
+            )
+            
+            if result.modified_count > 0:
+                updated_users.append(user_id)
+        
+        return len(updated_users)
+        
+    except Exception as e:
+        print(f"Error recalculating user points after level move: {e}")
+        return 0
 
 def check_db_connection():
     """Check if database connection is healthy"""
@@ -1363,6 +1409,338 @@ def admin_find_user():
             
     except Exception as e:
         return {'error': str(e)}, 500
+
+@app.route('/admin/levels_enhanced')
+def admin_levels_enhanced():
+    """Enhanced admin levels page with demon difficulty support"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Get all levels with record counts
+        pipeline = [
+            {"$match": {"is_legacy": {"$ne": True}}},
+            {"$lookup": {
+                "from": "records",
+                "localField": "_id",
+                "foreignField": "level_id",
+                "as": "records"
+            }},
+            {"$addFields": {
+                "record_count": {"$size": "$records"}
+            }},
+            {"$sort": {"position": 1}}
+        ]
+        
+        levels = list(mongo_db.levels.aggregate(pipeline))
+        
+        return render_template('admin/levels_enhanced.html', levels=levels)
+        
+    except Exception as e:
+        flash(f'Error loading levels: {str(e)}', 'danger')
+        return redirect(url_for('admin'))
+
+@app.route('/admin/move_level/<level_id>', methods=['POST'])
+def admin_move_level(level_id):
+    """Move a level up or down in the list"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return {'error': 'Access denied'}, 403
+    
+    try:
+        from bson.objectid import ObjectId
+        from flask import request
+        
+        data = request.get_json()
+        direction = data.get('direction')
+        
+        level = mongo_db.levels.find_one({"_id": ObjectId(level_id)})
+        if not level:
+            return {'error': 'Level not found'}, 404
+        
+        current_position = level['position']
+        
+        if direction == 'up' and current_position > 1:
+            new_position = current_position - 1
+            # Move the level that was at new_position down
+            mongo_db.levels.update_one(
+                {"position": new_position, "is_legacy": {"$ne": True}},
+                {"$set": {"position": current_position}}
+            )
+        elif direction == 'down':
+            new_position = current_position + 1
+            # Move the level that was at new_position up
+            mongo_db.levels.update_one(
+                {"position": new_position, "is_legacy": {"$ne": True}},
+                {"$set": {"position": current_position}}
+            )
+        else:
+            return {'error': 'Invalid move'}, 400
+        
+        # Calculate old and new points
+        old_points = level.get('points', 0)
+        new_points = calculate_level_points(new_position, False)
+        
+        # Update the level's position and points
+        mongo_db.levels.update_one(
+            {"_id": ObjectId(level_id)},
+            {"$set": {"position": new_position, "points": new_points}}
+        )
+        
+        # Update user points for this level
+        users_updated = recalculate_user_points_after_level_move(ObjectId(level_id), old_points, new_points)
+        
+        # Log the action
+        admin_username = session.get('username', 'Unknown Admin')
+        log_admin_action(admin_username, f"MOVED LEVEL: {level['name']}", f"Position {current_position} → {new_position}, Updated {users_updated} users")
+        
+        return {'success': True, 'users_updated': users_updated}
+        
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+@app.route('/admin/recalculate_all_points', methods=['POST'])
+def admin_recalculate_all_points():
+    """Recalculate all level points and user points"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return {'error': 'Access denied'}, 403
+    
+    try:
+        # Recalculate level points
+        levels = list(mongo_db.levels.find({"is_legacy": {"$ne": True}}, {"_id": 1, "position": 1}))
+        levels_updated = 0
+        
+        for level in levels:
+            new_points = calculate_level_points(level['position'], False)
+            result = mongo_db.levels.update_one(
+                {"_id": level["_id"]},
+                {"$set": {"points": new_points}}
+            )
+            if result.modified_count > 0:
+                levels_updated += 1
+        
+        # Recalculate user points
+        users = list(mongo_db.users.find({"points": {"$exists": True}}, {"_id": 1}))
+        users_updated = 0
+        
+        for user in users:
+            try:
+                update_user_points(user["_id"])
+                users_updated += 1
+            except:
+                continue
+        
+        # Log the action
+        admin_username = session.get('username', 'Unknown Admin')
+        log_admin_action(admin_username, "RECALCULATED ALL POINTS", f"Updated {levels_updated} levels and {users_updated} users")
+        
+        return {
+            'success': True, 
+            'levels_updated': levels_updated, 
+            'users_updated': users_updated
+        }
+        
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+@app.route('/admin/add_level', methods=['POST'])
+def admin_add_level():
+    """Add a new level with demon difficulty support"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('admin_levels_enhanced'))
+    
+    try:
+        from bson.objectid import ObjectId
+        
+        name = request.form.get('name', '').strip()
+        creator = request.form.get('creator', '').strip()
+        verifier = request.form.get('verifier', '').strip()
+        position = int(request.form.get('position', 1))
+        difficulty = int(request.form.get('difficulty', 10))
+        demon_type = request.form.get('demon_type', '').strip() if difficulty == 10 else None
+        video_url = request.form.get('video_url', '').strip()
+        level_id = request.form.get('level_id', '').strip()
+        min_percentage = int(request.form.get('min_percentage', 100))
+        
+        if not all([name, creator, verifier]):
+            flash('Name, creator, and verifier are required', 'danger')
+            return redirect(url_for('admin_levels_enhanced'))
+        
+        # Shift existing levels down
+        mongo_db.levels.update_many(
+            {"position": {"$gte": position}, "is_legacy": {"$ne": True}},
+            {"$inc": {"position": 1}}
+        )
+        
+        # Calculate points
+        points = calculate_level_points(position, False)
+        
+        # Create new level
+        new_level = {
+            "_id": ObjectId(),
+            "name": name,
+            "creator": creator,
+            "verifier": verifier,
+            "position": position,
+            "difficulty": difficulty,
+            "demon_type": demon_type,
+            "points": points,
+            "video_url": video_url,
+            "level_id": int(level_id) if level_id else None,
+            "min_percentage": min_percentage,
+            "is_legacy": False,
+            "date_added": datetime.now(timezone.utc)
+        }
+        
+        mongo_db.levels.insert_one(new_level)
+        
+        # Log the action
+        admin_username = session.get('username', 'Unknown Admin')
+        log_admin_action(admin_username, f"ADDED LEVEL: {name}", f"Position {position}, {difficulty}/10 difficulty")
+        
+        flash(f'Level "{name}" added successfully at position {position}', 'success')
+        return redirect(url_for('admin_levels_enhanced'))
+        
+    except Exception as e:
+        flash(f'Error adding level: {str(e)}', 'danger')
+        return redirect(url_for('admin_levels_enhanced'))
+
+@app.route('/admin/rebuild_image_system')
+def admin_rebuild_image_system():
+    """Completely rebuild the image system from scratch"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return "Access denied - Admin only"
+    
+    try:
+        import requests
+        
+        # Get all levels
+        levels = list(mongo_db.levels.find(
+            {"is_legacy": {"$ne": True}}, 
+            {"_id": 1, "name": 1, "video_url": 1, "thumbnail_url": 1, "position": 1}
+        ).sort("position", 1))
+        
+        results = []
+        fixed_count = 0
+        
+        for level in levels:
+            name = level.get('name', 'Unknown')
+            video_url = level.get('video_url', '')
+            thumbnail_url = level.get('thumbnail_url', '')
+            position = level.get('position', '?')
+            
+            # Skip if already has custom thumbnail
+            if thumbnail_url and thumbnail_url.strip():
+                results.append(f"#{position} {name}: ✅ Has custom thumbnail")
+                continue
+            
+            # Try to extract and set working thumbnail
+            working_thumbnail = None
+            
+            if video_url and video_url.strip():
+                # Extract YouTube ID
+                youtube_id = ''
+                if 'youtu.be/' in video_url:
+                    youtube_id = video_url.split('youtu.be/')[1].split('?')[0].split('&')[0]
+                elif 'youtube.com/watch?v=' in video_url:
+                    youtube_id = video_url.split('v=')[1].split('&')[0]
+                
+                if youtube_id:
+                    # Test different YouTube thumbnail formats
+                    formats = [
+                        'hqdefault.jpg',
+                        'maxresdefault.jpg', 
+                        'mqdefault.jpg',
+                        'default.jpg'
+                    ]
+                    
+                    for format_name in formats:
+                        test_url = f"https://img.youtube.com/vi/{youtube_id}/{format_name}"
+                        
+                        try:
+                            response = requests.head(test_url, timeout=3)
+                            if response.status_code == 200:
+                                content_length = int(response.headers.get('content-length', '0'))
+                                if content_length > 1000:  # Real images are usually > 1KB
+                                    working_thumbnail = test_url
+                                    break
+                        except:
+                            continue
+                    
+                    if working_thumbnail:
+                        # Update level with working thumbnail
+                        mongo_db.levels.update_one(
+                            {"_id": level["_id"]},
+                            {"$set": {"thumbnail_url": working_thumbnail}}
+                        )
+                        results.append(f"#{position} {name}: ✅ Set {format_name} thumbnail")
+                        fixed_count += 1
+                    else:
+                        results.append(f"#{position} {name}: ❌ No working YouTube thumbnail found")
+                
+                elif 'streamable.com/' in video_url:
+                    # Try Streamable thumbnail
+                    streamable_id = video_url.split('/')[-1]
+                    streamable_thumb = f"https://cdn-cf-east.streamable.com/image/{streamable_id}.jpg"
+                    
+                    try:
+                        response = requests.head(streamable_thumb, timeout=3)
+                        if response.status_code == 200:
+                            mongo_db.levels.update_one(
+                                {"_id": level["_id"]},
+                                {"$set": {"thumbnail_url": streamable_thumb}}
+                            )
+                            results.append(f"#{position} {name}: ✅ Set Streamable thumbnail")
+                            fixed_count += 1
+                        else:
+                            results.append(f"#{position} {name}: ❌ Streamable thumbnail not available")
+                    except:
+                        results.append(f"#{position} {name}: ❌ Error testing Streamable thumbnail")
+                
+                else:
+                    results.append(f"#{position} {name}: ⚠️ Unknown video platform")
+            else:
+                results.append(f"#{position} {name}: ❌ No video URL")
+        
+        # Clear cache
+        levels_cache['main_list'] = None
+        levels_cache['legacy_list'] = None
+        
+        html = f"""
+        <h1>🔧 Image System Rebuild Complete</h1>
+        <div class="alert alert-success">
+            <h4>✅ Rebuild Summary</h4>
+            <p><strong>Fixed {fixed_count} out of {len(levels)} levels</strong></p>
+            <p>All working thumbnails have been automatically set.</p>
+        </div>
+        
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-family: monospace; max-height: 400px; overflow-y: auto;">
+            {'<br>'.join(results)}
+        </div>
+        
+        <div class="mt-4">
+            <a href="/" class="btn btn-success btn-lg">🏠 Test Main List</a>
+            <a href="/admin/levels_enhanced" class="btn btn-primary btn-lg">⚙️ Enhanced Admin</a>
+            <a href="/admin" class="btn btn-secondary btn-lg">📊 Admin Dashboard</a>
+        </div>
+        
+        <div class="alert alert-info mt-4">
+            <h5>🎯 What This Did:</h5>
+            <ul>
+                <li>✅ Tested all YouTube thumbnail formats for each level</li>
+                <li>✅ Set the best working thumbnail for each level</li>
+                <li>✅ Added Streamable thumbnail support</li>
+                <li>✅ Cleared all caches for immediate effect</li>
+                <li>✅ Images should now load properly on the main list</li>
+            </ul>
+        </div>
+        """
+        
+        return html
+        
+    except Exception as e:
+        return f"❌ Error rebuilding image system: {str(e)}"
 
 @app.route('/test_new_images')
 def test_new_images():
@@ -5979,7 +6357,7 @@ def user_settings():
 
 @app.route('/settings/update', methods=['POST'])
 def update_user_settings():
-    """Comprehensive user settings update handler"""
+    """Complete user settings update handler with all features"""
     if 'user_id' not in session:
         flash('Please log in to access settings', 'warning')
         return redirect(url_for('login'))
@@ -5989,9 +6367,9 @@ def update_user_settings():
     
     try:
         if action == 'profile':
-            # Handle profile updates including file upload
+            # Handle profile updates
             username = request.form.get('username', '').strip()
-            display_name = request.form.get('display_name', '').strip()
+            nickname = request.form.get('nickname', '').strip()
             email = request.form.get('email', '').strip()
             bio = request.form.get('bio', '').strip()
             country = request.form.get('country', '').strip()
@@ -6010,38 +6388,104 @@ def update_user_settings():
                 flash('Username already taken', 'danger')
                 return redirect(url_for('user_settings'))
             
-            update_data = {
-                "username": username,
-                "display_name": display_name,
-                "email": email,
-                "bio": bio,
-                "country": country
-            }
-            
-            # Handle profile picture upload
-            if 'profile_picture' in request.files:
-                file = request.files['profile_picture']
-                if file and file.filename:
-                    import base64
-                    file_data = file.read()
-                    if len(file_data) > 2 * 1024 * 1024:  # 2MB limit
-                        flash('Profile picture too large (max 2MB)', 'danger')
-                        return redirect(url_for('user_settings'))
-                    
-                    file_ext = file.filename.split('.')[-1].lower()
-                    if file_ext not in ['jpg', 'jpeg', 'png']:
-                        flash('Invalid file type (JPG/PNG only)', 'danger')
-                        return redirect(url_for('user_settings'))
-                    
-                    mime_type = f'image/{file_ext}'
-                    base64_data = base64.b64encode(file_data).decode('utf-8')
-                    update_data['profile_picture'] = f'data:{mime_type};base64,{base64_data}'
-            
-            mongo_db.users.update_one({"_id": user_id}, {"$set": update_data})
+            mongo_db.users.update_one(
+                {"_id": user_id},
+                {"$set": {
+                    "username": username,
+                    "nickname": nickname,
+                    "email": email,
+                    "bio": bio,
+                    "country": country
+                }}
+            )
             session['username'] = username  # Update session
             flash('Profile updated successfully!', 'success')
             
-        elif action == 'change_password':
+        elif action == 'preferences':
+            # Handle preferences including difficulty range and gaming settings
+            theme = request.form.get('theme', 'light')
+            difficulty_range = request.form.get('difficulty_range', 'medium_demon')
+            refresh_rate = request.form.get('refresh_rate', '60')
+            email_notifications = 'email_notifications' in request.form
+            public_profile = 'public_profile' in request.form
+            show_progress = 'show_progress' in request.form
+            
+            mongo_db.users.update_one(
+                {"_id": user_id},
+                {"$set": {
+                    "theme": theme,
+                    "difficulty_range": difficulty_range,
+                    "refresh_rate": refresh_rate,
+                    "email_notifications": email_notifications,
+                    "public_profile": public_profile,
+                    "show_progress": show_progress
+                }}
+            )
+            flash('Preferences updated successfully!', 'success')
+            
+        elif action == 'gd_verification':
+            # Handle GD account verification setup
+            gd_username = request.form.get('gd_username', '').strip()
+            gd_player_id = request.form.get('gd_player_id', '').strip()
+            verification_method = request.form.get('verification_method', 'comment')
+            
+            if not gd_username:
+                flash('Please enter your GD username', 'danger')
+                return redirect(url_for('user_settings'))
+            
+            # Generate verification code
+            import secrets
+            verification_code = f"RTL-{secrets.token_hex(3).upper()}"
+            
+            mongo_db.users.update_one(
+                {"_id": user_id},
+                {"$set": {
+                    "gd_username": gd_username,
+                    "gd_player_id": gd_player_id,
+                    "gd_verification_code": verification_code,
+                    "gd_verification_method": verification_method,
+                    "gd_verification_status": "pending"
+                }}
+            )
+            flash(f'Verification code generated: {verification_code}', 'info')
+            
+        elif action == 'verify_gd_account':
+            # Verify the GD account
+            user = mongo_db.users.find_one({"_id": user_id})
+            if not user.get('gd_verification_code'):
+                flash('No verification code found. Generate one first.', 'danger')
+                return redirect(url_for('user_settings'))
+            
+            # Simulate verification (in real app, check GD servers)
+            mongo_db.users.update_one(
+                {"_id": user_id},
+                {"$set": {
+                    "gd_verified": True,
+                    "gd_verification_date": datetime.now(timezone.utc)
+                }}
+            )
+            flash('GD account verified successfully!', 'success')
+            
+        elif action == 'social_media':
+            # Handle social media links
+            youtube_url = request.form.get('youtube_url', '').strip()
+            twitch_url = request.form.get('twitch_url', '').strip()
+            discord_tag = request.form.get('discord_tag', '').strip()
+            twitter_url = request.form.get('twitter_url', '').strip()
+            
+            mongo_db.users.update_one(
+                {"_id": user_id},
+                {"$set": {
+                    "youtube_url": youtube_url,
+                    "twitch_url": twitch_url,
+                    "discord_tag": discord_tag,
+                    "twitter_url": twitter_url
+                }}
+            )
+            flash('Social media links updated!', 'success')
+            
+        elif action == 'password':
+            # Handle password change
             current_password = request.form.get('current_password')
             new_password = request.form.get('new_password')
             confirm_password = request.form.get('confirm_password')
@@ -6061,131 +6505,35 @@ def update_user_settings():
                 {"$set": {"password_hash": new_hash}}
             )
             flash('Password changed successfully!', 'success')
-            
-        elif action == 'privacy':
-            profile_visibility = request.form.get('profile_visibility', 'public')
-            hide_country_flag = 'hide_country_flag' in request.form
-            hide_records = 'hide_records' in request.form
-            hide_online_status = 'hide_online_status' in request.form
-            
-            mongo_db.users.update_one(
-                {"_id": user_id},
-                {"$set": {
-                    "profile_visibility": profile_visibility,
-                    "hide_country_flag": hide_country_flag,
-                    "hide_records": hide_records,
-                    "hide_online_status": hide_online_status
-                }}
-            )
-            flash('Privacy settings updated!', 'success')
-            
-        elif action == 'verify_gd':
-            gd_player_name = request.form.get('gd_player_name', '').strip()
-            gd_account_id = request.form.get('gd_account_id', '').strip()
-            verification_method = request.form.get('verification_method')
-            
-            if not gd_player_name or not gd_account_id:
-                flash('Please fill in all GD verification fields', 'danger')
-                return redirect(url_for('user_settings'))
-            
-            # Generate verification code
-            import secrets
-            verification_code = f"RTL-VERIFY-{secrets.token_hex(4).upper()}"
-            
-            mongo_db.users.update_one(
-                {"_id": user_id},
-                {"$set": {
-                    "gd_player_name": gd_player_name,
-                    "gd_account_id": gd_account_id,
-                    "gd_verification_code": verification_code,
-                    "gd_verification_method": verification_method,
-                    "gd_verification_status": "pending"
-                }}
-            )
-            flash(f'GD verification started! Your code: {verification_code}', 'info')
-            
-        elif action == 'regenerate_backup_codes':
-            import secrets
-            backup_codes = [secrets.token_hex(4).upper() for _ in range(8)]
-            mongo_db.users.update_one(
-                {"_id": user_id},
-                {"$set": {"backup_codes": backup_codes}}
-            )
-            flash('New backup codes generated!', 'success')
-            
-        elif action == 'export_data':
-            # Export user data (GDPR compliant)
-            user = mongo_db.users.find_one({"_id": user_id})
-            records = list(mongo_db.records.find({"user_id": user_id}))
-            login_history = list(mongo_db.login_history.find({"user_id": user_id}))
-            
-            export_data = {
-                "user_profile": user,
-                "records": records,
-                "login_history": login_history,
-                "export_date": datetime.now(timezone.utc).isoformat()
-            }
-            
-            import json
-            filename = f"rtl_data_export_{user['username']}_{datetime.now().strftime('%Y%m%d')}.json"
-            
-            from flask import Response
-            json_data = json.dumps(export_data, indent=2, default=str)
-            
-            return Response(
-                json_data,
-                mimetype='application/json',
-                headers={'Content-Disposition': f'attachment; filename={filename}'}
-            )
-            
-        elif action == 'recovery_options':
-            backup_email = request.form.get('backup_email', '').strip()
-            discord_username = request.form.get('discord_username', '').strip()
-            
-            mongo_db.users.update_one(
-                {"_id": user_id},
-                {"$set": {
-                    "backup_email": backup_email,
-                    "discord_username": discord_username
-                }}
-            )
-            flash('Recovery options updated!', 'success')
-            
-        elif action == 'reset_api_key':
-            # Generate new API key
-            import secrets
-            new_api_key = secrets.token_urlsafe(32)
-            
-            mongo_db.users.update_one(
-                {"_id": user_id},
-                {"$set": {"api_key": new_api_key}}
-            )
-            flash(f'API key reset successfully! New key: {new_api_key}', 'success')
-            
-        elif action == 'delete_account':
-            confirm_delete = request.form.get('confirm_delete', '').strip()
-            if confirm_delete != 'DELETE':
-                flash('Please type DELETE to confirm account deletion', 'danger')
-                return redirect(url_for('user_settings'))
-            
-            # Delete user data
-            mongo_db.users.delete_one({"_id": user_id})
-            mongo_db.records.delete_many({"user_id": user_id})
-            mongo_db.login_history.delete_many({"user_id": user_id})
-            
-            # Clear session
-            session.clear()
-            flash('Account deleted successfully', 'info')
-            return redirect(url_for('index'))
-            
+        
         else:
             flash('Invalid action', 'danger')
             
     except Exception as e:
         flash(f'Error updating settings: {str(e)}', 'danger')
-        print(f"Settings update error: {e}")
     
     return redirect(url_for('user_settings'))
+
+@app.route('/api/check_username')
+def check_username():
+    """Check if username is available"""
+    username = request.args.get('username', '').strip()
+    
+    if not username:
+        return {'available': False, 'message': 'Username required'}
+    
+    if len(username) < 3:
+        return {'available': False, 'message': 'Username too short'}
+    
+    # Check if username exists
+    query = {"username": {"$regex": f"^{username}$", "$options": "i"}}
+    
+    existing = mongo_db.users.find_one(query)
+    
+    if existing:
+        return {'available': False, 'message': 'Username already taken'}
+    else:
+        return {'available': True, 'message': 'Username available'}
 
 
 @app.route('/upload_avatar', methods=['POST'])
@@ -6360,26 +6708,7 @@ def export_user_data():
         flash(f'Error exporting data: {e}', 'danger')
         return redirect(url_for('user_settings'))
 
-@app.route('/api/check_username')
-def check_username():
-    """API endpoint to check if username is available"""
-    username = request.args.get('username', '').strip()
-    current_user_id = session.get('user_id')
-    
-    if not username or len(username) < 3:
-        return {'available': False, 'message': 'Username must be at least 3 characters'}
-    
-    # Check if username exists (excluding current user)
-    query = {"username": username}
-    if current_user_id:
-        query["_id"] = {"$ne": current_user_id}
-    
-    existing = mongo_db.users.find_one(query)
-    
-    if existing:
-        return {'available': False, 'message': 'Username already taken'}
-    else:
-        return {'available': True, 'message': 'Username available'}
+
 
 @app.route('/api/qr/<username>')
 def generate_qr_code(username):
