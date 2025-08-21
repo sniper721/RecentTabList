@@ -198,10 +198,43 @@
                                 <small class="form-text text-muted">Supported platforms: YouTube, Streamable, TikTok</small>
                             </div>
                             <div class="mb-3">
-                                <label for="thumbnail_url" class="form-label">Custom Thumbnail (Optional)</label>
-                                <input type="text" class="form-control mb-2" id="thumbnail_url" name="thumbnail_url" placeholder="Or paste image URL">
-                                <input type="file" class="form-control" id="thumbnail_file" name="thumbnail_file" accept="image/*">
-                                <small class="form-text text-muted">Upload image file or paste URL. If empty, YouTube thumbnail will be used</small>
+                                <label class="form-label">Thumbnail Options</label>
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="radio" name="thumbnail_type" id="thumb_auto" value="auto" checked>
+                                            <label class="form-check-label" for="thumb_auto">
+                                                <strong>Auto YouTube Thumbnail</strong> - Extract from video URL
+                                            </label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="radio" name="thumbnail_type" id="thumb_url" value="url">
+                                            <label class="form-check-label" for="thumb_url">
+                                                <strong>Custom Image URL</strong> - Use specific image
+                                            </label>
+                                        </div>
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="radio" name="thumbnail_type" id="thumb_upload" value="upload">
+                                            <label class="form-check-label" for="thumb_upload">
+                                                <strong>Upload Image</strong> - Upload from computer
+                                            </label>
+                                        </div>
+                                        
+                                        <div id="url_input" style="display: none;">
+                                            <input type="text" class="form-control mb-2" id="thumbnail_url" name="thumbnail_url" placeholder="https://example.com/image.jpg">
+                                        </div>
+                                        
+                                        <div id="upload_input" style="display: none;">
+                                            <input type="file" class="form-control" id="thumbnail_file" name="thumbnail_file" accept="image/*">
+                                        </div>
+                                        
+                                        <small class="form-text text-muted">
+                                            Auto: Uses YouTube thumbnail if video URL is provided<br>
+                                            Custom URL: Uses your specified image URL<br>
+                                            Upload: Upload image file (max 5MB)
+                                        </small>
+                                    </div>
+                                </div>
                             </div>
                             <div class="mb-3 form-check">
                                 <input type="checkbox" class="form-check-input" id="is_legacy" name="is_legacy">
@@ -279,10 +312,43 @@
                                 <small class="form-text text-muted">Supported platforms: YouTube, Streamable, TikTok</small>
                             </div>
                             <div class="mb-3">
-                                <label for="edit_thumbnail_url" class="form-label">Custom Thumbnail (Optional)</label>
-                                <input type="text" class="form-control mb-2" id="edit_thumbnail_url" name="thumbnail_url" placeholder="Or paste image URL">
-                                <input type="file" class="form-control" id="edit_thumbnail_file" name="thumbnail_file" accept="image/*">
-                                <small class="form-text text-muted">Upload image file or paste URL. If empty, YouTube thumbnail will be used</small>
+                                <label class="form-label">Thumbnail Options</label>
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="radio" name="thumbnail_type" id="edit_thumb_auto" value="auto" checked>
+                                            <label class="form-check-label" for="edit_thumb_auto">
+                                                <strong>Auto YouTube Thumbnail</strong> - Extract from video URL
+                                            </label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="radio" name="thumbnail_type" id="edit_thumb_url" value="url">
+                                            <label class="form-check-label" for="edit_thumb_url">
+                                                <strong>Custom Image URL</strong> - Use specific image
+                                            </label>
+                                        </div>
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="radio" name="thumbnail_type" id="edit_thumb_upload" value="upload">
+                                            <label class="form-check-label" for="edit_thumb_upload">
+                                                <strong>Upload Image</strong> - Upload from computer
+                                            </label>
+                                        </div>
+                                        
+                                        <div id="edit_url_input" style="display: none;">
+                                            <input type="text" class="form-control mb-2" id="edit_thumbnail_url" name="thumbnail_url" placeholder="https://example.com/image.jpg">
+                                        </div>
+                                        
+                                        <div id="edit_upload_input" style="display: none;">
+                                            <input type="file" class="form-control" id="edit_thumbnail_file" name="thumbnail_file" accept="image/*">
+                                        </div>
+                                        
+                                        <small class="form-text text-muted">
+                                            Auto: Uses YouTube thumbnail if video URL is provided<br>
+                                            Custom URL: Uses your specified image URL<br>
+                                            Upload: Upload image file (max 5MB)
+                                        </small>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -427,6 +493,46 @@
             const levelId = this.getAttribute('data-level-game-id');
             document.getElementById('delete_level_id').value = levelId;
         });
+    });
+    
+    // Handle thumbnail option switching for Add Level modal
+    document.querySelectorAll('input[name="thumbnail_type"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const urlInput = document.getElementById('url_input');
+            const uploadInput = document.getElementById('upload_input');
+            
+            // Hide all inputs first
+            urlInput.style.display = 'none';
+            uploadInput.style.display = 'none';
+            
+            // Show relevant input
+            if (this.value === 'url') {
+                urlInput.style.display = 'block';
+            } else if (this.value === 'upload') {
+                uploadInput.style.display = 'block';
+            }
+        });
+    });
+    
+    // Handle thumbnail option switching for Edit Level modal
+    document.querySelectorAll('input[name="thumbnail_type"]').forEach(radio => {
+        if (radio.id.startsWith('edit_')) {
+            radio.addEventListener('change', function() {
+                const urlInput = document.getElementById('edit_url_input');
+                const uploadInput = document.getElementById('edit_upload_input');
+                
+                // Hide all inputs first
+                urlInput.style.display = 'none';
+                uploadInput.style.display = 'none';
+                
+                // Show relevant input
+                if (this.value === 'url') {
+                    urlInput.style.display = 'block';
+                } else if (this.value === 'upload') {
+                    uploadInput.style.display = 'block';
+                }
+            });
+        }
     });
 </script>
 {% endblock %}
