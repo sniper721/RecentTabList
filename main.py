@@ -4215,42 +4215,48 @@ def admin_edit_level():
 
     
     level = mongo_db.levels.find_one({"_id": db_level_id})
-    thumbnail_url = request.form.get('thumbnail_url') or level.get('thumbnail_url', '')
+    
+    # Handle thumbnail options
+    thumbnail_type = request.form.get('thumbnail_type', 'auto')
+    thumbnail_url = ''
+    
+    if thumbnail_type == 'url':
+        # Custom URL
+        thumbnail_url = request.form.get('thumbnail_url', '').strip()
+    elif thumbnail_type == 'upload':
+        # File upload
+        if 'thumbnail_file' in request.files:
+            file = request.files['thumbnail_file']
+            if file and file.filename:
+                import os
+                import time
+                
+                # Create thumbnails directory if it doesn't exist
+                os.makedirs('static/thumbnails', exist_ok=True)
+                
+                # Generate unique filename
+                file_ext = file.filename.split('.')[-1].lower()
+                if file_ext not in ['png', 'jpg', 'jpeg', 'gif', 'webp']:
+                    file_ext = 'png'
+                
+                # Use level name and timestamp for filename
+                level_name = request.form.get('name', 'unknown')
+                safe_name = "".join(c for c in level_name if c.isalnum() or c in (' ', '-', '_')).rstrip()
+                safe_name = safe_name.replace(' ', '_')
+                filename = f"{safe_name}_{int(time.time())}.{file_ext}"
+                filepath = os.path.join('static/thumbnails', filename)
+                
+                # Save the file
+                file.save(filepath)
+                
+                # Set thumbnail URL to the saved file
+                thumbnail_url = f"/static/thumbnails/{filename}"
+                print(f"✅ Thumbnail uploaded: {filename}")
+    # If thumbnail_type == 'auto', thumbnail_url stays empty (uses YouTube auto)
     
     # Handle position changes
     old_position = level['position']
     old_is_legacy = level.get('is_legacy', False)
-    
-
-    
-    # Handle file upload - save to static folder
-    if 'thumbnail_file' in request.files:
-        file = request.files['thumbnail_file']
-        if file and file.filename:
-            import os
-            import time
-            
-            # Create thumbnails directory if it doesn't exist
-            os.makedirs('static/thumbnails', exist_ok=True)
-            
-            # Generate unique filename
-            file_ext = file.filename.split('.')[-1].lower()
-            if file_ext not in ['png', 'jpg', 'jpeg', 'gif', 'webp']:
-                file_ext = 'png'
-            
-            # Use level name and timestamp for filename
-            level_name = request.form.get('name', 'unknown')
-            safe_name = "".join(c for c in level_name if c.isalnum() or c in (' ', '-', '_')).rstrip()
-            safe_name = safe_name.replace(' ', '_')
-            filename = f"{safe_name}_{int(time.time())}.{file_ext}"
-            filepath = os.path.join('static/thumbnails', filename)
-            
-            # Save the file directly - ORIGINAL SIMPLE METHOD
-            file.save(filepath)
-            
-            # Set thumbnail URL to the saved file
-            thumbnail_url = f"/static/thumbnails/{filename}"
-            print(f"✅ Thumbnail updated: {filename}")
     
     points_str = request.form.get('points')
     min_percentage = int(request.form.get('min_percentage', '100'))

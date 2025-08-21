@@ -37,68 +37,38 @@
                                 {% set video_url = level.video_url if level is not mapping else level.get('video_url', '') %}
                                 {% set thumbnail_url = level.thumbnail_url if level is not mapping else level.get('thumbnail_url', '') %}
                                 
-                                <!-- Robust image system with multiple fallbacks -->
+                                <!-- SIMPLE, WORKING IMAGE SYSTEM -->
                                 {% if thumbnail_url and thumbnail_url.strip() %}
-                                    <!-- Admin set custom image -->
+                                    <!-- Custom admin thumbnail -->
                                     <img src="{{ thumbnail_url }}" 
                                          alt="{{ level_name }}" 
-                                         class="level-image img-fluid rounded"
+                                         class="img-fluid rounded"
                                          style="width: 206px; height: 116px; object-fit: cover;"
-                                         loading="lazy"
-                                         onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                    <div class="bg-secondary rounded d-flex align-items-center justify-content-center text-white" 
-                                         style="width: 206px; height: 116px; display: none;">
-                                        <div class="text-center">
-                                            <i class="fas fa-exclamation-triangle fa-2x mb-2"></i>
-                                            <div>Image Error</div>
-                                        </div>
-                                    </div>
+                                         loading="lazy">
                                 {% else %}
-                                    <!-- Auto-generate thumbnail from video URL -->
+                                    <!-- YouTube auto thumbnail -->
                                     {% set youtube_id = '' %}
-                                    {% set streamable_id = '' %}
-                                    
                                     {% if video_url and video_url.strip() %}
                                         {% if 'youtu.be/' in video_url %}
                                             {% set youtube_id = video_url.split('youtu.be/')[1].split('?')[0].split('&')[0] %}
                                         {% elif 'youtube.com/watch?v=' in video_url %}
                                             {% set youtube_id = video_url.split('v=')[1].split('&')[0] %}
-                                        {% elif 'streamable.com/' in video_url %}
-                                            {% set streamable_id = video_url.split('/')[-1] %}
                                         {% endif %}
                                     {% endif %}
                                     
                                     {% if youtube_id %}
-                                        <!-- Demon list style - simple and reliable -->
-                                        <img src="https://img.youtube.com/vi/{{ youtube_id }}/maxresdefault.jpg" 
+                                        <!-- Simple YouTube thumbnail - no complex fallbacks -->
+                                        <img src="https://img.youtube.com/vi/{{ youtube_id }}/hqdefault.jpg" 
                                              alt="{{ level_name }}" 
                                              class="img-fluid rounded"
                                              style="width: 206px; height: 116px; object-fit: cover;"
-                                             onload="this.style.opacity='1';"
-                                             onerror="this.src='https://img.youtube.com/vi/{{ youtube_id }}/hqdefault.jpg'; this.onerror=function(){this.src='https://img.youtube.com/vi/{{ youtube_id }}/mqdefault.jpg';};"
                                              loading="lazy">
-                                    {% elif streamable_id %}
-                                        <!-- Streamable thumbnail -->
-                                        <img src="https://cdn-cf-east.streamable.com/image/{{ streamable_id }}.jpg" 
-                                             alt="{{ level_name }}" 
-                                             class="level-image img-fluid rounded"
-                                             style="width: 206px; height: 116px; object-fit: cover;"
-                                             loading="lazy"
-                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                        <div class="bg-info rounded d-flex align-items-center justify-content-center text-white" 
-                                             style="width: 206px; height: 116px; display: none;">
-                                            <div class="text-center">
-                                                <i class="fas fa-play fa-2x mb-2"></i>
-                                                <div>Streamable</div>
-                                            </div>
-                                        </div>
-                                    {% else %}
-                                        <!-- No video URL available -->
-                                        <div class="bg-dark rounded d-flex align-items-center justify-content-center text-white" 
+                                        <!-- Clean placeholder for no video -->
+                                        <div class="bg-light rounded d-flex align-items-center justify-content-center text-muted" 
                                              style="width: 206px; height: 116px;">
                                             <div class="text-center">
-                                                <i class="fas fa-video-slash fa-2x mb-2"></i>
-                                                <div>No Video</div>
+                                                <i class="fas fa-image fa-2x mb-2"></i>
+                                                <div>No Preview</div>
                                             </div>
                                         </div>
                                     {% endif %}
