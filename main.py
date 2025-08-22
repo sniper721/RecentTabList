@@ -265,7 +265,8 @@ def utility_processor():
         get_active_announcements=get_active_announcements,
         get_all_levels=lambda: list(mongo_db.levels.find().sort("position", 1)),
         get_future_levels=lambda: list(mongo_db.future_levels.find().sort("position", 1)),
-        get_demon_difficulty_display=get_demon_difficulty_display
+        get_demon_difficulty_display=get_demon_difficulty_display,
+        get_demon_type_display=get_demon_type_display
     )
 
 def calculate_level_points(position, is_legacy=False, level_type="Level"):
@@ -277,7 +278,11 @@ def calculate_level_points(position, is_legacy=False, level_type="Level"):
     return round(250 * (0.9475 ** (position - 1)), 2)
 
 def get_demon_difficulty_display(difficulty, demon_type=None):
-    """Get display text for demon difficulties"""
+    """Get display text for demon difficulties - shows just the numerical difficulty"""
+    return f"{int(difficulty)}/10"
+
+def get_demon_type_display(difficulty, demon_type=None):
+    """Get demon type display text for 10-star levels"""
     if difficulty == 10 and demon_type:
         demon_types = {
             'easy': 'Easy Demon',
@@ -286,9 +291,8 @@ def get_demon_difficulty_display(difficulty, demon_type=None):
             'insane': 'Insane Demon',
             'extreme': 'Extreme Demon'
         }
-        return f"10/10 ({demon_types.get(demon_type, 'Demon')})"
-    else:
-        return f"{int(difficulty)}/10"
+        return demon_types.get(demon_type, 'Demon')
+    return None
 
 def recalculate_user_points_after_level_move(level_id, old_points, new_points):
     """Recalculate user points when a level's points change due to position movement"""
@@ -953,7 +957,216 @@ def test_base64_display():
     </html>
     """
 
-@app.route('/debug_thumbnails')
+@app.route('/admin/records')
+def admin_records():
+    """Admin record management system"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    # Get filter parameters
+    status_filter = request.args.get('status', 'all')
+    username_filter = request.args.get('username', '').strip()
+    level_filter = request.args.get('level', '').strip()
+    page = int(request.args.get('page', 1))
+    per_page = 25
+    
+    # Build query
+    match_conditions = {}
+    
+    if status_filter != 'all':
+        match_conditions['status'] = status_filter
+    
+    # Aggregation pipeline
+    pipeline = [
+        {"$match": match_conditions},
+        {"$lookup": {
+            "from": "users",
+            "localField": "user_id",
+            "foreignField": "_id",
+            "as": "user"
+        }},
+        {"$lookup": {
+            "from": "levels",
+            "localField": "level_id",
+            "foreignField": "_id",
+            "as": "level"
+        }},
+        {"$unwind": "$user"},
+        {"$unwind": "$level"},
+        {"$addFields": {
+            "percentage": {"$ifNull": ["$percentage", "$progress"]}
+        }},
+        {"$sort": {"date_submitted": -1}}
+    ]
+    
+    # Add username filter if specified
+    if username_filter:
+        pipeline.insert(3, {
+            "$match": {
+                "user.username": {"$regex": username_filter, "$options": "i"}
+            }
+        })
+    
+    # Add level name filter if specified
+    if level_filter:
+        pipeline.insert(-1, {
+            "$match": {
+                "level.name": {"$regex": level_filter, "$options": "i"}
+            }
+        })
+    
+    # Get total count
+    count_pipeline = pipeline + [{"$count": "total"}]
+    total_result = list(mongo_db.records.aggregate(count_pipeline))
+    total_records = total_result[0]['total'] if total_result else 0
+    
+    # Add pagination
+    pipeline.extend([
+        {"$skip": (page - 1) * per_page},
+        {"$limit": per_page}
+    ])
+    
+    # Execute query
+    records = list(mongo_db.records.aggregate(pipeline))
+    
+    # Calculate pagination info
+    total_pages = (total_records + per_page - 1) // per_page
+    has_prev = page > 1
+    has_next = page < total_pages
+    
+    return render_template('admin/records.html', 
+                         records=records,
+                         total_records=total_records,
+                         page=page,
+                         total_pages=total_pages,
+                         has_prev=has_prev,
+                         has_next=has_next,
+                         status_filter=status_filter,
+                         username_filter=username_filter,
+                         level_filter=level_filter)
+
+@app.route('/admin/record/<string:record_id>/edit', methods=['GET', 'POST'])
+def admin_edit_record(record_id):
+    """Edit a specific record"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('admin_records'))
+    
+    try:
+        # Get record with user and level info
+        pipeline = [
+            {"$match": {"_id": ObjectId(record_id)}},
+            {"$lookup": {
+                "from": "users",
+                "localField": "user_id",
+                "foreignField": "_id",
+                "as": "user"
+            }},
+            {"$lookup": {
+                "from": "levels",
+                "localField": "level_id",
+                "foreignField": "_id",
+                "as": "level"
+            }},
+            {"$unwind": "$user"},
+            {"$unwind": "$level"},
+            {"$addFields": {
+                "percentage": {"$ifNull": ["$percentage", "$progress"]}
+            }}
+        ]
+        
+        record_result = list(mongo_db.records.aggregate(pipeline))
+        if not record_result:
+            flash('Record not found', 'danger')
+            return redirect(url_for('admin_records'))
+        
+        record = record_result[0]
+        
+        if request.method == 'POST':
+            # Update record
+            updates = {
+                'percentage': int(request.form.get('percentage', record['percentage'])),
+                'status': request.form.get('status', record['status']),
+                'video_url': request.form.get('video_url', record.get('video_url', '')).strip()
+            }
+            
+            # Add admin edit info
+            admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+            admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+            
+            updates['last_edited_by'] = admin_username
+            updates['last_edited_at'] = datetime.now(timezone.utc)
+            
+            # Update in database
+            mongo_db.records.update_one(
+                {"_id": ObjectId(record_id)},
+                {"$set": updates}
+            )
+            
+            # Log admin action
+            log_admin_action(
+                admin_username,
+                f"EDITED RECORD: {record['user']['username']} on {record['level']['name']}",
+                f"Status: {updates['status']}, Percentage: {updates['percentage']}%"
+            )
+            
+            # Recalculate user points if status changed
+            if updates['status'] != record['status']:
+                update_user_points(record['user_id'])
+            
+            flash('Record updated successfully!', 'success')
+            return redirect(url_for('admin_records'))
+        
+        return render_template('admin/edit_record.html', record=record)
+        
+    except Exception as e:
+        flash(f'Error editing record: {str(e)}', 'danger')
+        return redirect(url_for('admin_records'))
+
+@app.route('/admin/record/<string:record_id>/delete', methods=['POST'])
+def admin_delete_record(record_id):
+    """Delete a specific record"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('admin_records'))
+    
+    try:
+        # Get record info before deletion
+        record = mongo_db.records.find_one({"_id": ObjectId(record_id)})
+        if not record:
+            flash('Record not found', 'danger')
+            return redirect(url_for('admin_records'))
+        
+        # Get user and level info for logging
+        user = mongo_db.users.find_one({"_id": record['user_id']})
+        level = mongo_db.levels.find_one({"_id": record['level_id']})
+        
+        # Delete the record
+        mongo_db.records.delete_one({"_id": ObjectId(record_id)})
+        
+        # Recalculate user points
+        update_user_points(record['user_id'])
+        
+        # Log admin action
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        
+        # Get the percentage value (handle both 'percentage' and 'progress' fields)
+        percentage_value = record.get('percentage', record.get('progress', 0))
+        
+        log_admin_action(
+            admin_username,
+            f"DELETED RECORD: {user['username'] if user else 'Unknown'} on {level['name'] if level else 'Unknown'}",
+            f"Percentage: {percentage_value}%, Status: {record['status']}"
+        )
+        
+        flash('Record deleted successfully!', 'success')
+        
+    except Exception as e:
+        flash(f'Error deleting record: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin_records'))
 def debug_thumbnails():
     """Debug thumbnail URLs in database"""
     if 'user_id' not in session or not session.get('is_admin'):
@@ -1858,9 +2071,13 @@ def admin_add_level():
         level_id = request.form.get('level_id', '').strip()
         min_percentage = int(request.form.get('min_percentage', 100))
         
-        if not all([name, creator, verifier]):
-            flash('Name, creator, and verifier are required', 'danger')
+        # Validate demon type for 10-star levels
+        if difficulty == 10 and not demon_type:
+            flash('Demon type is required for 10-star levels', 'danger')
             return redirect(url_for('admin_levels_enhanced'))
+        
+        if difficulty != 10 and demon_type:
+            demon_type = None  # Clear demon type for non-demon levels
         
         # Shift existing levels down
         mongo_db.levels.update_many(
@@ -4544,6 +4761,16 @@ def admin_edit_level():
     
     db_level_id = int(request.form.get('level_id'))
     game_level_id = request.form.get('game_level_id')
+    difficulty = float(request.form.get('difficulty'))
+    demon_type = request.form.get('demon_type', '').strip() if difficulty == 10 else None
+    
+    # Validate demon type for 10-star levels
+    if difficulty == 10 and not demon_type:
+        flash('Demon type is required for 10-star levels', 'danger')
+        return redirect(url_for('admin_levels'))
+    
+    if difficulty != 10 and demon_type:
+        demon_type = None  # Clear demon type for non-demon levels
 
     
     level = mongo_db.levels.find_one({"_id": db_level_id})
@@ -4637,7 +4864,8 @@ def admin_edit_level():
         "video_url": request.form.get('video_url'),
         "thumbnail_url": thumbnail_url,
         "description": request.form.get('description'),
-        "difficulty": float(request.form.get('difficulty')),
+        "difficulty": difficulty,
+        "demon_type": demon_type,
         "position": position,
         "is_legacy": is_legacy,
         "level_type": request.form.get('level_type', 'Level'),
@@ -6704,7 +6932,7 @@ def update_user_settings():
             nickname = request.form.get('nickname', '').strip()
             email = request.form.get('email', '').strip()
             bio = request.form.get('bio', '').strip()
-            country = request.form.get('country', '').strip()
+            timezone = request.form.get('timezone', 'UTC').strip()
             
             # Validation
             if not username or len(username) < 3:
@@ -6727,11 +6955,47 @@ def update_user_settings():
                     "nickname": nickname,
                     "email": email,
                     "bio": bio,
-                    "country": country
+                    "timezone": timezone
                 }}
             )
             session['username'] = username  # Update session
             flash('Profile updated successfully!', 'success')
+            
+        elif action == 'gd_verification':
+            gd_username = request.form.get('gd_username', '').strip()
+            gd_user_id = request.form.get('gd_user_id', '').strip()
+            verification_method = request.form.get('verification_method', 'comment')
+            
+            # Generate verification code
+            import secrets
+            verification_code = f"RTL-{secrets.token_hex(4).upper()}"
+            
+            mongo_db.users.update_one(
+                {"_id": user_id},
+                {"$set": {
+                    "gd_username": gd_username,
+                    "gd_user_id": int(gd_user_id) if gd_user_id else None,
+                    "gd_verification_method": verification_method,
+                    "gd_verification_code": verification_code,
+                    "gd_verified": False
+                }}
+            )
+            flash('Verification code generated! Follow the instructions to verify your account.', 'info')
+            
+        elif action == 'notifications':
+            email_notifications = 'email_notifications' in request.form
+            record_notifications = 'record_notifications' in request.form
+            level_notifications = 'level_notifications' in request.form
+            
+            mongo_db.users.update_one(
+                {"_id": user_id},
+                {"$set": {
+                    "email_notifications": email_notifications,
+                    "record_notifications": record_notifications,
+                    "level_notifications": level_notifications
+                }}
+            )
+            flash('Notification preferences updated!', 'success')
             
         elif action == 'preferences':
             # Handle preferences including difficulty range and gaming settings

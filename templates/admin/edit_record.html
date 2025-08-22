@@ -1,0 +1,162 @@
+{% extends "layout.html" %}
+
+{% block title %}Edit Record - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>✏️ Edit Record #{{ record._id }}</h2>
+                <div>
+                    <a href="{{ url_for('admin_records') }}" class="btn btn-secondary">← Back to Records</a>
+                </div>
+            </div>
+            
+            <!-- Record Information -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">📋 Record Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>User:</strong> {{ record.user.username }}</p>
+                            <p><strong>Level:</strong> {{ record.level.name }}</p>
+                            <p><strong>Creator:</strong> {{ record.level.creator }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Position:</strong> #{{ record.level.position }}</p>
+                            <p><strong>Submitted:</strong> {{ record.date_submitted.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                            {% if record.get('last_edited_by') %}
+                                <p><strong>Last Edited:</strong> {{ record.last_edited_by }} on {{ record.last_edited_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Edit Form -->
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Edit Record Details</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="percentage" class="form-label">Percentage *</label>
+                                    <input type="number" class="form-control" id="percentage" name="percentage" 
+                                           value="{{ record.percentage }}" min="1" max="100" required>
+                                    <div class="form-text">The completion percentage (1-100)</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="status" class="form-label">Status *</label>
+                                    <select class="form-select" id="status" name="status" required>
+                                        <option value="pending" {% if record.status == 'pending' %}selected{% endif %}>⏳ Pending</option>
+                                        <option value="approved" {% if record.status == 'approved' %}selected{% endif %}>✅ Approved</option>
+                                        <option value="rejected" {% if record.status == 'rejected' %}selected{% endif %}>❌ Rejected</option>
+                                    </select>
+                                    <div class="form-text">Record approval status</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="video_url" class="form-label">Video URL</label>
+                            <input type="url" class="form-control" id="video_url" name="video_url" 
+                                   value="{{ record.video_url or '' }}" placeholder="https://youtube.com/watch?v=...">
+                            <div class="form-text">Proof video URL (optional)</div>
+                        </div>
+                        
+                        <!-- Current Video Preview -->
+                        {% if record.video_url %}
+                        <div class="mb-3">
+                            <label class="form-label">Current Video</label>
+                            <div class="border rounded p-3 bg-light">
+                                <a href="{{ record.video_url }}" target="_blank" class="btn btn-outline-primary btn-sm">
+                                    <i class="fas fa-external-link-alt"></i> View Current Video
+                                </a>
+                                <small class="d-block mt-2 text-muted">{{ record.video_url }}</small>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Warning for Status Changes -->
+                        <div class="alert alert-warning">
+                            <h6><i class="fas fa-exclamation-triangle"></i> Important Notes:</h6>
+                            <ul class="mb-0">
+                                <li><strong>Approving</strong> a record will add points to the user's total</li>
+                                <li><strong>Rejecting</strong> an approved record will remove points from the user</li>
+                                <li><strong>Changing percentage</strong> will recalculate the user's points</li>
+                                <li>All changes are logged and attributed to your admin account</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('admin_records') }}" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Save Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Danger Zone -->
+            <div class="card mt-4 border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">⚠️ Danger Zone</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-danger">
+                        <strong>Delete Record:</strong> This action cannot be undone. The record will be permanently removed 
+                        and the user's points will be recalculated.
+                    </p>
+                    <form method="POST" action="{{ url_for('admin_delete_record', record_id=record._id|string) }}" 
+                          onsubmit="return confirm('⚠️ PERMANENTLY DELETE THIS RECORD?\n\nUser: {{ record.user.username }}\nLevel: {{ record.level.name }}\nPercentage: {{ record.percentage }}%\n\nThis action CANNOT be undone!\n\nType DELETE to confirm:') && prompt('Type DELETE to confirm:') === 'DELETE';">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> Delete Record
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Status change confirmation
+    document.getElementById('status').addEventListener('change', function() {
+        const originalStatus = '{{ record.status }}';
+        const newStatus = this.value;
+        
+        if (originalStatus !== newStatus) {
+            if (newStatus === 'approved' && originalStatus !== 'approved') {
+                if (!confirm('⚠️ Approve this record?\n\nThis will add points to the user\'s total.')) {
+                    this.value = originalStatus;
+                }
+            } else if (newStatus === 'rejected' && originalStatus === 'approved') {
+                if (!confirm('⚠️ Reject this approved record?\n\nThis will remove points from the user\'s total.')) {
+                    this.value = originalStatus;
+                }
+            }
+        }
+    });
+    
+    // Percentage validation
+    document.getElementById('percentage').addEventListener('input', function() {
+        const value = parseInt(this.value);
+        if (value < 1 || value > 100) {
+            this.setCustomValidity('Percentage must be between 1 and 100');
+        } else {
+            this.setCustomValidity('');
+        }
+    });
+</script>
+{% endblock %}

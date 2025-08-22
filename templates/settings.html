@@ -1,6 +1,39 @@
 {% extends "layout.html" %}
+{% extends "layout.html" %}
 
 {% block title %}Settings - {{ user.username }}{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Password confirmation validation
+        const newPassword = document.getElementById('new_password');
+        const confirmPassword = document.getElementById('confirm_password');
+        
+        if (newPassword && confirmPassword) {
+            confirmPassword.addEventListener('input', function() {
+                if (newPassword.value !== confirmPassword.value) {
+                    confirmPassword.setCustomValidity('Passwords do not match');
+                } else {
+                    confirmPassword.setCustomValidity('');
+                }
+            });
+        }
+        
+        // Verify GD account form validation
+        const gdVerifyForm = document.querySelector('form[action*="verify_gd_account"]');
+        if (gdVerifyForm) {
+            gdVerifyForm.addEventListener('submit', function(e) {
+                const gdUsername = document.getElementById('gd_username').value.trim();
+                if (!gdUsername) {
+                    e.preventDefault();
+                    alert('Please enter your GD username first!');
+                    return false;
+                }
+            });
+        }
+    });
+</script>
 
 {% block content %}
 <div class="container">
@@ -43,28 +76,22 @@
                                    value="{{ user.email }}" required>
                         </div>
                         
+
+                        
                         <div class="mb-3">
-                            <label for="country" class="form-label">Country</label>
-                            <select class="form-select form-select-sm" id="country" name="country">
-                                <option value="">Select country</option>
-                                <option value="US" {% if user.country == 'US' %}selected{% endif %}>🇺🇸 United States</option>
-                                <option value="GB" {% if user.country == 'GB' %}selected{% endif %}>🇬🇧 United Kingdom</option>
-                                <option value="CA" {% if user.country == 'CA' %}selected{% endif %}>🇨🇦 Canada</option>
-                                <option value="DE" {% if user.country == 'DE' %}selected{% endif %}>🇩🇪 Germany</option>
-                                <option value="FR" {% if user.country == 'FR' %}selected{% endif %}>🇫🇷 France</option>
-                                <option value="ES" {% if user.country == 'ES' %}selected{% endif %}>🇪🇸 Spain</option>
-                                <option value="IT" {% if user.country == 'IT' %}selected{% endif %}>🇮🇹 Italy</option>
-                                <option value="NL" {% if user.country == 'NL' %}selected{% endif %}>🇳🇱 Netherlands</option>
-                                <option value="SE" {% if user.country == 'SE' %}selected{% endif %}>🇸🇪 Sweden</option>
-                                <option value="NO" {% if user.country == 'NO' %}selected{% endif %}>🇳🇴 Norway</option>
-                                <option value="AU" {% if user.country == 'AU' %}selected{% endif %}>🇦🇺 Australia</option>
-                                <option value="JP" {% if user.country == 'JP' %}selected{% endif %}>🇯🇵 Japan</option>
-                                <option value="KR" {% if user.country == 'KR' %}selected{% endif %}>🇰🇷 South Korea</option>
-                                <option value="CN" {% if user.country == 'CN' %}selected{% endif %}>🇨🇳 China</option>
-                                <option value="BR" {% if user.country == 'BR' %}selected{% endif %}>🇧🇷 Brazil</option>
-                                <option value="MX" {% if user.country == 'MX' %}selected{% endif %}>🇲🇽 Mexico</option>
-                                <option value="RU" {% if user.country == 'RU' %}selected{% endif %}>🇷🇺 Russia</option>
-                                <option value="IN" {% if user.country == 'IN' %}selected{% endif %}>🇮🇳 India</option>
+                            <label for="timezone" class="form-label">Timezone</label>
+                            <select class="form-select form-select-sm" id="timezone" name="timezone">
+                                <option value="UTC" {% if not user.timezone or user.timezone == 'UTC' %}selected{% endif %}>UTC (GMT+0)</option>
+                                <option value="US/Eastern" {% if user.timezone == 'US/Eastern' %}selected{% endif %}>Eastern Time (GMT-5/-4)</option>
+                                <option value="US/Central" {% if user.timezone == 'US/Central' %}selected{% endif %}>Central Time (GMT-6/-5)</option>
+                                <option value="US/Mountain" {% if user.timezone == 'US/Mountain' %}selected{% endif %}>Mountain Time (GMT-7/-6)</option>
+                                <option value="US/Pacific" {% if user.timezone == 'US/Pacific' %}selected{% endif %}>Pacific Time (GMT-8/-7)</option>
+                                <option value="Europe/London" {% if user.timezone == 'Europe/London' %}selected{% endif %}>London (GMT+0/+1)</option>
+                                <option value="Europe/Berlin" {% if user.timezone == 'Europe/Berlin' %}selected{% endif %}>Berlin (GMT+1/+2)</option>
+                                <option value="Europe/Moscow" {% if user.timezone == 'Europe/Moscow' %}selected{% endif %}>Moscow (GMT+3)</option>
+                                <option value="Asia/Tokyo" {% if user.timezone == 'Asia/Tokyo' %}selected{% endif %}>Tokyo (GMT+9)</option>
+                                <option value="Asia/Shanghai" {% if user.timezone == 'Asia/Shanghai' %}selected{% endif %}>Shanghai (GMT+8)</option>
+                                <option value="Australia/Sydney" {% if user.timezone == 'Australia/Sydney' %}selected{% endif %}>Sydney (GMT+10/+11)</option>
                             </select>
                         </div>
                         
@@ -304,6 +331,18 @@
                                             <strong>Profile Method:</strong> Add verification code to your GD profile description
                                         </label>
                                     </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="verification_method" id="method_friend" value="friend">
+                                        <label class="form-check-label" for="method_friend">
+                                            <strong>Friend Request Method:</strong> Send a friend request with verification code as message
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="verification_method" id="method_message" value="message">
+                                        <label class="form-check-label" for="method_message">
+                                            <strong>Direct Message Method:</strong> Send a private message with verification code
+                                        </label>
+                                    </div>
                                 </div>
                                 
                                 <button type="submit" class="btn btn-success btn-sm">Generate Verification Code</button>
@@ -318,7 +357,7 @@
                                 <p class="mb-2"><strong>Instructions:</strong></p>
                                 <ol class="mb-0">
                                     <li>Copy the code above</li>
-                                    <li>{% if user.gd_verification_method == 'comment' %}Post it as a comment on any GD level{% elif user.gd_verification_method == 'level' %}Create a level and put it in the description{% else %}Add it to your GD profile description{% endif %}</li>
+                                    <li>{% if user.gd_verification_method == 'comment' %}Post it as a comment on any GD level{% elif user.gd_verification_method == 'level' %}Create a level and put it in the description{% elif user.gd_verification_method == 'profile' %}Add it to your GD profile description{% elif user.gd_verification_method == 'friend' %}Send a friend request to user 'RTLVerification' with the code as the message{% elif user.gd_verification_method == 'message' %}Send a private message to user 'RTLVerification' with the verification code{% else %}Add it to your GD profile description{% endif %}</li>
                                     <li>Click "Verify Account" below</li>
                                 </ol>
                             </div>

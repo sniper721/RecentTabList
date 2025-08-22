@@ -73,7 +73,7 @@
                                     </div>
                                 {% endif %}
                                 <div class="position-absolute top-0 start-0 bg-dark text-white px-2 py-1 rounded">
-                                    {{ level.position }}
+                                    {{ level.historical_position if level.historical_position else level.position }}
                                 </div>
                             </div>
                         </div>
@@ -87,7 +87,7 @@
                         </div>
                         <div class="text-end">
                             <div class="text-muted"><strong>{{ level.difficulty|round|int }}/10</strong></div>
-                            <small class="text-muted">{{ format_points(level.points) }} points</small>
+                            <small class="text-muted">{{ format_points(level.historical_points if level.historical_points else level.points) }} points</small>
                         </div>
                     </div>
                     {% endfor %}
