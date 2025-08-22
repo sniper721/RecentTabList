@@ -37,14 +37,32 @@
                                 {% set video_url = level.video_url if level is not mapping else level.get('video_url', '') %}
                                 {% set thumbnail_url = level.thumbnail_url if level is not mapping else level.get('thumbnail_url', '') %}
                                 
-                                <!-- SIMPLE, WORKING IMAGE SYSTEM -->
+                                <!-- OPTIMIZED IMAGE SYSTEM FOR BASE64 -->
                                 {% if thumbnail_url and thumbnail_url.strip() %}
-                                    <!-- Custom admin thumbnail -->
-                                    <img src="{{ thumbnail_url }}" 
-                                         alt="{{ level_name }}" 
-                                         class="img-fluid rounded"
-                                         style="width: 206px; height: 116px; object-fit: cover;"
-                                         loading="lazy">
+                                    {% if thumbnail_url.startswith('data:image') %}
+                                        <!-- Base64 image (no error handling needed) -->
+                                        <img src="{{ thumbnail_url }}" 
+                                             alt="{{ level_name }}" 
+                                             class="img-fluid rounded"
+                                             style="width: 206px; height: 116px; object-fit: cover;"
+                                             loading="lazy">
+                                    {% else %}
+                                        <!-- External URL image with error handling -->
+                                        <img src="{{ thumbnail_url }}" 
+                                             alt="{{ level_name }}" 
+                                             class="img-fluid rounded"
+                                             style="width: 206px; height: 116px; object-fit: cover;"
+                                             loading="lazy"
+                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <!-- Fallback for broken external images -->
+                                        <div class="bg-light rounded d-flex align-items-center justify-content-center text-muted" 
+                                             style="width: 206px; height: 116px; display: none;">
+                                            <div class="text-center">
+                                                <i class="fas fa-image fa-2x mb-2"></i>
+                                                <div>Image Error</div>
+                                            </div>
+                                        </div>
+                                    {% endif %}
                                 {% else %}
                                     <!-- YouTube auto thumbnail -->
                                     {% set youtube_id = '' %}
@@ -63,6 +81,7 @@
                                              class="img-fluid rounded"
                                              style="width: 206px; height: 116px; object-fit: cover;"
                                              loading="lazy">
+                                    {% else %}
                                         <!-- Clean placeholder for no video -->
                                         <div class="bg-light rounded d-flex align-items-center justify-content-center text-muted" 
                                              style="width: 206px; height: 116px;">

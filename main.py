@@ -595,6 +595,89 @@ def log_admin_action(admin_username, action, details=""):
     except Exception as e:
         print(f"Error logging admin action: {e}")
 
+def convert_image_to_base64(file_stream, max_kb=50, target_size=(320, 180)):
+    """
+    Convert uploaded image to optimized Base64 within size limit
+    
+    Args:
+        file_stream: File stream from uploaded image
+        max_kb: Maximum size in KB (default 50KB)
+        target_size: Target dimensions as (width, height) tuple (default 320x180 for 16:9)
+    
+    Returns:
+        Base64 data URL string or None if conversion fails
+    """
+    try:
+        from PIL import Image
+        import base64
+        from io import BytesIO
+        
+        # Open image from stream
+        img = Image.open(file_stream)
+        
+        # Convert to RGB (removes alpha channel if present)
+        if img.mode in ('RGBA', 'P', 'LA'):
+            img = img.convert('RGB')
+        
+        # Force 16:9 aspect ratio by cropping/resizing
+        target_width, target_height = target_size
+        
+        # Calculate current aspect ratio
+        current_width, current_height = img.size
+        current_ratio = current_width / current_height
+        target_ratio = target_width / target_height
+        
+        if current_ratio > target_ratio:
+            # Image is wider than target ratio - crop width
+            new_width = int(current_height * target_ratio)
+            left = (current_width - new_width) // 2
+            img = img.crop((left, 0, left + new_width, current_height))
+        elif current_ratio < target_ratio:
+            # Image is taller than target ratio - crop height
+            new_height = int(current_width / target_ratio)
+            top = (current_height - new_height) // 2
+            img = img.crop((0, top, current_width, top + new_height))
+        
+        # Resize to exact target dimensions
+        img = img.resize(target_size, Image.Resampling.LANCZOS)
+        
+        # Try different quality levels to fit size limit (prefer better quality first)
+        max_bytes = max_kb * 1024
+        
+        for quality in [95, 85, 75, 65, 55, 45, 35]:  # Start with high quality
+            output = BytesIO()
+            img.save(output, 
+                    format='JPEG', 
+                    quality=quality, 
+                    optimize=True, 
+                    progressive=True)
+            
+            output.seek(0)
+            image_bytes = output.getvalue()
+            
+            # Check if within size limit
+            if len(image_bytes) <= max_bytes:
+                # Convert to Base64 data URL
+                base64_string = base64.b64encode(image_bytes).decode('utf-8')
+                data_url = f"data:image/jpeg;base64,{base64_string}"
+                
+                # Final size check (Base64 is ~33% larger)
+                final_size_kb = len(data_url.encode('utf-8')) / 1024
+                print(f"✅ Image optimized: {quality}% quality, {final_size_kb:.1f}KB")
+                
+                return data_url
+        
+        # If even lowest quality is too big, return None
+        print(f"❌ Could not compress image to under {max_kb}KB")
+        return None
+        
+    except ImportError:
+        print("❌ PIL/Pillow not available for image processing")
+        return None
+    except Exception as e:
+        print(f"❌ Error converting image to Base64: {e}")
+        return None
+
 def send_discord_notification_direct(username, level_name, progress, video_url):
     """Direct Discord notification without external file"""
     import requests
@@ -826,6 +909,218 @@ def quick_fix_urls():
         
     except Exception as e:
         return f"<h2>❌ Error</h2><p>{str(e)}</p>"
+
+@app.route('/test_base64_display')
+def test_base64_display():
+    """Test Base64 image display directly"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    # Get the first level with a Base64 thumbnail
+    level = mongo_db.levels.find_one({
+        "thumbnail_url": {"$regex": "^data:image"}
+    })
+    
+    if not level:
+        return "<h2>No Base64 images found in database</h2><p><a href='/debug_thumbnails'>Debug Thumbnails</a></p>"
+    
+    thumbnail_url = level.get('thumbnail_url', '')
+    
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Base64 Image Test</title>
+    </head>
+    <body style="padding: 20px; font-family: Arial;">
+        <h2>Base64 Image Display Test</h2>
+        <p><strong>Level:</strong> {level.get('name', 'Unknown')}</p>
+        <p><strong>Thumbnail URL starts with:</strong> {thumbnail_url[:50] if thumbnail_url else 'None'}...</p>
+        <p><strong>Size:</strong> {len(thumbnail_url)} characters ({len(thumbnail_url.encode('utf-8'))//1024}KB)</p>
+        
+        <h3>Direct Image Display:</h3>
+        <img src="{thumbnail_url}" 
+             style="width: 320px; height: 180px; border: 2px solid red; object-fit: cover;"
+             alt="Base64 Test" 
+             onload="document.getElementById('status').innerHTML = '✅ Image loaded successfully!'"
+             onerror="document.getElementById('status').innerHTML = '❌ Image failed to load!'">
+        
+        <p id="status">⏳ Loading...</p>
+        
+        <p><a href="/debug_thumbnails">← Back to Debug</a> | <a href="/">Main List</a></p>
+    </body>
+    </html>
+    """
+
+@app.route('/debug_thumbnails')
+def debug_thumbnails():
+    """Debug thumbnail URLs in database"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Get first 10 levels with their thumbnail info
+        levels = list(mongo_db.levels.find(
+            {}, 
+            {"name": 1, "thumbnail_url": 1, "video_url": 1, "position": 1}
+        ).sort("position", 1).limit(10))
+        
+        debug_html = """
+        <div style="padding: 20px; font-family: Arial;">
+            <h2>🔍 Thumbnail Debug Info</h2>
+            <table border="1" style="border-collapse: collapse; width: 100%;">
+                <tr style="background: #f5f5f5;">
+                    <th style="padding: 10px;">Position</th>
+                    <th style="padding: 10px;">Level Name</th>
+                    <th style="padding: 10px;">Thumbnail Type</th>
+                    <th style="padding: 10px;">Thumbnail Info</th>
+                </tr>
+        """
+        
+        for level in levels:
+            name = level.get('name', 'Unknown')
+            position = level.get('position', '?')
+            thumbnail_url = level.get('thumbnail_url', '')
+            video_url = level.get('video_url', '')
+            
+            if thumbnail_url and thumbnail_url.strip():
+                if thumbnail_url.startswith('data:image'):
+                    thumb_type = "Base64"
+                    thumb_info = f"Length: {len(thumbnail_url)} chars ({len(thumbnail_url.encode('utf-8'))//1024}KB)"
+                elif thumbnail_url.startswith('http'):
+                    thumb_type = "External URL"
+                    thumb_info = thumbnail_url[:50] + "..." if len(thumbnail_url) > 50 else thumbnail_url
+                elif thumbnail_url.startswith('/static/'):
+                    thumb_type = "Local File"
+                    thumb_info = thumbnail_url
+                else:
+                    thumb_type = "Unknown"
+                    thumb_info = thumbnail_url[:50] + "..." if len(thumbnail_url) > 50 else thumbnail_url
+            else:
+                if video_url and ('youtube.com' in video_url or 'youtu.be' in video_url):
+                    thumb_type = "YouTube Auto"
+                    thumb_info = "Will use YouTube thumbnail"
+                else:
+                    thumb_type = "No Image"
+                    thumb_info = "Will show placeholder"
+            
+            debug_html += f"""
+                <tr>
+                    <td style="padding: 10px;">{position}</td>
+                    <td style="padding: 10px;">{name}</td>
+                    <td style="padding: 10px;"><strong>{thumb_type}</strong></td>
+                    <td style="padding: 10px; font-family: monospace; font-size: 12px;">{thumb_info}</td>
+                </tr>
+            """
+        
+        debug_html += """
+            </table>
+            <br>
+            <p><a href="/">← Back to Main List</a> | <a href="/admin/levels">Admin Levels</a> | <a href="/test_base64_upload">Test Base64 Upload</a> | <a href="/test_base64_display">🧪 Test Base64 Display</a></p>
+        </div>
+        """
+        
+        return debug_html
+        
+    except Exception as e:
+        return f"<div style='padding:20px; color:red;'>Debug Error: {e}</div>"
+
+@app.route('/test_base64_upload', methods=['GET', 'POST'])
+def test_base64_upload():
+    """Test Base64 image conversion functionality"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        try:
+            test_file = request.files.get('test_file')
+            if test_file and test_file.filename:
+                # Try converting to Base64
+                base64_data = convert_image_to_base64(
+                    test_file.stream,
+                    max_kb=50,
+                    target_size=(320, 180)
+                )
+                
+                if base64_data:
+                    # Calculate final size
+                    final_size_kb = len(base64_data.encode('utf-8')) / 1024
+                    
+                    return f"""
+                    <div style="padding: 20px; font-family: Arial;">
+                        <h2>✅ Base64 Conversion Successful!</h2>
+                        <p><strong>Original file:</strong> {test_file.filename}</p>
+                        <p><strong>Final size:</strong> {final_size_kb:.1f}KB (Base64)</p>
+                        <p><strong>Dimensions:</strong> 320x180 (16:9 aspect ratio)</p>
+                        
+                        <h3>Preview:</h3>
+                        <img src="{base64_data}" style="border: 1px solid #ddd; max-width: 320px;">
+                        
+                        <h3>Base64 Data (first 100 chars):</h3>
+                        <code style="background: #f5f5f5; padding: 10px; display: block; word-break: break-all;">
+                            {base64_data[:100]}...
+                        </code>
+                        
+                        <p><a href="/test_base64_upload">Test Another Image</a> | <a href="/admin/levels">Admin Levels</a></p>
+                    </div>
+                    """
+                else:
+                    return """
+                    <div style="padding: 20px; font-family: Arial; color: red;">
+                        <h2>❌ Base64 Conversion Failed</h2>
+                        <p>Could not compress image to under 50KB even at lowest quality.</p>
+                        <p>Try a smaller or simpler image.</p>
+                        <p><a href="/test_base64_upload">Try Again</a></p>
+                    </div>
+                    """
+            else:
+                return "No file uploaded"
+                
+        except Exception as e:
+            return f"<div style='padding:20px; color:red;'>Error: {e}</div>"
+    
+    # GET request - show upload form
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Test Base64 Image Conversion</title>
+        <style>
+            body { font-family: Arial; padding: 20px; max-width: 600px; margin: 0 auto; }
+            .form-group { margin: 15px 0; }
+            input[type=file], button { padding: 10px; margin: 5px 0; }
+            .info { background: #e3f2fd; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        </style>
+    </head>
+    <body>
+        <h2>🖼️ Test Base64 Image Conversion</h2>
+        
+        <div class="info">
+            <h4>Conversion Settings:</h4>
+            <ul>
+                <li><strong>Max size:</strong> 50KB (Base64)</li>
+                <li><strong>Dimensions:</strong> 320x180 pixels (16:9 aspect ratio)</li>
+                <li><strong>Quality:</strong> Starts at 95%, reduces if needed</li>
+                <li><strong>Format:</strong> JPEG with optimization</li>
+                <li><strong>Cropping:</strong> Auto-crops to fit 16:9 ratio</li>
+            </ul>
+        </div>
+        
+        <form method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+                <label>Select Image to Test:</label><br>
+                <input type="file" name="test_file" accept="image/*" required>
+            </div>
+            <button type="submit">🚀 Convert to Base64</button>
+        </form>
+        
+        <p><a href="/admin/levels">← Back to Admin Levels</a></p>
+    </body>
+    </html>
+    """
 
 @app.route('/admin/set_thumbnail/<level_id>', methods=['GET', 'POST'])
 def set_thumbnail(level_id):
@@ -2315,6 +2610,50 @@ def debug_images():
         """
         
         return html
+        
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
+
+@app.route('/cleanup_broken_thumbnails')
+def cleanup_broken_thumbnails():
+    """Clean up broken thumbnail URLs pointing to missing files"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return "Access denied - Admin only"
+    
+    try:
+        # Find levels with thumbnail URLs pointing to missing files in /static/thumbnails/
+        levels_with_broken_thumbs = list(mongo_db.levels.find({
+            "thumbnail_url": {"$regex": "^/static/thumbnails/"}
+        }))
+        
+        if not levels_with_broken_thumbs:
+            return "<h2>✅ No broken thumbnails found!</h2><p><a href='/'>← Back to main</a></p>"
+        
+        # Clear the broken thumbnail URLs
+        result = mongo_db.levels.update_many(
+            {"thumbnail_url": {"$regex": "^/static/thumbnails/"}},
+            {"$set": {"thumbnail_url": ""}}
+        )
+        
+        # Clear cache
+        levels_cache['main_list'] = None
+        levels_cache['legacy_list'] = None
+        
+        return f"""
+        <h2>🔧 Cleaned Up Broken Thumbnails!</h2>
+        <div style="background: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p>✅ Removed {result.modified_count} broken thumbnail URLs</p>
+            <p>These were pointing to missing files in /static/thumbnails/</p>
+            <p>Now these levels will fall back to YouTube thumbnails automatically!</p>
+        </div>
+        <p>
+            <a href="/" style="background: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 18px;">🏠 CHECK MAIN LIST NOW</a>
+        </p>
+        <p>
+            <a href="/debug_images">🔍 Debug Images</a> | 
+            <a href="/admin">⚙️ Admin Panel</a>
+        </p>
+        """
         
     except Exception as e:
         return f"❌ Error: {str(e)}"
@@ -4065,35 +4404,28 @@ def admin_levels():
         video_url = request.form.get('video_url')
         thumbnail_url = request.form.get('thumbnail_url')
         
-        # Handle file upload - save to static folder
+        # Handle file upload - Convert to Base64 instead of saving file
         if 'thumbnail_file' in request.files:
             file = request.files['thumbnail_file']
             if file and file.filename:
-                import os
-                import time
+                print(f"🔄 Processing uploaded image: {file.filename}")
                 
-                # Create thumbnails directory if it doesn't exist
-                os.makedirs('static/thumbnails', exist_ok=True)
-                
-                # Generate unique filename
+                # Validate file type
                 file_ext = file.filename.split('.')[-1].lower()
                 if file_ext not in ['png', 'jpg', 'jpeg', 'gif', 'webp']:
-                    file_ext = 'png'
+                    flash('Invalid file type. Please use PNG, JPG, JPEG, GIF, or WebP.', 'danger')
+                    return redirect(url_for('admin_levels'))
                 
-                # Use level name and timestamp for filename
-                safe_name = "".join(c for c in name if c.isalnum() or c in (' ', '-', '_')).rstrip()
-                safe_name = safe_name.replace(' ', '_')
-                filename = f"{safe_name}_{int(time.time())}.{file_ext}"
-                filepath = os.path.join('static/thumbnails', filename)
+                # Convert to Base64 with 50KB limit and 16:9 aspect ratio
+                base64_data = convert_image_to_base64(file.stream, max_kb=50, target_size=(320, 180))
                 
-                # Save the file directly - ORIGINAL SIMPLE METHOD
-                file.save(filepath)
-                
-                # Set thumbnail URL to the saved file
-                thumbnail_url = f"/static/thumbnails/{filename}"
-                    
-                print(f"✅ Thumbnail uploaded successfully: {filename}")
-                print(f"✅ Thumbnail URL: {thumbnail_url}")
+                if base64_data:
+                    thumbnail_url = base64_data
+                    print(f"✅ Image converted to Base64 successfully")
+                    flash(f'Image uploaded and optimized successfully! ({len(base64_data)//1024}KB)', 'success')
+                else:
+                    flash('Failed to process image. Please try a smaller image or different format.', 'danger')
+                    return redirect(url_for('admin_levels'))
         
         description = request.form.get('description')
         difficulty = float(request.form.get('difficulty'))
@@ -4224,34 +4556,28 @@ def admin_edit_level():
         # Custom URL
         thumbnail_url = request.form.get('thumbnail_url', '').strip()
     elif thumbnail_type == 'upload':
-        # File upload
+        # File upload - Convert to Base64 instead of saving file
         if 'thumbnail_file' in request.files:
             file = request.files['thumbnail_file']
             if file and file.filename:
-                import os
-                import time
+                print(f"🔄 Processing uploaded image for edit: {file.filename}")
                 
-                # Create thumbnails directory if it doesn't exist
-                os.makedirs('static/thumbnails', exist_ok=True)
-                
-                # Generate unique filename
+                # Validate file type
                 file_ext = file.filename.split('.')[-1].lower()
                 if file_ext not in ['png', 'jpg', 'jpeg', 'gif', 'webp']:
-                    file_ext = 'png'
+                    flash('Invalid file type. Please use PNG, JPG, JPEG, GIF, or WebP.', 'danger')
+                    return redirect(url_for('admin_levels'))
                 
-                # Use level name and timestamp for filename
-                level_name = request.form.get('name', 'unknown')
-                safe_name = "".join(c for c in level_name if c.isalnum() or c in (' ', '-', '_')).rstrip()
-                safe_name = safe_name.replace(' ', '_')
-                filename = f"{safe_name}_{int(time.time())}.{file_ext}"
-                filepath = os.path.join('static/thumbnails', filename)
+                # Convert to Base64 with 50KB limit and 16:9 aspect ratio
+                base64_data = convert_image_to_base64(file.stream, max_kb=50, target_size=(320, 180))
                 
-                # Save the file
-                file.save(filepath)
-                
-                # Set thumbnail URL to the saved file
-                thumbnail_url = f"/static/thumbnails/{filename}"
-                print(f"✅ Thumbnail uploaded: {filename}")
+                if base64_data:
+                    thumbnail_url = base64_data
+                    print(f"✅ Image converted to Base64 successfully")
+                    flash(f'Thumbnail updated successfully! ({len(base64_data)//1024}KB)', 'success')
+                else:
+                    flash('Failed to process image. Please try a smaller image or different format.', 'danger')
+                    return redirect(url_for('admin_levels'))
     # If thumbnail_type == 'auto', thumbnail_url stays empty (uses YouTube auto)
     
     # Handle position changes
