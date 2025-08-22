@@ -111,6 +111,9 @@
                         {% set difficulty = (level.difficulty|default(5.0))|round|int if level is not mapping else (level['difficulty']|default(5.0))|round|int %}
                         {% set demon_type = level.demon_type if level is not mapping else level.get('demon_type') %}
                         <div class="text-muted"><strong>{{ get_demon_difficulty_display(difficulty, demon_type) }}</strong></div>
+                        {% if difficulty == 10 and get_demon_type_display(difficulty, demon_type) %}
+                            <div class="text-muted small">{{ get_demon_type_display(difficulty, demon_type) }}</div>
+                        {% endif %}
                         {% set position = level.position if level is not mapping else level['position'] %}
                         {% set points = level.points if level is not mapping else level['points'] %}
                         <small class="text-muted">{{ format_points(points or ((100 - position + 1) / 10)|round(2)) }} points</small>
