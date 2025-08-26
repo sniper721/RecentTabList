@@ -1,0 +1,195 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ article.title }} - RTL News{% endblock %}
+
+{% block extra_css %}
+<style>
+    .article-header {
+        border-bottom: 3px solid #000;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+    }
+    
+    .article-title {
+        font-family: 'Times New Roman', serif;
+        font-size: 2.5rem;
+        font-weight: bold;
+        line-height: 1.2;
+        margin-bottom: 1rem;
+    }
+    
+    .article-meta {
+        color: #666;
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
+    
+    .article-content {
+        font-size: 1.1rem;
+        line-height: 1.8;
+        text-align: justify;
+        margin-bottom: 2rem;
+    }
+    
+    .article-content p {
+        margin-bottom: 1.5rem;
+    }
+    
+    .category-badge {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.8rem;
+        border-radius: 4px;
+        font-weight: bold;
+        text-transform: uppercase;
+        margin-bottom: 1rem;
+        display: inline-block;
+    }
+    
+    .category-general { background: #6c757d; color: white; }
+    .category-updates { background: #007bff; color: white; }
+    .category-events { background: #28a745; color: white; }
+    .category-announcements { background: #ffc107; color: black; }
+    .category-community { background: #17a2b8; color: white; }
+    
+    .related-articles {
+        border-top: 2px solid #ddd;
+        padding-top: 2rem;
+        margin-top: 2rem;
+    }
+    
+    .related-article-card {
+        border: 1px solid #ddd;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        transition: all 0.2s ease;
+    }
+    
+    .related-article-card:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        transform: translateY(-1px);
+    }
+    
+    .back-to-news {
+        background: #000;
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        text-transform: uppercase;
+        font-weight: bold;
+        letter-spacing: 1px;
+        text-decoration: none;
+        display: inline-block;
+        transition: all 0.2s ease;
+    }
+    
+    .back-to-news:hover {
+        background: #333;
+        color: white;
+    }
+    
+    @media (max-width: 768px) {
+        .article-title {
+            font-size: 1.8rem;
+        }
+        .article-content {
+            font-size: 1rem;
+            text-align: left;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-lg-8 offset-lg-2">
+            <!-- Article Header -->
+            <div class="article-header">
+                <div class="mb-2">
+                    <a href="{{ url_for('news_blog') }}" class="back-to-news">
+                        ← Back to News
+                    </a>
+                </div>
+                
+                <span class="category-badge category-{{ article.category.lower() }}">
+                    {{ article.category }}
+                </span>
+                
+                <h1 class="article-title">{{ article.title }}</h1>
+                
+                <div class="article-meta">
+                    <i class="fas fa-user"></i> By <strong>{{ article.author }}</strong> • 
+                    <i class="fas fa-calendar"></i> {{ article.published_at.strftime('%B %d, %Y at %I:%M %p') }}
+                    {% if article.published_at.date() == datetime.now().date() %}
+                        <span class="badge bg-danger ms-2">PUBLISHED TODAY</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Article Content -->
+            <div class="article-content">
+                {{ article.content|safe }}
+            </div>
+            
+            <!-- Article Footer -->
+            <div class="d-flex justify-content-between align-items-center py-3 border-top">
+                <div>
+                    <small class="text-muted">
+                        Published {{ article.published_at.strftime('%B %d, %Y') }}
+                        {% if article.updated_at and article.updated_at != article.created_at %}
+                            • Updated {{ article.updated_at.strftime('%B %d, %Y') }}
+                        {% endif %}
+                    </small>
+                </div>
+                <div>
+                    <a href="{{ url_for('news_blog') }}" class="btn btn-outline-primary">
+                        📰 More News
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Related Articles -->
+    {% if related_articles %}
+    <div class="row">
+        <div class="col-lg-8 offset-lg-2">
+            <div class="related-articles">
+                <h3 style="font-family: 'Times New Roman', serif; margin-bottom: 1.5rem;">Related Articles</h3>
+                <div class="row">
+                    {% for related in related_articles %}
+                    <div class="col-md-4">
+                        <div class="related-article-card">
+                            <span class="category-badge category-{{ related.category.lower() }}" style="font-size: 0.7rem; padding: 0.2rem 0.5rem;">
+                                {{ related.category }}
+                            </span>
+                            
+                            <h5 style="font-family: 'Times New Roman', serif; margin-bottom: 0.5rem;">
+                                <a href="{{ url_for('news_article', article_id=related._id) }}" 
+                                   class="text-decoration-none text-dark">
+                                    {{ related.title }}
+                                </a>
+                            </h5>
+                            
+                            <p class="small text-muted mb-2">
+                                {{ related.published_at.strftime('%B %d, %Y') }}
+                            </p>
+                            
+                            <p class="small">
+                                {{ related.excerpt[:100] }}{% if related.excerpt|length > 100 %}...{% endif %}
+                            </p>
+                            
+                            <a href="{{ url_for('news_article', article_id=related._id) }}" 
+                               class="btn btn-sm btn-outline-dark">
+                                Read More →
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

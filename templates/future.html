@@ -27,7 +27,7 @@
                     {% for level in levels %}
                     <div class="d-flex align-items-center p-3 border-bottom level-card" 
                          style="background: linear-gradient(90deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%); cursor: pointer; transition: all 0.2s ease;"
-                         onclick="window.location.href='{{ url_for('future_level_details', level_id=level._id) }}'"
+                         onclick="window.location.href='{{ url_for('future_level_details', level_id=level._id) }}';"
                          onmouseover="this.style.background='linear-gradient(90deg, rgba(102,126,234,0.2) 0%, rgba(118,75,162,0.2) 100%)'"
                          onmouseout="this.style.background='linear-gradient(90deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%)'">
                         <div class="me-4">
@@ -70,13 +70,13 @@
                         <div class="flex-grow-1">
                             <h5 class="mb-1">{{ level.name }}</h5>
                             <p class="mb-1 text-muted">by {{ level.creator }}</p>
-                            <small class="text-muted d-block">verified by {{ level.verifier }}</small>
+                            <!-- verified by text removed - levels not verified yet -->
                             {% if level.description %}
                                 <small class="text-info d-block mt-1">{{ level.description }}</small>
                             {% endif %}
                         </div>
                         <div class="text-end">
-                            <div class="text-muted"><strong>{{ (level.difficulty or 5)|round|int }}/10</strong></div>
+                            <div class="text-muted"><strong>{{ get_difficulty_text(level.difficulty or 5) }}</strong></div>
                             <small class="text-muted">{{ level.points or 0 }} points</small>
                             <div class="mt-1">
                                 <span class="badge bg-info">Coming Soon</span>

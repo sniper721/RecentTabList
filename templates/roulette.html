@@ -1,0 +1,368 @@
+{% extends "layout.html" %}
+
+{% block title %}🎯 Recent Tab Roulette - RTL{% endblock %}
+
+{% block extra_css %}
+<style>
+    .roulette-container {
+        background: #1a1a1a;
+        min-height: 100vh;
+        color: white;
+        padding: 2rem 0;
+    }
+    
+    .roulette-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    
+    .roulette-title {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #ffffff;
+        margin-bottom: 0.5rem;
+    }
+    
+    .level-card {
+        background: #2d2d2d;
+        border-radius: 15px;
+        padding: 2rem;
+        margin: 2rem auto;
+        max-width: 800px;
+        border: 1px solid #444;
+    }
+    
+    .level-display {
+        display: flex;
+        align-items: center;
+        gap: 2rem;
+        margin-bottom: 2rem;
+    }
+    
+    .level-thumbnail {
+        width: 120px;
+        height: 120px;
+        border-radius: 10px;
+        background: #444;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+        color: #888;
+        flex-shrink: 0;
+    }
+    
+    .level-info {
+        flex: 1;
+    }
+    
+    .level-title {
+        font-size: 1.8rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+        color: #ffffff;
+    }
+    
+    .level-creator {
+        color: #aaa;
+        font-style: italic;
+        margin-bottom: 1rem;
+    }
+    
+    .level-details {
+        display: flex;
+        gap: 2rem;
+        color: #ccc;
+        font-size: 0.9rem;
+    }
+    
+    .target-section {
+        text-align: right;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 1rem;
+    }
+    
+    .target-display {
+        background: #333;
+        border: 1px solid #555;
+        border-radius: 10px;
+        padding: 1rem;
+        color: #ddd;
+        font-size: 1rem;
+        min-width: 150px;
+        text-align: center;
+    }
+    
+    .percentage-input {
+        background: #333;
+        border: 2px solid #555;
+        border-radius: 8px;
+        color: white;
+        padding: 0.8rem;
+        font-size: 1.1rem;
+        text-align: center;
+        width: 150px;
+    }
+    
+    .percentage-input:focus {
+        outline: none;
+        border-color: #4CAF50;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+    
+    .btn-done {
+        background: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.8rem 1.5rem;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+    
+    .btn-done:hover {
+        background: #45a049;
+    }
+    
+    .btn-give-up {
+        background: #f44336;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.8rem 1.5rem;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+    
+    .btn-give-up:hover {
+        background: #da190b;
+    }
+    
+    .start-section {
+        text-align: center;
+        max-width: 600px;
+        margin: 0 auto;
+        background: #2d2d2d;
+        border-radius: 15px;
+        padding: 3rem;
+        border: 1px solid #444;
+    }
+    
+    .btn-start {
+        background: #2196F3;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 1rem 2rem;
+        font-size: 1.2rem;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background 0.3s;
+    }
+    
+    .btn-start:hover {
+        background: #1976D2;
+    }
+    
+    .progress-info {
+        background: #333;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-top: 2rem;
+        text-align: center;
+    }
+    
+    .progress-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: center;
+        margin-top: 1rem;
+    }
+    
+    .progress-badge {
+        background: #4CAF50;
+        color: white;
+        padding: 0.3rem 0.8rem;
+        border-radius: 15px;
+        font-size: 0.8rem;
+        font-weight: bold;
+    }
+    
+    .current-badge {
+        background: #FF9800;
+        animation: pulse 2s infinite;
+    }
+    
+    .completion-message {
+        background: linear-gradient(45deg, #4CAF50, #8BC34A);
+        color: white;
+        border-radius: 15px;
+        padding: 2rem;
+        text-align: center;
+        margin: 2rem auto;
+        max-width: 600px;
+    }
+    
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+    
+    .back-link {
+        text-align: center;
+        margin-top: 2rem;
+    }
+    
+    .back-link a {
+        color: #2196F3;
+        text-decoration: none;
+        font-weight: bold;
+    }
+    
+    .back-link a:hover {
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="roulette-container">
+    <div class="container">
+        <div class="roulette-header">
+            <h1 class="roulette-title">Recent Tab Roulette</h1>
+        </div>
+        
+        {% if current_session %}
+            {% if current_session.current_target == 100 and current_session.levels_completed %}
+            <!-- Completion Message -->
+            <div class="completion-message">
+                <h2>🎉 Challenge Completed!</h2>
+                <p>Congratulations! You've reached 100% and completed the Recent Tab Roulette!</p>
+                <p>You completed <strong>{{ current_session.levels_completed|length }}</strong> levels in total.</p>
+                <form method="POST" style="margin-top: 1rem;">
+                    <input type="hidden" name="action" value="start_roulette">
+                    <button type="submit" class="btn-start">🔄 Start New Challenge</button>
+                </form>
+            </div>
+            {% else %}
+            <!-- Active Challenge -->
+            <div class="level-card">
+                {% if current_level %}
+                <div class="level-display">
+                    <div class="level-thumbnail">
+                        🎮
+                    </div>
+                    <div class="level-info">
+                        <div class="level-title">#{{ current_level.position }} - {{ current_level.name }}</div>
+                        <div class="level-creator">by {{ current_level.creator }}</div>
+                        <div class="level-details">
+                            <span>Difficulty: {{ current_level.difficulty }}/10</span>
+                            <span>Verifier: {{ current_level.verifier }}</span>
+                        </div>
+                    </div>
+                    <div class="target-section">
+                        <div class="target-display">
+                            At least {{ current_session.current_target }}%
+                        </div>
+                        <form method="POST" style="display: flex; flex-direction: column; gap: 1rem;">
+                            <input type="hidden" name="action" value="submit_percentage">
+                            <input type="number" 
+                                   class="percentage-input" 
+                                   name="percentage" 
+                                   min="0" 
+                                   max="100" 
+                                   placeholder="%" 
+                                   required
+                                   autofocus>
+                            <div class="action-buttons">
+                                <button type="submit" class="btn-done">Done</button>
+                                <button type="button" class="btn-give-up" onclick="giveUp()">Give up</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                
+                {% if current_level.video_url or current_level.level_id %}
+                <div style="text-align: center; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #444;">
+                    {% if current_level.video_url %}
+                    <a href="{{ current_level.video_url }}" target="_blank" style="color: #2196F3; margin-right: 1rem; text-decoration: none;">🎥 Watch Verification</a>
+                    {% endif %}
+                    {% if current_level.level_id %}
+                    <button onclick="copyLevelID('{{ current_level.level_id }}')" style="background: none; border: none; color: #2196F3; cursor: pointer; text-decoration: underline;">📋 Copy Level ID</button>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% endif %}
+            </div>
+            
+            <!-- Progress Info -->
+            {% if current_session.levels_completed %}
+            <div class="progress-info">
+                <h4>Progress: Level {{ current_session.current_level }}</h4>
+                <div class="progress-badges">
+                    {% for completed in current_session.levels_completed %}
+                    <span class="progress-badge">{{ loop.index }}: {{ completed.actual_percentage }}%</span>
+                    {% endfor %}
+                    <span class="progress-badge current-badge">{{ current_session.current_level }}: {{ current_session.current_target }}%</span>
+                </div>
+            </div>
+            {% endif %}
+            {% endif %}
+        {% else %}
+        <!-- Start New Challenge -->
+        <div class="start-section">
+            <h2>🎯 Progressive Challenge</h2>
+            <p>Start with 1% on your first level, 2% on the second, and keep climbing until you reach 100%!</p>
+            <p>Get higher than needed? Skip ahead to the next appropriate level!</p>
+            
+            {% if session.user_id %}
+            <form method="POST" style="margin-top: 2rem;">
+                <input type="hidden" name="action" value="start_roulette">
+                <button type="submit" class="btn-start">🚀 Start Challenge</button>
+            </form>
+            {% else %}
+            <div style="margin-top: 2rem;">
+                <p>You need to log in to participate!</p>
+                <a href="{{ url_for('login') }}" class="btn-start" style="display: inline-block; text-decoration: none; margin-right: 1rem;">🔑 Login</a>
+                <a href="{{ url_for('register') }}" class="btn-start" style="display: inline-block; text-decoration: none; background: #4CAF50;">📝 Register</a>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <div class="back-link">
+            <a href="{{ url_for('index') }}">← Back to Main List</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function copyLevelID(levelId) {
+    navigator.clipboard.writeText(levelId).then(function() {
+        alert('Level ID copied to clipboard!');
+    });
+}
+
+function giveUp() {
+    if (confirm('Are you sure you want to give up?')) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.innerHTML = '<input type="hidden" name="action" value="quit_roulette">';
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endblock %}

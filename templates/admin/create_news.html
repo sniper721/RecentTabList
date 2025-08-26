@@ -1,0 +1,158 @@
+{% extends "layout.html" %}
+
+{% block title %}Create News Article - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>📝 Create News Article</h2>
+        <div>
+            <a href="{{ url_for('admin_news') }}" class="btn btn-secondary">← Back to News</a>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Article Details</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Title *</label>
+                            <input type="text" class="form-control" id="title" name="title" 
+                                   placeholder="Enter article title" required>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="category" class="form-label">Category</label>
+                                    <select class="form-select" id="category" name="category">
+                                        <option value="General">General</option>
+                                        <option value="Updates">Updates</option>
+                                        <option value="Events">Events</option>
+                                        <option value="Announcements">Announcements</option>
+                                        <option value="Community">Community</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="status" class="form-label">Status</label>
+                                    <select class="form-select" id="status" name="status">
+                                        <option value="draft">📝 Draft</option>
+                                        <option value="published">📢 Published</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="excerpt" class="form-label">Excerpt</label>
+                            <textarea class="form-control" id="excerpt" name="excerpt" rows="3" 
+                                      placeholder="Brief summary of the article (optional - will be auto-generated if empty)"></textarea>
+                            <div class="form-text">This will appear in the article preview. If left empty, it will be auto-generated from the content.</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="content" class="form-label">Content *</label>
+                            <textarea class="form-control" id="content" name="content" rows="15" 
+                                      placeholder="Write your article content here..." required></textarea>
+                            <div class="form-text">You can use HTML formatting in the content.</div>
+                        </div>
+                        
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="featured" name="featured">
+                            <label class="form-check-label" for="featured">
+                                <strong>Featured Article</strong> - This article will appear prominently on the news page
+                            </label>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('admin_news') }}" class="btn btn-secondary">Cancel</a>
+                            <div>
+                                <button type="submit" name="status" value="draft" class="btn btn-warning me-2">
+                                    <i class="fas fa-save"></i> Save as Draft
+                                </button>
+                                <button type="submit" name="status" value="published" class="btn btn-success">
+                                    <i class="fas fa-paper-plane"></i> Publish Now
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0">📋 Publishing Guide</h6>
+                </div>
+                <div class="card-body">
+                    <h6>Tips for Great Articles:</h6>
+                    <ul class="small">
+                        <li><strong>Title:</strong> Keep it clear and engaging</li>
+                        <li><strong>Excerpt:</strong> 150-200 characters work best</li>
+                        <li><strong>Content:</strong> Use paragraphs for readability</li>
+                        <li><strong>Featured:</strong> Use sparingly for important news</li>
+                    </ul>
+                    
+                    <h6 class="mt-3">Categories:</h6>
+                    <ul class="small">
+                        <li><strong>General:</strong> General community news</li>
+                        <li><strong>Updates:</strong> Site updates and changes</li>
+                        <li><strong>Events:</strong> Competitions and events</li>
+                        <li><strong>Announcements:</strong> Important notifications</li>
+                        <li><strong>Community:</strong> Player spotlights and features</li>
+                    </ul>
+                    
+                    <div class="alert alert-warning mt-3">
+                        <strong>Note:</strong> Published articles will immediately appear on the news page and be visible to all users.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-generate excerpt from content
+    const contentTextarea = document.getElementById('content');
+    const excerptTextarea = document.getElementById('excerpt');
+    
+    contentTextarea.addEventListener('blur', function() {
+        if (!excerptTextarea.value.trim() && this.value.trim()) {
+            // Strip HTML tags and create excerpt
+            const text = this.value.replace(/<[^>]*>/g, '');
+            const excerpt = text.substring(0, 200);
+            excerptTextarea.value = excerpt + (text.length > 200 ? '...' : '');
+        }
+    });
+    
+    // Form validation
+    const form = document.querySelector('form');
+    form.addEventListener('submit', function(e) {
+        const title = document.getElementById('title').value.trim();
+        const content = document.getElementById('content').value.trim();
+        
+        if (!title || !content) {
+            e.preventDefault();
+            alert('Title and content are required!');
+            return;
+        }
+        
+        if (title.length > 200) {
+            e.preventDefault();
+            alert('Title is too long (maximum 200 characters)');
+            return;
+        }
+    });
+});
+</script>
+{% endblock %}

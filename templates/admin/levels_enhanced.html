@@ -51,14 +51,9 @@
                                 </select>
                             </div>
                             <div class="col-md-2">
-                                <label class="form-label">Demon Type:</label>
+                                <label class="form-label">Demon Type (Removed):</label>
                                 <select class="form-select" name="demon_type" id="addDemonType" disabled>
-                                    <option value="">Select Type</option>
-                                    <option value="easy">Easy Demon</option>
-                                    <option value="medium">Medium Demon</option>
-                                    <option value="hard">Hard Demon</option>
-                                    <option value="insane">Insane Demon</option>
-                                    <option value="extreme">Extreme Demon</option>
+                                    <option value="">No longer used</option>
                                 </select>
                             </div>
                         </div>
@@ -206,14 +201,9 @@
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label">Demon Type:</label>
-                            <select class="form-select" id="editDemonType" name="demon_type">
-                                <option value="">Select Type</option>
-                                <option value="easy">Easy Demon</option>
-                                <option value="medium">Medium Demon</option>
-                                <option value="hard">Hard Demon</option>
-                                <option value="insane">Insane Demon</option>
-                                <option value="extreme">Extreme Demon</option>
+                            <label class="form-label">Demon Type (Removed):</label>
+                            <select class="form-select" id="editDemonType" name="demon_type" disabled>
+                                <option value="">No longer used</option>
                             </select>
                         </div>
                         <div class="col-md-2">
@@ -258,14 +248,10 @@ function toggleDemonType(formType) {
     const difficultySelect = document.getElementById(formType + 'Difficulty');
     const demonTypeSelect = document.getElementById(formType + 'DemonType');
     
-    if (difficultySelect.value === '10') {
-        demonTypeSelect.disabled = false;
-        demonTypeSelect.required = true;
-    } else {
-        demonTypeSelect.disabled = true;
-        demonTypeSelect.required = false;
-        demonTypeSelect.value = '';
-    }
+    // Demon type no longer required - always keep disabled
+    demonTypeSelect.disabled = true;
+    demonTypeSelect.required = false;
+    demonTypeSelect.value = '';
 }
 
 function editLevel(levelId) {

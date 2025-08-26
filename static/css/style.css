@@ -523,6 +523,116 @@ p {
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.3);
 }
 
+/* Blue Ocean Theme */
+[data-bs-theme="blue"] {
+    --primary-color: #0ea5e9;
+    --primary-hover: #0284c7;
+    --secondary-color: #475569;
+    --success-color: #10b981;
+    --danger-color: #ef4444;
+    --warning-color: #f59e0b;
+    --info-color: #06b6d4;
+    --background-color: #0c4a6e;
+    --surface-color: #075985;
+    --card-color: #0369a1;
+    --text-primary: #e0f2fe;
+    --text-secondary: #b3e5fc;
+    --text-muted: #81d4fa;
+    --border-color: #0284c7;
+    --border-light: #0ea5e9;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.25);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.35), 0 2px 4px -2px rgb(0 0 0 / 0.25);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.35), 0 4px 6px -4px rgb(0 0 0 / 0.25);
+}
+
+/* Purple Night Theme */
+[data-bs-theme="purple"] {
+    --primary-color: #a855f7;
+    --primary-hover: #9333ea;
+    --secondary-color: #64748b;
+    --success-color: #10b981;
+    --danger-color: #ef4444;
+    --warning-color: #f59e0b;
+    --info-color: #06b6d4;
+    --background-color: #581c87;
+    --surface-color: #6b21a8;
+    --card-color: #7c2d92;
+    --text-primary: #f3e8ff;
+    --text-secondary: #e9d5ff;
+    --text-muted: #d8b4fe;
+    --border-color: #9333ea;
+    --border-light: #a855f7;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.25);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.35), 0 2px 4px -2px rgb(0 0 0 / 0.25);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.35), 0 4px 6px -4px rgb(0 0 0 / 0.25);
+}
+
+/* Forest Green Theme */
+[data-bs-theme="green"] {
+    --primary-color: #22c55e;
+    --primary-hover: #16a34a;
+    --secondary-color: #64748b;
+    --success-color: #10b981;
+    --danger-color: #ef4444;
+    --warning-color: #f59e0b;
+    --info-color: #06b6d4;
+    --background-color: #14532d;
+    --surface-color: #166534;
+    --card-color: #15803d;
+    --text-primary: #f0fdf4;
+    --text-secondary: #dcfce7;
+    --text-muted: #bbf7d0;
+    --border-color: #16a34a;
+    --border-light: #22c55e;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.25);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.35), 0 2px 4px -2px rgb(0 0 0 / 0.25);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.35), 0 4px 6px -4px rgb(0 0 0 / 0.25);
+}
+
+/* Cherry Red Theme */
+[data-bs-theme="red"] {
+    --primary-color: #ef4444;
+    --primary-hover: #dc2626;
+    --secondary-color: #64748b;
+    --success-color: #10b981;
+    --danger-color: #ef4444;
+    --warning-color: #f59e0b;
+    --info-color: #06b6d4;
+    --background-color: #7f1d1d;
+    --surface-color: #991b1b;
+    --card-color: #b91c1c;
+    --text-primary: #fef2f2;
+    --text-secondary: #fecaca;
+    --text-muted: #fca5a5;
+    --border-color: #dc2626;
+    --border-light: #ef4444;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.25);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.35), 0 2px 4px -2px rgb(0 0 0 / 0.25);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.35), 0 4px 6px -4px rgb(0 0 0 / 0.25);
+}
+
+/* Sunset Orange Theme */
+[data-bs-theme="orange"] {
+    --primary-color: #f97316;
+    --primary-hover: #ea580c;
+    --secondary-color: #64748b;
+    --success-color: #10b981;
+    --danger-color: #ef4444;
+    --warning-color: #f59e0b;
+    --info-color: #06b6d4;
+    --background-color: #9a3412;
+    --surface-color: #c2410c;
+    --card-color: #dc2626;
+    --text-primary: #fff7ed;
+    --text-secondary: #fed7aa;
+    --text-muted: #fdba74;
+    --border-color: #ea580c;
+    --border-light: #f97316;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.25);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.35), 0 2px 4px -2px rgb(0 0 0 / 0.25);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.35), 0 4px 6px -4px rgb(0 0 0 / 0.25);
+}
+
 /* Light Theme (default) */
 [data-bs-theme="light"] {
     --primary-color: #3b82f6;
@@ -693,6 +803,493 @@ body, .card, .navbar, .btn, .form-control, .form-select, .dropdown-menu, .alert,
 .position-relative img {
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
+}
+
+/* Enhanced Flying Squares Animation for Dark Mode - Complete Rewrite */
+[data-bs-theme="dark"] body {
+    position: relative;
+    overflow-x: hidden;
+}
+
+/* GD-Style Background with Cubes and Spikes */
+[data-bs-theme="dark"] body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: -3;
+    background: 
+        linear-gradient(135deg, rgba(255, 0, 100, 0.03) 0%, transparent 40%),
+        linear-gradient(225deg, rgba(0, 255, 255, 0.03) 0%, transparent 40%),
+        radial-gradient(circle at 20% 20%, rgba(255, 100, 0, 0.04) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(100, 0, 255, 0.04) 0%, transparent 50%);
+    animation: gdBackgroundShift 25s ease-in-out infinite;
+}
+
+@keyframes gdBackgroundShift {
+    0%, 100% { 
+        filter: hue-rotate(0deg) brightness(0.8);
+        transform: scale(1);
+    }
+    33% { 
+        filter: hue-rotate(60deg) brightness(1.1);
+        transform: scale(1.02);
+    }
+    66% { 
+        filter: hue-rotate(-60deg) brightness(0.9);
+        transform: scale(0.98);
+    }
+}
+
+/* GD Cube Particles */
+.gd-cube {
+    position: fixed;
+    pointer-events: auto;
+    z-index: -1;
+    opacity: 0;
+    background: linear-gradient(45deg, 
+        rgba(150, 150, 150, 0.8) 0%, 
+        rgba(180, 180, 180, 0.9) 25%,
+        rgba(200, 200, 200, 0.8) 50%,
+        rgba(170, 170, 170, 0.9) 75%,
+        rgba(160, 160, 160, 0.8) 100%);
+    border: 2px solid rgba(200, 200, 200, 0.7);
+    border-radius: 6px;
+    box-shadow: 
+        0 0 20px rgba(150, 150, 150, 0.6),
+        inset 0 0 10px rgba(220, 220, 220, 0.4),
+        0 0 40px rgba(180, 180, 180, 0.5);
+    animation: gdCubeFloatUp 15s linear infinite;
+    cursor: pointer;
+}
+
+.gd-cube::before {
+    content: '';
+    position: absolute;
+    top: 15%;
+    left: 15%;
+    width: 70%;
+    height: 70%;
+    background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.4) 0%, 
+        transparent 50%);
+    border-radius: 2px;
+}
+
+/* GD Spike Particles */
+.gd-spike {
+    position: fixed;
+    pointer-events: auto;
+    z-index: -1;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    animation: gdSpikeFloatUp 18s linear infinite;
+    cursor: pointer;
+}
+
+.gd-spike::before {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    filter: drop-shadow(0 0 15px rgba(150, 150, 150, 0.8));
+}
+
+/* Spike Type 1 - Upward Gray */
+.gd-spike.type-1::before {
+    border-left: 20px solid transparent;
+    border-right: 20px solid transparent;
+    border-bottom: 50px solid rgba(160, 160, 160, 0.9);
+    border-top: 0;
+}
+
+/* Spike Type 2 - Downward Gray */
+.gd-spike.type-2::before {
+    border-left: 18px solid transparent;
+    border-right: 18px solid transparent;
+    border-top: 45px solid rgba(170, 170, 170, 0.9);
+    border-bottom: 0;
+}
+
+/* Spike Type 3 - Sideways Gray */
+.gd-spike.type-3::before {
+    border-top: 20px solid transparent;
+    border-bottom: 20px solid transparent;
+    border-left: 45px solid rgba(150, 150, 150, 0.9);
+    border-right: 0;
+}
+
+/* GD Orb Particles */
+.gd-orb {
+    position: fixed;
+    pointer-events: auto;
+    z-index: -1;
+    border-radius: 50%;
+    opacity: 0;
+    background: radial-gradient(circle at 30% 30%, 
+        rgba(200, 200, 200, 0.9) 0%,
+        rgba(160, 160, 160, 0.8) 40%,
+        rgba(140, 140, 140, 0.7) 100%);
+    border: 3px solid rgba(190, 190, 190, 0.8);
+    box-shadow: 
+        0 0 25px rgba(170, 170, 170, 0.7),
+        inset 0 0 15px rgba(210, 210, 210, 0.5),
+        0 0 50px rgba(160, 160, 160, 0.6);
+    animation: gdOrbFloatUp 20s linear infinite;
+    cursor: pointer;
+}
+
+.gd-orb::before {
+    content: '';
+    position: absolute;
+    top: 20%;
+    left: 20%;
+    width: 30%;
+    height: 30%;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
+}
+
+/* Animation Keyframes */
+/* Multi-directional Animation Keyframes */
+@keyframes gdCubeFloatUp {
+    0% {
+        transform: translateY(100vh) translateX(0) rotate(0deg) scale(0.8);
+        opacity: 0;
+    }
+    10% {
+        opacity: 0.8;
+    }
+    50% {
+        transform: translateY(50vh) translateX(20px) rotate(180deg) scale(1.2);
+        opacity: 0.9;
+    }
+    90% {
+        opacity: 0.8;
+    }
+    100% {
+        transform: translateY(-10vh) translateX(0) rotate(360deg) scale(0.8);
+        opacity: 0;
+    }
+}
+
+@keyframes gdCubeFloatDown {
+    0% {
+        transform: translateY(-10vh) translateX(0) rotate(0deg) scale(0.8);
+        opacity: 0;
+    }
+    10% {
+        opacity: 0.8;
+    }
+    50% {
+        transform: translateY(50vh) translateX(-20px) rotate(-180deg) scale(1.2);
+        opacity: 0.9;
+    }
+    90% {
+        opacity: 0.8;
+    }
+    100% {
+        transform: translateY(100vh) translateX(0) rotate(-360deg) scale(0.8);
+        opacity: 0;
+    }
+}
+
+@keyframes gdCubeFloatLeft {
+    0% {
+        transform: translateX(-10vw) translateY(0) rotate(0deg) scale(0.8);
+        opacity: 0;
+    }
+    10% {
+        opacity: 0.8;
+    }
+    50% {
+        transform: translateX(50vw) translateY(30px) rotate(180deg) scale(1.2);
+        opacity: 0.9;
+    }
+    90% {
+        opacity: 0.8;
+    }
+    100% {
+        transform: translateX(100vw) translateY(0) rotate(360deg) scale(0.8);
+        opacity: 0;
+    }
+}
+
+@keyframes gdCubeFloatRight {
+    0% {
+        transform: translateX(100vw) translateY(0) rotate(0deg) scale(0.8);
+        opacity: 0;
+    }
+    10% {
+        opacity: 0.8;
+    }
+    50% {
+        transform: translateX(50vw) translateY(-30px) rotate(-180deg) scale(1.2);
+        opacity: 0.9;
+    }
+    90% {
+        opacity: 0.8;
+    }
+    100% {
+        transform: translateX(-10vw) translateY(0) rotate(-360deg) scale(0.8);
+        opacity: 0;
+    }
+}
+
+@keyframes gdSpikeFloatUp {
+    0% {
+        transform: translateY(100vh) translateX(0) rotate(0deg);
+        opacity: 0;
+    }
+    8% {
+        opacity: 0.8;
+    }
+    50% {
+        transform: translateY(50vh) translateX(35px) rotate(90deg);
+        opacity: 0.9;
+    }
+    92% {
+        opacity: 0.8;
+    }
+    100% {
+        transform: translateY(-10vh) translateX(0) rotate(180deg);
+        opacity: 0;
+    }
+}
+
+@keyframes gdSpikeFloatSide {
+    0% {
+        transform: translateX(-10vw) translateY(0) rotate(0deg);
+        opacity: 0;
+    }
+    8% {
+        opacity: 0.8;
+    }
+    50% {
+        transform: translateX(50vw) translateY(25px) rotate(135deg);
+        opacity: 0.9;
+    }
+    92% {
+        opacity: 0.8;
+    }
+    100% {
+        transform: translateX(100vw) translateY(0) rotate(270deg);
+        opacity: 0;
+    }
+}
+
+@keyframes gdSpikeFloatDiagonal {
+    0% {
+        transform: translateX(100vw) translateY(100vh) rotate(0deg);
+        opacity: 0;
+    }
+    8% {
+        opacity: 0.8;
+    }
+    50% {
+        transform: translateX(50vw) translateY(50vh) rotate(180deg);
+        opacity: 0.9;
+    }
+    92% {
+        opacity: 0.8;
+    }
+    100% {
+        transform: translateX(-10vw) translateY(-10vh) rotate(360deg);
+        opacity: 0;
+    }
+}
+
+@keyframes gdOrbFloatUp {
+    0% {
+        transform: translateY(100vh) translateX(0) scale(0.6);
+        opacity: 0;
+    }
+    5% {
+        opacity: 0.8;
+    }
+    50% {
+        transform: translateY(50vh) translateX(20px) scale(1.2);
+        opacity: 0.9;
+    }
+    95% {
+        opacity: 0.8;
+    }
+    100% {
+        transform: translateY(-10vh) translateX(0) scale(0.6);
+        opacity: 0;
+    }
+}
+
+@keyframes gdOrbFloatCross {
+    0% {
+        transform: translateX(-10vw) translateY(20vh) scale(0.6);
+        opacity: 0;
+    }
+    5% {
+        opacity: 0.8;
+    }
+    50% {
+        transform: translateX(50vw) translateY(80vh) scale(1.3);
+        opacity: 0.9;
+    }
+    95% {
+        opacity: 0.8;
+    }
+    100% {
+        transform: translateX(100vw) translateY(20vh) scale(0.6);
+        opacity: 0;
+    }
+}
+
+@keyframes gdOrbFloatCircle {
+    0% {
+        transform: translateX(50vw) translateY(-10vh) scale(0.6) rotate(0deg);
+        opacity: 0;
+    }
+    5% {
+        opacity: 0.8;
+    }
+    25% {
+        transform: translateX(80vw) translateY(25vh) scale(1.0) rotate(90deg);
+    }
+    50% {
+        transform: translateX(50vw) translateY(100vh) scale(1.4) rotate(180deg);
+        opacity: 0.9;
+    }
+    75% {
+        transform: translateX(20vw) translateY(25vh) scale(1.0) rotate(270deg);
+    }
+    95% {
+        opacity: 0.8;
+    }
+    100% {
+        transform: translateX(50vw) translateY(-10vh) scale(0.6) rotate(360deg);
+        opacity: 0;
+    }
+}
+
+/* Pulse animation for special elements */
+.gd-cube.pulse {
+    animation-name: gdCubePulse;
+    animation-duration: 12s;
+}
+
+@keyframes gdCubePulse {
+    0% {
+        transform: translateY(100vh) rotate(0deg) scale(0.8);
+        opacity: 0;
+        box-shadow: 0 0 10px rgba(255, 100, 100, 0.3);
+    }
+    15% {
+        box-shadow: 0 0 40px rgba(255, 100, 100, 0.8);
+    }
+    50% {
+        transform: translateY(50vh) rotate(180deg) scale(1.6);
+        opacity: 1;
+        box-shadow: 0 0 60px rgba(255, 100, 100, 1);
+    }
+    85% {
+        box-shadow: 0 0 40px rgba(255, 100, 100, 0.8);
+    }
+    100% {
+        transform: translateY(-10vh) rotate(360deg) scale(0.8);
+        opacity: 0;
+        box-shadow: 0 0 10px rgba(255, 100, 100, 0.3);
+    }
+}
+
+/* Hide GD elements in non-dark themes */
+[data-bs-theme="light"] .gd-cube,
+[data-bs-theme="light"] .gd-spike,
+[data-bs-theme="light"] .gd-orb,
+[data-bs-theme="auto"] .gd-cube,
+[data-bs-theme="auto"] .gd-spike,
+[data-bs-theme="auto"] .gd-orb,
+[data-bs-theme="blue"] .gd-cube,
+[data-bs-theme="blue"] .gd-spike,
+[data-bs-theme="blue"] .gd-orb,
+[data-bs-theme="purple"] .gd-cube,
+[data-bs-theme="purple"] .gd-spike,
+[data-bs-theme="purple"] .gd-orb,
+[data-bs-theme="green"] .gd-cube,
+[data-bs-theme="green"] .gd-spike,
+[data-bs-theme="green"] .gd-orb,
+[data-bs-theme="red"] .gd-cube,
+[data-bs-theme="red"] .gd-spike,
+[data-bs-theme="red"] .gd-orb,
+[data-bs-theme="orange"] .gd-cube,
+[data-bs-theme="orange"] .gd-spike,
+[data-bs-theme="orange"] .gd-orb {
+    display: none !important;
+}
+
+/* Animated background with moving gradients */
+/* RobTop Face Icon */
+.gd-icon {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(45deg, 
+        #ff8f00 0%, 
+        #ffb74d 25%,
+        #ff9800 50%,
+        #ef6c00 75%,
+        #ff8f00 100%);
+    border: 3px solid #fff;
+    border-radius: 50%;
+    box-shadow: 
+        0 0 20px rgba(255, 152, 0, 0.8),
+        inset 0 0 10px rgba(255, 255, 255, 0.3),
+        0 0 40px rgba(255, 152, 0, 0.4);
+    cursor: pointer;
+    z-index: 1000;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.gd-icon:hover {
+    transform: scale(1.1);
+    box-shadow: 
+        0 0 30px rgba(255, 152, 0, 1.0),
+        inset 0 0 15px rgba(255, 255, 255, 0.4),
+        0 0 50px rgba(255, 152, 0, 0.6);
+}
+
+/* RobTop's Eyes */
+.gd-icon::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 18px;
+    width: 8px;
+    height: 8px;
+    background: #000;
+    border-radius: 50%;
+    box-shadow: 16px 0 0 #000; /* Right eye */
+}
+
+/* RobTop's Smile */
+.gd-icon::after {
+    content: '';
+    position: absolute;
+    top: 35px;
+    left: 20px;
+    width: 20px;
+    height: 10px;
+    border: 2px solid #000;
+    border-top: none;
+    border-radius: 0 0 20px 20px;
 }
 
 /* Settings page improvements */

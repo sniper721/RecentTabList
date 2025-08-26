@@ -1,5 +1,4 @@
 {% extends "layout.html" %}
-{% extends "layout.html" %}
 
 {% block title %}Settings - {{ user.username }}{% endblock %}
 
@@ -179,11 +178,12 @@
                         <div class="mb-3">
                             <label for="difficulty_range" class="form-label">Difficulty Range</label>
                             <select class="form-select form-select-sm" id="difficulty_range" name="difficulty_range">
-                                <option value="easy_demon" {% if user.difficulty_range == 'easy_demon' %}selected{% endif %}>Easy Demon</option>
-                                <option value="medium_demon" {% if user.difficulty_range == 'medium_demon' %}selected{% endif %}>Medium Demon</option>
-                                <option value="hard_demon" {% if user.difficulty_range == 'hard_demon' %}selected{% endif %}>Hard Demon</option>
-                                <option value="insane_demon" {% if user.difficulty_range == 'insane_demon' %}selected{% endif %}>Insane Demon</option>
-                                <option value="extreme_demon" {% if user.difficulty_range == 'extreme_demon' %}selected{% endif %}>Extreme Demon</option>
+                                <option value="easy" {% if user.difficulty_range == 'easy' %}selected{% endif %}>Easy</option>
+                                <option value="normal" {% if user.difficulty_range == 'normal' %}selected{% endif %}>Normal</option>
+                                <option value="hard" {% if user.difficulty_range == 'hard' %}selected{% endif %}>Hard</option>
+                                <option value="harder" {% if user.difficulty_range == 'harder' %}selected{% endif %}>Harder</option>
+                                <option value="insane" {% if user.difficulty_range == 'insane' %}selected{% endif %}>Insane</option>
+                                <option value="demon" {% if user.difficulty_range == 'demon' %}selected{% endif %}>Demon</option>
                             </select>
                             <div class="form-text">Your preferred difficulty range for level recommendations</div>
                         </div>

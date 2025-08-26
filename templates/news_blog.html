@@ -1,0 +1,296 @@
+{% extends "layout.html" %}
+
+{% block title %}RTL News - Latest Updates{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Newspaper-style CSS */
+    .newspaper-header {
+        border-bottom: 4px solid #000;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        text-align: center;
+    }
+    
+    .newspaper-title {
+        font-family: 'Times New Roman', serif;
+        font-size: 3rem;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 3px;
+        margin-bottom: 0.5rem;
+    }
+    
+    .newspaper-tagline {
+        font-style: italic;
+        color: #666;
+        font-size: 1.1rem;
+    }
+    
+    .newspaper-date {
+        font-weight: bold;
+        margin-top: 0.5rem;
+        font-size: 0.9rem;
+    }
+    
+    .featured-article {
+        border: 2px solid #000;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        background: #f8f9fa;
+    }
+    
+    .featured-title {
+        font-family: 'Times New Roman', serif;
+        font-size: 2.5rem;
+        font-weight: bold;
+        line-height: 1.2;
+        margin-bottom: 1rem;
+        text-transform: uppercase;
+    }
+    
+    .article-card {
+        border: 1px solid #ddd;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        background: white;
+        transition: all 0.2s ease;
+        height: 100%;
+    }
+    
+    .article-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        transform: translateY(-2px);
+    }
+    
+    .article-title {
+        font-family: 'Times New Roman', serif;
+        font-size: 1.4rem;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+        line-height: 1.3;
+    }
+    
+    .article-meta {
+        font-size: 0.85rem;
+        color: #666;
+        margin-bottom: 0.75rem;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 0.5rem;
+    }
+    
+    .article-excerpt {
+        color: #444;
+        line-height: 1.6;
+        margin-bottom: 1rem;
+    }
+    
+    .category-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 3px;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+    
+    .category-general { background: #6c757d; color: white; }
+    .category-updates { background: #007bff; color: white; }
+    .category-events { background: #28a745; color: white; }
+    .category-announcements { background: #ffc107; color: black; }
+    .category-community { background: #17a2b8; color: white; }
+    
+    .breaking-news {
+        background: linear-gradient(45deg, #dc3545, #c82333);
+        color: white;
+        padding: 0.5rem 1rem;
+        margin-bottom: 1.5rem;
+        text-align: center;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .read-more-btn {
+        background: #000;
+        color: white;
+        border: none;
+        padding: 0.5rem 1rem;
+        text-transform: uppercase;
+        font-weight: bold;
+        letter-spacing: 1px;
+        transition: all 0.2s ease;
+    }
+    
+    .read-more-btn:hover {
+        background: #333;
+        color: white;
+    }
+    
+    .newspaper-columns {
+        column-count: 2;
+        column-gap: 2rem;
+        text-align: justify;
+    }
+    
+    @media (max-width: 768px) {
+        .newspaper-title {
+            font-size: 2rem;
+            letter-spacing: 1px;
+        }
+        .featured-title {
+            font-size: 1.8rem;
+        }
+        .newspaper-columns {
+            column-count: 1;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Newspaper Header -->
+    <div class="newspaper-header">
+        <div class="newspaper-title">RTL DAILY</div>
+        <div class="newspaper-tagline">The Recent Tab List - Your Source for GD News & Updates</div>
+        <div class="newspaper-date">{{ datetime.now().strftime('%A, %B %d, %Y') }}</div>
+    </div>
+
+    {% if featured_articles %}
+    <!-- Featured Articles Section -->
+    <div class="row mb-4">
+        {% for article in featured_articles %}
+        <div class="col-md-{% if loop.first %}8{% else %}4{% endif %}">
+            <div class="featured-article {% if loop.first %}mb-3{% endif %}">
+                {% if loop.first %}
+                    <div class="breaking-news">
+                        🔥 BREAKING NEWS 🔥
+                    </div>
+                {% endif %}
+                
+                <span class="category-badge category-{{ article.category.lower() }}">
+                    {{ article.category }}
+                </span>
+                
+                <h1 class="featured-title {% if not loop.first %}h4{% endif %}">
+                    <a href="{{ url_for('news_article', article_id=article._id) }}" class="text-decoration-none text-dark">
+                        {{ article.title }}
+                    </a>
+                </h1>
+                
+                <div class="article-meta">
+                    <i class="fas fa-user"></i> {{ article.author }} • 
+                    <i class="fas fa-calendar"></i> {{ article.published_at.strftime('%B %d, %Y') }}
+                    {% if article.published_at.date() == datetime.now().date() %}
+                        <span class="badge bg-danger ms-2">TODAY</span>
+                    {% endif %}
+                </div>
+                
+                {% if loop.first %}
+                <div class="newspaper-columns">
+                    {{ article.excerpt|safe }}
+                </div>
+                {% else %}
+                <p class="article-excerpt">{{ article.excerpt }}</p>
+                {% endif %}
+                
+                <a href="{{ url_for('news_article', article_id=article._id) }}" class="btn read-more-btn btn-sm">
+                    Read Full Story →
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Regular Articles Grid -->
+    {% if regular_articles %}
+    <div class="row">
+        <div class="col-12">
+            <h2 class="border-bottom border-dark pb-2 mb-4" style="font-family: 'Times New Roman', serif; text-transform: uppercase; letter-spacing: 2px;">
+                📰 Latest Headlines
+            </h2>
+        </div>
+        
+        {% for article in regular_articles %}
+        <div class="col-lg-4 col-md-6 mb-3">
+            <div class="article-card">
+                <span class="category-badge category-{{ article.category.lower() }}">
+                    {{ article.category }}
+                </span>
+                
+                <h3 class="article-title">
+                    <a href="{{ url_for('news_article', article_id=article._id) }}" class="text-decoration-none text-dark">
+                        {{ article.title }}
+                    </a>
+                </h3>
+                
+                <div class="article-meta">
+                    <i class="fas fa-user"></i> {{ article.author }} • 
+                    <i class="fas fa-calendar"></i> {{ article.published_at.strftime('%b %d') }}
+                    {% if article.published_at.date() == datetime.now().date() %}
+                        <span class="badge bg-success">NEW</span>
+                    {% endif %}
+                </div>
+                
+                <p class="article-excerpt">{{ article.excerpt }}</p>
+                
+                <div class="mt-auto">
+                    <a href="{{ url_for('news_article', article_id=article._id) }}" class="btn read-more-btn btn-sm w-100">
+                        Continue Reading →
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if not featured_articles and not regular_articles %}
+    <!-- No Articles -->
+    <div class="text-center py-5">
+        <div style="font-size: 4rem; margin-bottom: 2rem;">📰</div>
+        <h2>Coming Soon!</h2>
+        <p class="lead">The RTL Daily is preparing exciting news and updates for you.</p>
+        <p class="text-muted">Check back soon for the latest happenings in the Geometry Dash community!</p>
+        <a href="{{ url_for('index') }}" class="btn btn-primary btn-lg">Back to Main List</a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Newspaper Footer -->
+<div class="container-fluid mt-5 py-4 border-top border-dark bg-dark text-light">
+    <div class="row text-center">
+        <div class="col-md-4">
+            <h6 style="font-family: 'Times New Roman', serif; text-transform: uppercase; color: white;">News Tips</h6>
+            <p class="small text-light">Have a story? Contact our news team!</p>
+        </div>
+        <div class="col-md-4">
+            <h6 style="font-family: 'Times New Roman', serif; text-transform: uppercase; color: white;">Subscribe</h6>
+            <p class="small text-light">Stay updated with the latest RTL news</p>
+        </div>
+        <div class="col-md-4">
+            <h6 style="font-family: 'Times New Roman', serif; text-transform: uppercase; color: white;">Archive</h6>
+            <p class="small text-light">Browse past editions and articles</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Add smooth hover effects
+document.addEventListener('DOMContentLoaded', function() {
+    // Add smooth hover effects
+    document.querySelectorAll('.article-card').forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.borderColor = '#007bff';
+        });
+        
+        card.addEventListener('mouseleave', function() {
+            this.style.borderColor = '#ddd';
+        });
+    });
+});
+</script>
+{% endblock %}

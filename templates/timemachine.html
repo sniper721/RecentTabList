@@ -86,7 +86,7 @@
                             {% endif %}
                         </div>
                         <div class="text-end">
-                            <div class="text-muted"><strong>{{ level.difficulty|round|int }}/10</strong></div>
+                            <div class="text-muted"><strong>{{ get_difficulty_text(level.difficulty) }}</strong></div>
                             <small class="text-muted">{{ format_points(level.historical_points if level.historical_points else level.points) }} points</small>
                         </div>
                     </div>

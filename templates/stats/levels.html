@@ -75,7 +75,7 @@
                         {% for diff in stats.difficulty_distribution %}
                         <div class="mb-3">
                             <div class="d-flex justify-content-between">
-                                <span>{{ diff._id or 'Unknown' }}/10</span>
+                                <span>{{ get_difficulty_text(diff._id or 5) }}</span>
                                 <span><strong>{{ diff.count }}</strong></span>
                             </div>
                             <div class="progress" style="height: 8px;">
