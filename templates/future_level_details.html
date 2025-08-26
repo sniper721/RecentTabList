@@ -17,7 +17,7 @@
                         <div class="col-md-6">
                             <p><strong>Creator:</strong> {{ level.creator }}</p>
                             <p><strong>Verifier:</strong> {{ level.verifier }}</p>
-                            <p><strong>Difficulty:</strong> {{ level.difficulty }}/10</p>
+                            <p><strong>Difficulty:</strong> {{ get_difficulty_text(level.difficulty or 5) }}</p>
                             <p><strong>Points:</strong> {{ level.points }}</p>
                         </div>
                         <div class="col-md-6">
@@ -41,7 +41,7 @@
             {% if level.video_url %}
             <div class="card mb-4">
                 <div class="card-header">
-                    <h5 class="mb-0">📹 Verification Video</h5>
+                    <h5 class="mb-0">📹 Showcase Video</h5>
                 </div>
                 <div class="card-body">
                     {% if 'youtube.com' in level.video_url or 'youtu.be' in level.video_url %}

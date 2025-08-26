@@ -57,7 +57,7 @@
                         </div>
                         <div class="text-end">
                             {% set difficulty = (level.difficulty|default(5.0))|round|int %}
-                            <div class="text-muted"><strong>{{ difficulty }}/10</strong></div>
+                            <div class="text-muted"><strong>{{ get_difficulty_text(difficulty) }}</strong></div>
                             <small class="text-muted">{{ format_points(level.points or 0) }} points</small>
                         </div>
                     </div>

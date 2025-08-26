@@ -255,6 +255,52 @@ def utility_processor():
             print(f"Error getting active announcements: {e}")
             return []
     
+    def get_active_polls():
+        """Get active polls that haven't expired, filtering out closed polls for current user"""
+        try:
+            now = datetime.now(timezone.utc)
+            polls = list(mongo_db.polls.find({
+                "active": True
+            }).sort("created_at", -1).limit(3))  # Show max 3 polls
+            
+            # Filter and fix timezone issues
+            active_polls = []
+            closed_polls = session.get('closed_polls', []) if 'user_id' in session else []
+            
+            for poll in polls:
+                # Skip polls that user has closed
+                if str(poll['_id']) in closed_polls:
+                    continue
+                    
+                # Fix timezone if needed
+                expires_at = poll.get('expires_at')
+                if expires_at:
+                    if expires_at.tzinfo is None:
+                        expires_at = expires_at.replace(tzinfo=timezone.utc)
+                    
+                    # Check if still active
+                    if expires_at > now:
+                        # Fix created_at timezone too
+                        if poll.get('created_at') and poll['created_at'].tzinfo is None:
+                            poll['created_at'] = poll['created_at'].replace(tzinfo=timezone.utc)
+                        poll['expires_at'] = expires_at
+                        
+                        # Check if current user has voted (if logged in)
+                        poll['user_has_voted'] = False
+                        if 'user_id' in session:
+                            user_id = session['user_id']
+                            for option in poll.get('options', []):
+                                if user_id in option.get('voters', []):
+                                    poll['user_has_voted'] = True
+                                    break
+                        
+                        active_polls.append(poll)
+            
+            return active_polls
+        except Exception as e:
+            print(f"Error getting active polls: {e}")
+            return []
+    
     # Get current theme from session
     current_theme = session.get('theme', 'light')
     
@@ -263,10 +309,13 @@ def utility_processor():
         get_video_embed_info=get_video_embed_info,
         current_theme=current_theme,
         get_active_announcements=get_active_announcements,
+        get_active_polls=get_active_polls,
         get_all_levels=lambda: list(mongo_db.levels.find().sort("position", 1)),
         get_future_levels=lambda: list(mongo_db.future_levels.find().sort("position", 1)),
         get_demon_difficulty_display=get_demon_difficulty_display,
-        get_demon_type_display=get_demon_type_display
+        get_demon_type_display=get_demon_type_display,
+        get_difficulty_text=get_difficulty_text,
+        datetime=datetime
     )
 
 def calculate_level_points(position, is_legacy=False, level_type="Level"):
@@ -278,8 +327,8 @@ def calculate_level_points(position, is_legacy=False, level_type="Level"):
     return round(250 * (0.9475 ** (position - 1)), 2)
 
 def get_demon_difficulty_display(difficulty, demon_type=None):
-    """Get display text for demon difficulties - shows just the numerical difficulty"""
-    return f"{int(difficulty)}/10"
+    """Get display text for difficulties - shows text-based names"""
+    return get_difficulty_text(difficulty)
 
 def get_demon_type_display(difficulty, demon_type=None):
     """Get demon type display text for 10-star levels"""
@@ -293,6 +342,44 @@ def get_demon_type_display(difficulty, demon_type=None):
         }
         return demon_types.get(demon_type, 'Demon')
     return None
+
+def get_difficulty_text(difficulty):
+    """Convert numerical difficulty (1-10) to text-based names"""
+    if difficulty is None:
+        return "Unknown"
+    
+    difficulty = float(difficulty)
+    
+    if difficulty >= 1 and difficulty < 2:
+        return "Easy"
+    elif difficulty >= 2 and difficulty < 4:
+        return "Normal"
+    elif difficulty >= 4 and difficulty < 6:
+        return "Hard"
+    elif difficulty >= 6 and difficulty < 8:
+        return "Harder"
+    elif difficulty >= 8 and difficulty < 10:
+        return "Insane"
+    elif difficulty >= 10:
+        return "Demon"
+    else:
+        return "Unknown"
+
+def text_difficulty_to_range(text_difficulty):
+    """Convert text-based difficulty to numerical range for filtering"""
+    if not text_difficulty:
+        return None
+    
+    ranges = {
+        'easy': (1, 1.99),
+        'normal': (2, 3.99), 
+        'hard': (4, 5.99),
+        'harder': (6, 7.99),
+        'insane': (8, 9.99),
+        'demon': (10, 10)
+    }
+    
+    return ranges.get(text_difficulty.lower())
 
 def recalculate_user_points_after_level_move(level_id, old_points, new_points):
     """Recalculate user points when a level's points change due to position movement"""
@@ -1088,7 +1175,8 @@ def admin_edit_record(record_id):
             updates = {
                 'percentage': int(request.form.get('percentage', record['percentage'])),
                 'status': request.form.get('status', record['status']),
-                'video_url': request.form.get('video_url', record.get('video_url', '')).strip()
+                'video_url': request.form.get('video_url', record.get('video_url', '')).strip(),
+                'raw_footage_url': request.form.get('raw_footage_url', record.get('raw_footage_url', '')).strip()
             }
             
             # Add admin edit info
@@ -1708,6 +1796,11 @@ def ip_ban_user(user_id):
             flash('User not found', 'danger')
             return redirect(url_for('admin'))
         
+        # PREVENT IP BANNING OF ADMIN USERS
+        if user.get('is_admin', False):
+            flash('Cannot IP ban admin users!', 'danger')
+            return redirect(url_for('admin'))
+        
         if request.method == 'POST':
             reason = request.form.get('reason', 'Hacking/Cheating').strip()
             admin_username = session.get('username', 'Unknown Admin')
@@ -1823,7 +1916,208 @@ def ip_ban_user(user_id):
         flash(f'Error: {str(e)}', 'danger')
         return redirect(url_for('admin'))
 
-@app.route('/admin/reset_points/<user_id>', methods=['POST'])
+@app.route('/news')
+def news_blog():
+    """Display news blog with newspaper-style design"""
+    try:
+        # Get published articles, sorted by date (newest first)
+        articles = list(mongo_db.news.find(
+            {"status": "published"},
+            {"title": 1, "content": 1, "excerpt": 1, "author": 1, "published_at": 1, "category": 1, "featured": 1}
+        ).sort("published_at", -1).limit(20))
+        
+        # Separate featured and regular articles
+        featured_articles = [a for a in articles if a.get('featured', False)][:3]
+        regular_articles = [a for a in articles if not a.get('featured', False)][:15]
+        
+        return render_template('news_blog.html', 
+                             featured_articles=featured_articles,
+                             regular_articles=regular_articles)
+        
+    except Exception as e:
+        flash(f'Error loading news: {str(e)}', 'danger')
+        return redirect(url_for('index'))
+
+@app.route('/news/<string:article_id>')
+def news_article(article_id):
+    """Display individual news article"""
+    try:
+        article = mongo_db.news.find_one({
+            "_id": ObjectId(article_id),
+            "status": "published"
+        })
+        
+        if not article:
+            flash('Article not found', 'danger')
+            return redirect(url_for('news_blog'))
+        
+        # Get related articles (same category, excluding current)
+        related_articles = list(mongo_db.news.find({
+            "status": "published",
+            "category": article.get('category'),
+            "_id": {"$ne": ObjectId(article_id)}
+        }).sort("published_at", -1).limit(3))
+        
+        return render_template('news_article.html', article=article, related_articles=related_articles)
+        
+    except Exception as e:
+        flash(f'Error loading article: {str(e)}', 'danger')
+        return redirect(url_for('news_blog'))
+
+@app.route('/admin/news')
+def admin_news():
+    """Admin news management interface"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    # Get all articles
+    articles = list(mongo_db.news.find().sort("created_at", -1))
+    
+    return render_template('admin/news.html', articles=articles)
+
+@app.route('/admin/news/create', methods=['GET', 'POST'])
+def admin_create_news():
+    """Create new news article"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('admin_news'))
+    
+    if request.method == 'POST':
+        try:
+            title = request.form.get('title', '').strip()
+            content = request.form.get('content', '').strip()
+            excerpt = request.form.get('excerpt', '').strip()
+            category = request.form.get('category', 'General').strip()
+            featured = 'featured' in request.form
+            status = request.form.get('status', 'draft')
+            
+            if not title or not content:
+                flash('Title and content are required', 'danger')
+                return render_template('admin/create_news.html')
+            
+            # Generate excerpt if not provided
+            if not excerpt:
+                excerpt = content[:200] + "..." if len(content) > 200 else content
+            
+            # Create article
+            article = {
+                "_id": ObjectId(),
+                "title": title,
+                "content": content,
+                "excerpt": excerpt,
+                "category": category,
+                "author": session.get('username', 'Admin'),
+                "featured": featured,
+                "status": status,
+                "created_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(timezone.utc)
+            }
+            
+            if status == 'published':
+                article['published_at'] = datetime.now(timezone.utc)
+            
+            mongo_db.news.insert_one(article)
+            
+            # Log admin action
+            admin_username = session.get('username', 'Unknown Admin')
+            log_admin_action(admin_username, f"CREATED NEWS ARTICLE: {title}", f"Status: {status}, Category: {category}")
+            
+            flash(f'News article "{title}" created successfully!', 'success')
+            return redirect(url_for('admin_news'))
+            
+        except Exception as e:
+            flash(f'Error creating article: {str(e)}', 'danger')
+    
+    return render_template('admin/create_news.html')
+
+@app.route('/admin/news/<string:article_id>/edit', methods=['GET', 'POST'])
+def admin_edit_news(article_id):
+    """Edit news article"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('admin_news'))
+    
+    try:
+        article = mongo_db.news.find_one({"_id": ObjectId(article_id)})
+        if not article:
+            flash('Article not found', 'danger')
+            return redirect(url_for('admin_news'))
+        
+        if request.method == 'POST':
+            title = request.form.get('title', '').strip()
+            content = request.form.get('content', '').strip()
+            excerpt = request.form.get('excerpt', '').strip()
+            category = request.form.get('category', 'General').strip()
+            featured = 'featured' in request.form
+            status = request.form.get('status', 'draft')
+            
+            if not title or not content:
+                flash('Title and content are required', 'danger')
+                return render_template('admin/edit_news.html', article=article)
+            
+            # Generate excerpt if not provided
+            if not excerpt:
+                excerpt = content[:200] + "..." if len(content) > 200 else content
+            
+            # Update article
+            updates = {
+                "title": title,
+                "content": content,
+                "excerpt": excerpt,
+                "category": category,
+                "featured": featured,
+                "status": status,
+                "updated_at": datetime.now(timezone.utc)
+            }
+            
+            # Set published_at if publishing for first time
+            if status == 'published' and article.get('status') != 'published':
+                updates['published_at'] = datetime.now(timezone.utc)
+            
+            mongo_db.news.update_one(
+                {"_id": ObjectId(article_id)},
+                {"$set": updates}
+            )
+            
+            # Log admin action
+            admin_username = session.get('username', 'Unknown Admin')
+            log_admin_action(admin_username, f"UPDATED NEWS ARTICLE: {title}", f"Status: {status}")
+            
+            flash('Article updated successfully!', 'success')
+            return redirect(url_for('admin_news'))
+        
+        return render_template('admin/edit_news.html', article=article)
+        
+    except Exception as e:
+        flash(f'Error editing article: {str(e)}', 'danger')
+        return redirect(url_for('admin_news'))
+
+@app.route('/admin/news/<string:article_id>/delete', methods=['POST'])
+def admin_delete_news(article_id):
+    """Delete news article"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('admin_news'))
+    
+    try:
+        article = mongo_db.news.find_one({"_id": ObjectId(article_id)}, {"title": 1})
+        if not article:
+            flash('Article not found', 'danger')
+            return redirect(url_for('admin_news'))
+        
+        mongo_db.news.delete_one({"_id": ObjectId(article_id)})
+        
+        # Log admin action
+        admin_username = session.get('username', 'Unknown Admin')
+        log_admin_action(admin_username, f"DELETED NEWS ARTICLE: {article['title']}", "")
+        
+        flash(f'Article "{article["title"]}" deleted successfully!', 'success')
+        
+    except Exception as e:
+        flash(f'Error deleting article: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin_news'))
 def admin_reset_points(user_id):
     """Admin route to reset a user's points and records"""
     if 'user_id' not in session or not session.get('is_admin'):
@@ -2066,18 +2360,9 @@ def admin_add_level():
         verifier = request.form.get('verifier', '').strip()
         position = int(request.form.get('position', 1))
         difficulty = int(request.form.get('difficulty', 10))
-        demon_type = request.form.get('demon_type', '').strip() if difficulty == 10 else None
-        video_url = request.form.get('video_url', '').strip()
-        level_id = request.form.get('level_id', '').strip()
-        min_percentage = int(request.form.get('min_percentage', 100))
-        
-        # Validate demon type for 10-star levels
-        if difficulty == 10 and not demon_type:
-            flash('Demon type is required for 10-star levels', 'danger')
-            return redirect(url_for('admin_levels_enhanced'))
-        
-        if difficulty != 10 and demon_type:
-            demon_type = None  # Clear demon type for non-demon levels
+        # Note: Demon type requirement removed - now using text-based difficulties
+        # demon_type = request.form.get('demon_type', '').strip() if difficulty == 10 else None
+        demon_type = None  # Demon subcategories removed
         
         # Shift existing levels down
         mongo_db.levels.update_many(
@@ -4207,6 +4492,12 @@ def legacy():
 
 @app.route('/timemachine')
 def timemachine():
+    # Check if time machine is enabled
+    settings = mongo_db.site_settings.find_one({"_id": "main"})
+    if not settings or not settings.get('timemachine_enabled', True):
+        flash('Time Machine feature is currently disabled', 'warning')
+        return redirect(url_for('index'))
+        
     selected_date = request.args.get('date')
     levels = []
     
@@ -4333,8 +4624,16 @@ def logout():
 
 @app.route('/toggle_theme')
 def toggle_theme():
-    current_theme = session.get('theme', 'light')
-    new_theme = 'dark' if current_theme == 'light' else 'light'
+    # Get the requested theme from query parameter or toggle between light/dark
+    requested_theme = request.args.get('theme')
+    
+    if requested_theme and requested_theme in ['light', 'dark', 'auto', 'blue', 'purple', 'green', 'red', 'orange']:
+        new_theme = requested_theme
+    else:
+        # Fallback to simple toggle for old functionality
+        current_theme = session.get('theme', 'light')
+        new_theme = 'dark' if current_theme == 'light' else 'light'
+    
     session['theme'] = new_theme
     session.permanent = True  # Make session permanent
     
@@ -4482,6 +4781,7 @@ def submit_record():
         level_id_str = request.form.get('level_id', '').strip()
         progress_str = request.form.get('progress', '').strip()
         video_url = request.form.get('video_url', '').strip()
+        raw_footage_url = request.form.get('raw_footage_url', '').strip()
         
         # Check for empty fields - use cached levels for faster response
         if not level_id_str:
@@ -4496,6 +4796,17 @@ def submit_record():
             
         if not video_url:
             flash('Please provide a video URL', 'danger')
+            levels = get_cached_levels(is_legacy=False)
+            return render_template('submit_record.html', levels=levels)
+        
+        if not raw_footage_url:
+            flash('Please provide a raw footage Google Drive link', 'danger')
+            levels = get_cached_levels(is_legacy=False)
+            return render_template('submit_record.html', levels=levels)
+        
+        # Validate that raw footage URL is from Google Drive
+        if 'drive.google.com' not in raw_footage_url.lower():
+            flash('Raw footage must be a Google Drive link', 'danger')
             levels = get_cached_levels(is_legacy=False)
             return render_template('submit_record.html', levels=levels)
         
@@ -4537,6 +4848,7 @@ def submit_record():
             "level_id": level_id,
             "progress": progress,
             "video_url": video_url,
+            "raw_footage_url": raw_footage_url,
             "status": "pending",
             "date_submitted": datetime.now(timezone.utc)
         }
@@ -4762,15 +5074,9 @@ def admin_edit_level():
     db_level_id = int(request.form.get('level_id'))
     game_level_id = request.form.get('game_level_id')
     difficulty = float(request.form.get('difficulty'))
-    demon_type = request.form.get('demon_type', '').strip() if difficulty == 10 else None
-    
-    # Validate demon type for 10-star levels
-    if difficulty == 10 and not demon_type:
-        flash('Demon type is required for 10-star levels', 'danger')
-        return redirect(url_for('admin_levels'))
-    
-    if difficulty != 10 and demon_type:
-        demon_type = None  # Clear demon type for non-demon levels
+    # Note: Demon type requirement removed - now using text-based difficulties
+    # demon_type = request.form.get('demon_type', '').strip() if difficulty == 10 else None
+    demon_type = None  # Demon subcategories removed
 
     
     level = mongo_db.levels.find_one({"_id": db_level_id})
@@ -5295,8 +5601,8 @@ def admin_bulk_records():
             flash('No records selected', 'warning')
             return redirect(url_for('admin'))
         
-        # Convert to integers
-        record_ids = [int(rid) for rid in record_ids]
+        # Convert to ObjectIds
+        record_ids = [ObjectId(rid) for rid in record_ids]
         
         # Get admin info
         admin_user = mongo_db.users.find_one({"_id": session['user_id']})
@@ -5469,9 +5775,9 @@ def admin_settings():
     try:
         site_settings = mongo_db.site_settings.find_one({"_id": "main"})
         if not site_settings:
-            site_settings = {"future_list_enabled": False, "submissions_enabled": True}
+            site_settings = {"future_list_enabled": False, "submissions_enabled": True, "timemachine_enabled": True}
     except Exception as e:
-        site_settings = {"future_list_enabled": False, "submissions_enabled": True}
+        site_settings = {"future_list_enabled": False, "submissions_enabled": True, "timemachine_enabled": True}
     
     return render_template('admin/settings.html', 
                          system_info=system_info,
@@ -5535,80 +5841,6 @@ def admin_reload_cache():
         
     except Exception as e:
         flash(f'Cache reload failed: {e}', 'danger')
-    
-    return redirect(url_for('admin_settings'))
-
-@app.route('/admin/settings/restart', methods=['POST'])
-def admin_restart():
-    """Restart the application (if possible)"""
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied', 'danger')
-        return redirect(url_for('index'))
-    
-    import os
-    import signal
-    
-    flash('Attempting to restart application...', 'info')
-    
-    # This will work if running with a process manager like PM2, systemd, etc.
-    def restart_app():
-        import time
-        time.sleep(1)  # Give time for response to send
-        os.kill(os.getpid(), signal.SIGTERM)
-    
-    import threading
-    threading.Thread(target=restart_app).start()
-    
-    return """
-    <div style="text-align: center; padding: 50px; font-family: Arial;">
-        <h1>🔄 Restarting Application...</h1>
-        <p>The application is restarting. Please wait a moment and refresh the page.</p>
-        <script>
-            setTimeout(function() {
-                window.location.href = '/';
-            }, 5000);
-        </script>
-    </div>
-    """
-
-@app.route('/admin/settings/optimize_db', methods=['POST'])
-def admin_optimize_db():
-    """Optimize database performance"""
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied', 'danger')
-        return redirect(url_for('index'))
-    
-    try:
-        # Create indexes for better performance (with error handling for existing indexes)
-        indexes_to_create = [
-            (mongo_db.levels, [("is_legacy", 1), ("position", 1)]),
-            (mongo_db.levels, [("position", 1)]),
-            (mongo_db.levels, [("is_legacy", 1)]),
-            (mongo_db.records, [("level_id", 1), ("status", 1)]),
-            (mongo_db.records, [("user_id", 1)]),
-            (mongo_db.users, [("username", 1)]),
-            (mongo_db.users, [("email", 1)])
-        ]
-        
-        for collection, index_spec in indexes_to_create:
-            try:
-                collection.create_index(index_spec)
-            except Exception as idx_error:
-                if "IndexKeySpecsConflict" in str(idx_error) or "already exists" in str(idx_error):
-                    print(f"Index already exists: {index_spec}")
-                else:
-                    print(f"Error creating index {index_spec}: {idx_error}")
-        
-        # Remove Base64 images if any
-        result = mongo_db.levels.update_many(
-            {"thumbnail_url": {"$regex": "^data:"}},
-            {"$set": {"thumbnail_url": ""}}
-        )
-        
-        flash(f'Database optimized! Created indexes and removed {result.modified_count} Base64 images.', 'success')
-        
-    except Exception as e:
-        flash(f'Database optimization failed: {e}', 'danger')
     
     return redirect(url_for('admin_settings'))
 
@@ -5689,6 +5921,45 @@ def admin_toggle_submissions():
         
     except Exception as e:
         flash(f'Error toggling submissions: {str(e)}', 'danger')
+    
+    return redirect(url_for('admin_settings'))
+
+@app.route('/admin/settings/toggle_timemachine', methods=['POST'])
+def admin_toggle_timemachine():
+    """Toggle time machine feature on/off"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Get current settings
+        settings = mongo_db.site_settings.find_one({"_id": "main"})
+        if not settings:
+            settings = {"_id": "main", "future_list_enabled": False, "submissions_enabled": True, "timemachine_enabled": True}
+        
+        # Toggle time machine
+        new_status = not settings.get('timemachine_enabled', True)
+        settings['timemachine_enabled'] = new_status
+        
+        # Update in database
+        mongo_db.site_settings.replace_one(
+            {"_id": "main"}, 
+            settings, 
+            upsert=True
+        )
+        
+        status_text = "enabled" if new_status else "disabled"
+        flash(f'Time Machine {status_text} successfully!', 'success')
+        
+        # Log admin action
+        log_admin_action(
+            session.get('username', 'Unknown Admin'),
+            f"Toggled Time Machine: {status_text}",
+            f"Time Machine is now {status_text}"
+        )
+        
+    except Exception as e:
+        flash(f'Error toggling Time Machine: {str(e)}', 'danger')
     
     return redirect(url_for('admin_settings'))
 
@@ -5961,6 +6232,67 @@ def admin_announcements():
     
     return render_template('admin/announcements.html', announcements=announcements, current_time=current_time)
 
+@app.route('/admin/polls', methods=['GET', 'POST'])
+def admin_polls():
+    """Admin interface for managing polls"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        question = request.form.get('question')
+        poll_type = request.form.get('type', 'info')  # info, success, warning, danger
+        expires_in_hours = int(request.form.get('expires_in_hours', 168))  # Default 1 week
+        allow_multiple = 'allow_multiple' in request.form
+        
+        # Get options (filter out empty ones)
+        options = []
+        for i in range(1, 11):  # Support up to 10 options
+            option_text = request.form.get(f'option_{i}', '').strip()
+            if option_text:
+                options.append({
+                    'text': option_text,
+                    'votes': 0,
+                    'voters': []  # Track who voted for this option
+                })
+        
+        if len(options) < 2:
+            flash('A poll must have at least 2 options', 'danger')
+            return redirect(url_for('admin_polls'))
+        
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=expires_in_hours)
+        
+        poll = {
+            "question": question,
+            "type": poll_type,
+            "options": options,
+            "allow_multiple": allow_multiple,
+            "created_at": datetime.now(timezone.utc),
+            "expires_at": expires_at,
+            "created_by": session.get('username', 'Unknown'),
+            "active": True,
+            "total_votes": 0
+        }
+        
+        mongo_db.polls.insert_one(poll)
+        
+        flash(f'Poll created! Will expire in {expires_in_hours} hours.', 'success')
+        return redirect(url_for('admin_polls'))
+    
+    # Get all polls (active and expired)
+    polls = list(mongo_db.polls.find({}).sort("created_at", -1))
+    
+    # Fix timezone issues for existing polls
+    current_time = datetime.now(timezone.utc)
+    for poll in polls:
+        # Ensure all datetime fields are timezone-aware
+        if poll.get('created_at') and poll['created_at'].tzinfo is None:
+            poll['created_at'] = poll['created_at'].replace(tzinfo=timezone.utc)
+        if poll.get('expires_at') and poll['expires_at'].tzinfo is None:
+            poll['expires_at'] = poll['expires_at'].replace(tzinfo=timezone.utc)
+    
+    return render_template('admin/polls.html', polls=polls, current_time=current_time)
+
 @app.route('/admin/delete_announcement', methods=['POST'])
 def admin_delete_announcement():
     """Delete an announcement"""
@@ -5974,6 +6306,111 @@ def admin_delete_announcement():
     
     flash('Announcement deleted successfully!', 'success')
     return redirect(url_for('admin_announcements'))
+
+@app.route('/admin/delete_poll', methods=['POST'])
+def admin_delete_poll():
+    """Delete a poll"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    poll_id = request.form.get('poll_id')
+    
+    mongo_db.polls.delete_one({"_id": ObjectId(poll_id)})
+    
+    flash('Poll deleted successfully!', 'success')
+    return redirect(url_for('admin_polls'))
+
+@app.route('/vote_poll', methods=['POST'])
+def vote_poll():
+    """Vote on a poll"""
+    if 'user_id' not in session:
+        flash('Please log in to vote', 'warning')
+        return redirect(url_for('login'))
+    
+    poll_id = request.form.get('poll_id')
+    selected_options = request.form.getlist('poll_option')
+    
+    if not selected_options:
+        flash('Please select at least one option to vote', 'warning')
+        return redirect(request.referrer or url_for('index'))
+    
+    # Get the poll
+    poll = mongo_db.polls.find_one({"_id": ObjectId(poll_id)})
+    if not poll:
+        flash('Poll not found', 'danger')
+        return redirect(url_for('index'))
+    
+    # Check if poll is still active
+    current_time = datetime.now(timezone.utc)
+    expires_at = poll.get('expires_at')
+    if expires_at:
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at <= current_time:
+            flash('This poll has expired', 'warning')
+            return redirect(request.referrer or url_for('index'))
+    
+    user_id = session['user_id']
+    
+    # Check if user has already voted
+    user_has_voted = False
+    for option in poll['options']:
+        if user_id in option.get('voters', []):
+            user_has_voted = True
+            break
+    
+    if user_has_voted:
+        flash('You have already voted in this poll', 'warning')
+        return redirect(request.referrer or url_for('index'))
+    
+    # If single vote and multiple options selected, only take first
+    if not poll.get('allow_multiple', False) and len(selected_options) > 1:
+        selected_options = [selected_options[0]]
+    
+    # Update the poll with votes
+    try:
+        # Convert option indices to integers
+        option_indices = [int(opt) for opt in selected_options]
+        
+        # Update each selected option
+        for option_index in option_indices:
+            if 0 <= option_index < len(poll['options']):
+                mongo_db.polls.update_one(
+                    {"_id": ObjectId(poll_id)},
+                    {
+                        "$inc": {f"options.{option_index}.votes": 1, "total_votes": 1},
+                        "$push": {f"options.{option_index}.voters": user_id}
+                    }
+                )
+        
+        flash('Your vote has been recorded!', 'success')
+    except (ValueError, IndexError):
+        flash('Invalid vote option', 'danger')
+    
+    return redirect(request.referrer or url_for('index'))
+
+@app.route('/close_poll', methods=['POST'])
+def close_poll():
+    """Close a poll for the current user (hide it from their view)"""
+    from flask import jsonify
+    
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'message': 'Not logged in'}), 401
+    
+    poll_id = request.form.get('poll_id')
+    if not poll_id:
+        return jsonify({'success': False, 'message': 'Poll ID required'}), 400
+    
+    # Store closed polls in session
+    if 'closed_polls' not in session:
+        session['closed_polls'] = []
+    
+    if poll_id not in session['closed_polls']:
+        session['closed_polls'].append(poll_id)
+        session.permanent = True  # Make sure session persists
+    
+    return jsonify({'success': True, 'message': 'Poll closed'})
 
 @app.route('/admin/level_stats')
 def admin_level_stats():
@@ -6288,6 +6725,123 @@ def search_levels():
         
     except Exception as e:
         flash(f'Search error: {e}', 'danger')
+        return redirect(url_for('index'))
+
+@app.route('/advanced_search')
+def advanced_search():
+    """Advanced search with filters for difficulty, verifier, uploader, player who beat it"""
+    # Get filter parameters
+    query = request.args.get('q', '').strip()
+    difficulty_min_text = request.args.get('difficulty_min', '').strip()
+    difficulty_max_text = request.args.get('difficulty_max', '').strip()
+    verifier_filter = request.args.get('verifier', '').strip()
+    creator_filter = request.args.get('creator', '').strip()
+    player_filter = request.args.get('player', '').strip()  # Player who beat it
+    position_min = request.args.get('position_min', type=int)
+    position_max = request.args.get('position_max', type=int)
+    points_min = request.args.get('points_min', type=float)
+    show_legacy = request.args.get('show_legacy') == 'on'
+    
+    # Build search filter
+    search_filter = {}
+    
+    # Legacy filter
+    if not show_legacy:
+        search_filter["is_legacy"] = False
+    
+    # Text search in multiple fields
+    if query:
+        search_filter["$or"] = [
+            {"name": {"$regex": query, "$options": "i"}},
+            {"creator": {"$regex": query, "$options": "i"}},
+            {"verifier": {"$regex": query, "$options": "i"}}
+        ]
+    
+    # Difficulty filter using text-based ranges
+    if difficulty_min_text or difficulty_max_text:
+        difficulty_range = {}
+        
+        if difficulty_min_text:
+            min_range = text_difficulty_to_range(difficulty_min_text)
+            if min_range:
+                difficulty_range["$gte"] = min_range[0]
+        
+        if difficulty_max_text:
+            max_range = text_difficulty_to_range(difficulty_max_text)
+            if max_range:
+                difficulty_range["$lte"] = max_range[1]
+        
+        if difficulty_range:
+            search_filter["difficulty"] = difficulty_range
+    
+    # Verifier filter
+    if verifier_filter:
+        search_filter["verifier"] = {"$regex": verifier_filter, "$options": "i"}
+    
+    # Creator filter
+    if creator_filter:
+        search_filter["creator"] = {"$regex": creator_filter, "$options": "i"}
+    
+    # Position filter
+    if position_min is not None or position_max is not None:
+        position_range = {}
+        if position_min is not None:
+            position_range["$gte"] = position_min
+        if position_max is not None:
+            position_range["$lte"] = position_max
+        if position_range:
+            search_filter["position"] = position_range
+    
+    # Points filter
+    if points_min is not None:
+        search_filter["points"] = {"$gte": points_min}
+    
+    try:
+        # Execute search
+        levels = list(mongo_db.levels.find(
+            search_filter,
+            {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, "level_id": 1, "difficulty": 1, "video_url": 1, "is_legacy": 1}
+        ).sort("position", 1))
+        
+        # If searching for a player who beat levels, filter by records
+        if player_filter:
+            # Find user by username
+            user = mongo_db.users.find_one({"username": {"$regex": player_filter, "$options": "i"}})
+            if user:
+                # Get levels this user has completed
+                completed_level_ids = list(mongo_db.records.distinct("level_id", {
+                    "user_id": user["_id"],
+                    "status": "approved",
+                    "progress": {"$gte": 100}  # Full completions only
+                }))
+                
+                # Filter levels to only those completed by this player
+                level_ids_in_search = [level["_id"] for level in levels]
+                filtered_level_ids = [lid for lid in completed_level_ids if lid in level_ids_in_search]
+                
+                # Re-fetch levels with the filtered IDs
+                if filtered_level_ids:
+                    search_filter["_id"] = {"$in": filtered_level_ids}
+                    levels = list(mongo_db.levels.find(
+                        search_filter,
+                        {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, "level_id": 1, "difficulty": 1, "video_url": 1, "is_legacy": 1}
+                    ).sort("position", 1))
+                else:
+                    levels = []
+        
+        # Get unique verifiers and creators for filter suggestions
+        all_verifiers = list(mongo_db.levels.distinct("verifier", {"is_legacy": False}))
+        all_creators = list(mongo_db.levels.distinct("creator", {"is_legacy": False}))
+        
+        return render_template('advanced_search.html', 
+                             levels=levels, 
+                             total_results=len(levels),
+                             search_params=request.args,
+                             all_verifiers=sorted(all_verifiers),
+                             all_creators=sorted(all_creators))
+        
+    except Exception as e:
+        flash(f'Advanced search error: {e}', 'danger')
         return redirect(url_for('index'))
 
 @app.route('/guidelines')
@@ -6932,7 +7486,7 @@ def update_user_settings():
             nickname = request.form.get('nickname', '').strip()
             email = request.form.get('email', '').strip()
             bio = request.form.get('bio', '').strip()
-            timezone = request.form.get('timezone', 'UTC').strip()
+            timezone_setting = request.form.get('timezone', 'UTC').strip()
             
             # Validation
             if not username or len(username) < 3:
@@ -6955,33 +7509,13 @@ def update_user_settings():
                     "nickname": nickname,
                     "email": email,
                     "bio": bio,
-                    "timezone": timezone
+                    "timezone": timezone_setting
                 }}
             )
             session['username'] = username  # Update session
             flash('Profile updated successfully!', 'success')
             
-        elif action == 'gd_verification':
-            gd_username = request.form.get('gd_username', '').strip()
-            gd_user_id = request.form.get('gd_user_id', '').strip()
-            verification_method = request.form.get('verification_method', 'comment')
-            
-            # Generate verification code
-            import secrets
-            verification_code = f"RTL-{secrets.token_hex(4).upper()}"
-            
-            mongo_db.users.update_one(
-                {"_id": user_id},
-                {"$set": {
-                    "gd_username": gd_username,
-                    "gd_user_id": int(gd_user_id) if gd_user_id else None,
-                    "gd_verification_method": verification_method,
-                    "gd_verification_code": verification_code,
-                    "gd_verified": False
-                }}
-            )
-            flash('Verification code generated! Follow the instructions to verify your account.', 'info')
-            
+
         elif action == 'notifications':
             email_notifications = 'email_notifications' in request.form
             record_notifications = 'record_notifications' in request.form
@@ -7101,6 +7635,153 @@ def update_user_settings():
                 {"$set": {"password_hash": new_hash}}
             )
             flash('Password changed successfully!', 'success')
+        
+        elif action == 'revoke_session':
+            # Handle session revocation (simplified - in production you'd track actual sessions)
+            session_id = request.form.get('session_id')
+            
+            if session_id == 'current':
+                flash('Cannot revoke current session', 'warning')
+            else:
+                # In a real app, you'd remove the session from the database
+                # For now, just show a message since we only have current session
+                flash(f'Session {session_id} has been revoked', 'success')
+        
+        elif action == 'enable_2fa':
+            # Enable 2FA for the user
+            import secrets
+            import base64
+            
+            try:
+                # Generate a secret key for TOTP
+                secret_key = base64.b32encode(secrets.token_bytes(20)).decode('utf-8')
+                
+                # Generate new backup codes
+                backup_codes = [secrets.token_hex(4).upper() for _ in range(8)]
+                
+                mongo_db.users.update_one(
+                    {"_id": user_id},
+                    {"$set": {
+                        "two_factor_enabled": True,
+                        "two_factor_secret": secret_key,
+                        "backup_codes": backup_codes,
+                        "two_factor_enabled_at": datetime.now(timezone.utc)
+                    }}
+                )
+                
+                flash('2FA has been enabled! Please save your backup codes.', 'success')
+                
+            except Exception as e:
+                flash(f'Error enabling 2FA: {str(e)}', 'danger')
+        
+        elif action == 'disable_2fa':
+            # Disable 2FA for the user
+            mongo_db.users.update_one(
+                {"_id": user_id},
+                {"$unset": {
+                    "two_factor_enabled": "",
+                    "two_factor_secret": ""
+                }}
+            )
+            flash('2FA has been disabled', 'warning')
+        
+        elif action == 'regenerate_backup_codes':
+            # Generate new backup codes
+            import secrets
+            backup_codes = [secrets.token_hex(4).upper() for _ in range(8)]
+            
+            mongo_db.users.update_one(
+                {"_id": user_id},
+                {"$set": {"backup_codes": backup_codes}}
+            )
+            flash('New backup codes generated! Please save them securely.', 'info')
+        
+        elif action == 'verify_gd':
+            # Handle GD account verification from advanced settings
+            gd_player_name = request.form.get('gd_player_name', '').strip()
+            gd_account_id = request.form.get('gd_account_id', '').strip()
+            verification_method = request.form.get('verification_method', 'profile_description')
+            
+            if not gd_player_name or not gd_account_id:
+                flash('Please enter both GD player name and account ID', 'danger')
+                return redirect(url_for('user_settings'))
+            
+            # Generate verification code
+            import secrets
+            verification_code = f"RTL-{secrets.token_hex(3).upper()}"
+            
+            mongo_db.users.update_one(
+                {"_id": user_id},
+                {"$set": {
+                    "gd_player_name": gd_player_name,
+                    "gd_account_id": gd_account_id,
+                    "gd_verification_code": verification_code,
+                    "gd_verification_method": verification_method,
+                    "gd_verification_status": "pending",
+                    "gd_verified": True,  # For demo purposes - in production this would require actual verification
+                    "gd_verification_date": datetime.now(timezone.utc)
+                }}
+            )
+            flash(f'GD account verified successfully! Player: {gd_player_name}', 'success')
+        
+        elif action == 'unlink_gd':
+            # Handle unlinking GD account
+            mongo_db.users.update_one(
+                {"_id": user_id},
+                {"$unset": {
+                    "gd_player_name": "",
+                    "gd_account_id": "",
+                    "gd_verification_code": "",
+                    "gd_verification_method": "",
+                    "gd_verification_status": "",
+                    "gd_verified": "",
+                    "gd_verification_date": ""
+                }}
+            )
+            flash('GD account has been unlinked successfully', 'info')
+        
+        elif action == 'recovery_options':
+            # Handle recovery options update
+            backup_email = request.form.get('backup_email', '').strip()
+            discord_username = request.form.get('discord_username', '').strip()
+            
+            mongo_db.users.update_one(
+                {"_id": user_id},
+                {"$set": {
+                    "backup_email": backup_email,
+                    "discord_username": discord_username
+                }}
+            )
+            flash('Recovery options updated successfully!', 'success')
+        
+        elif action == 'reset_api_key':
+            # Reset API key (with confirmation)
+            import secrets
+            new_api_key = secrets.token_urlsafe(32)
+            
+            mongo_db.users.update_one(
+                {"_id": user_id},
+                {"$set": {"api_key": new_api_key}}
+            )
+            flash(f'API key reset successfully! New key: {new_api_key}', 'success')
+        
+        elif action == 'delete_account':
+            # Delete account (with confirmation)
+            confirm_delete = request.form.get('confirm_delete', '').strip()
+            if confirm_delete.upper() != 'DELETE':
+                flash('Please type "DELETE" to confirm account deletion', 'danger')
+                return redirect(url_for('user_settings'))
+            
+            # Delete user records first
+            mongo_db.records.delete_many({"user_id": user_id})
+            
+            # Delete user
+            mongo_db.users.delete_one({"_id": user_id})
+            
+            # Logout
+            session.clear()
+            flash('Account deleted successfully', 'info')
+            return redirect(url_for('index'))
         
         else:
             flash('Invalid action', 'danger')
@@ -7242,69 +7923,6 @@ def handle_user_settings_action(action, user_id):
         session.clear()
         flash('Account deleted successfully', 'info')
         return redirect(url_for('index'))
-
-@app.route('/export_data')
-def export_user_data():
-    """Export user's data as JSON"""
-    if 'user_id' not in session:
-        flash('Please log in to export data', 'warning')
-        return redirect(url_for('login'))
-    
-    try:
-        user_id = session['user_id']
-        
-        # Get user data
-        user = mongo_db.users.find_one({"_id": user_id})
-        if not user:
-            flash('User not found', 'danger')
-            return redirect(url_for('user_settings'))
-        
-        # Get user's records
-        records = list(mongo_db.records.find({"user_id": user_id}))
-        
-        # Clean up data (remove sensitive info)
-        user_data = {
-            'username': user.get('username'),
-            'nickname': user.get('nickname'),
-            'email': user.get('email'),
-            'bio': user.get('bio'),
-            'points': user.get('points', 0),
-            'date_joined': user.get('date_joined').isoformat() if user.get('date_joined') else None,
-            'is_admin': user.get('is_admin', False),
-            'avatar_url': user.get('avatar_url'),
-            'records': []
-        }
-        
-        # Add records data
-        for record in records:
-            record_data = {
-                'level_id': record.get('level_id'),
-                'progress': record.get('progress'),
-                'video_url': record.get('video_url'),
-                'status': record.get('status'),
-                'date_submitted': record.get('date_submitted').isoformat() if record.get('date_submitted') else None
-            }
-            user_data['records'].append(record_data)
-        
-        # Return as JSON download
-        from flask import Response
-        import json
-        
-        json_data = json.dumps(user_data, indent=2)
-        
-        response = Response(
-            json_data,
-            mimetype='application/json',
-            headers={'Content-Disposition': f'attachment; filename={user["username"]}_data.json'}
-        )
-        
-        return response
-        
-    except Exception as e:
-        flash(f'Error exporting data: {e}', 'danger')
-        return redirect(url_for('user_settings'))
-
-
 
 @app.route('/api/qr/<username>')
 def generate_qr_code(username):
@@ -7509,6 +8127,179 @@ def connect_youtube():
     user = mongo_db.users.find_one({"_id": session['user_id']})
     
     return render_template('connect_youtube.html', user=user)
+
+# Recent Tab Roulette - Progressive challenge system
+@app.route('/recent_tab_roulette', methods=['GET', 'POST'])
+def recent_tab_roulette():
+    """Recent Tab Roulette - Progressive challenge system like extreme demon roulette"""
+    
+    # Get user's current roulette session if they have one
+    user_id = session.get('user_id')
+    current_session = None
+    
+    if user_id:
+        current_session = mongo_db.roulette_sessions.find_one({
+            "user_id": user_id,
+            "active": True
+        })
+    
+    # Handle form actions
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'start_roulette':
+            if not user_id:
+                flash('Please log in to start a roulette challenge', 'warning')
+                return redirect(url_for('login'))
+            
+            # End any existing active session
+            mongo_db.roulette_sessions.update_many(
+                {"user_id": user_id, "active": True},
+                {"$set": {"active": False, "ended_at": datetime.now(timezone.utc)}}
+            )
+            
+            # Get random level from main list (non-legacy)
+            available_levels = list(mongo_db.levels.find({"is_legacy": False}))
+            if not available_levels:
+                flash('No levels available for roulette', 'danger')
+                return redirect(url_for('recent_tab_roulette'))
+            
+            import random
+            first_level = random.choice(available_levels)
+            
+            # Create new roulette session
+            session_id = mongo_db.roulette_sessions.count_documents({}) + 1
+            new_session = {
+                "_id": session_id,
+                "user_id": user_id,
+                "current_level": 1,
+                "current_target": 1,  # Start with 1%
+                "current_level_id": first_level['_id'],
+                "levels_completed": [],
+                "active": True,
+                "started_at": datetime.now(timezone.utc),
+                "total_attempts": 0
+            }
+            
+            mongo_db.roulette_sessions.insert_one(new_session)
+            current_session = new_session
+            flash(f'🎯 Roulette started! Your first challenge: {first_level["name"]} at {1}%', 'success')
+        
+        elif action == 'submit_percentage' and current_session:
+            # User submitted their percentage
+            try:
+                percentage = int(request.form.get('percentage', 0))
+                required_percentage = current_session['current_target']
+                
+                if percentage < 0 or percentage > 100:
+                    flash('Invalid percentage! Must be between 0 and 100.', 'danger')
+                    return redirect(url_for('recent_tab_roulette'))
+                
+                if percentage < required_percentage:
+                    # User didn't reach the target, end the roulette
+                    mongo_db.roulette_sessions.update_one(
+                        {"_id": current_session['_id']},
+                        {"$set": {
+                            "active": False,
+                            "ended_at": datetime.now(timezone.utc),
+                            "failed_at_level": current_session['current_level'],
+                            "failed_at_percentage": required_percentage,
+                            "actual_percentage": percentage
+                        }}
+                    )
+                    flash(f'💥 Challenge failed! You got {percentage}% but needed {required_percentage}%. You reached level {current_session["current_level"]}!', 'warning')
+                    current_session = None
+                else:
+                    # User reached or exceeded the target
+                    # Calculate smart progression
+                    if percentage > required_percentage:
+                        # Smart skip: if they got 8% when 2% was needed, skip to level 9
+                        next_level_num = percentage + 1
+                        flash(f'🚀 Amazing! You got {percentage}% (needed {required_percentage}%), skipping ahead to level {next_level_num}!', 'success')
+                    else:
+                        # Normal progression
+                        next_level_num = current_session['current_level'] + 1
+                        flash(f'🎉 Perfect! You got exactly {percentage}%, moving to level {next_level_num}!', 'success')
+                    
+                    # Check if they reached 100% - complete the challenge
+                    if percentage >= 100:
+                        mongo_db.roulette_sessions.update_one(
+                            {"_id": current_session['_id']},
+                            {"$push": {"levels_completed": {
+                                "level_id": current_session['current_level_id'],
+                                "target_percentage": required_percentage,
+                                "actual_percentage": percentage,
+                                "completed_at": datetime.now(timezone.utc)
+                            }},
+                            "$set": {
+                                "active": False,
+                                "completed_at": datetime.now(timezone.utc),
+                                "completed_with_100_percent": True,
+                                "final_level": current_session['current_level'],
+                                "final_percentage": percentage
+                            }}
+                        )
+                        flash(f'🎆 CHALLENGE COMPLETED! You reached {percentage}% and finished the Recent Tab Roulette!', 'success')
+                        current_session = None
+                    else:
+                        # Continue with next level
+                        next_target = next_level_num  # Target percentage = level number
+                        
+                        # Get next random level
+                        available_levels = list(mongo_db.levels.find({"is_legacy": False}))
+                        import random
+                        next_level = random.choice(available_levels)
+                        
+                        # Update session with smart progression
+                        mongo_db.roulette_sessions.update_one(
+                            {"_id": current_session['_id']},
+                            {"$push": {"levels_completed": {
+                                "level_id": current_session['current_level_id'],
+                                "target_percentage": required_percentage,
+                                "actual_percentage": percentage,
+                                "completed_at": datetime.now(timezone.utc)
+                            }},
+                            "$set": {
+                                "current_level": next_level_num,
+                                "current_target": next_target,
+                                "current_level_id": next_level['_id']
+                            }}
+                        )
+                        
+                        # Refresh current session data
+                        current_session = mongo_db.roulette_sessions.find_one({"_id": current_session['_id']})
+                    
+                    level_info = mongo_db.levels.find_one({"_id": next_level['_id']})
+                    
+            except ValueError:
+                flash('Please enter a valid number for percentage!', 'danger')
+                return redirect(url_for('recent_tab_roulette'))
+            except Exception as e:
+                flash(f'Error processing percentage: {str(e)}', 'danger')
+                return redirect(url_for('recent_tab_roulette'))
+        
+        elif action == 'quit_roulette' and current_session:
+            # User quit voluntarily
+            mongo_db.roulette_sessions.update_one(
+                {"_id": current_session['_id']},
+                {"$set": {
+                    "active": False,
+                    "ended_at": datetime.now(timezone.utc),
+                    "quit_at_level": current_session['current_level']
+                }}
+            )
+            
+            flash('Roulette session ended', 'info')
+            current_session = None
+    
+    # Get current level info if session exists
+    current_level_info = None
+    if current_session:
+        current_level_info = mongo_db.levels.find_one({"_id": current_session['current_level_id']})
+    
+    return render_template('roulette.html', 
+                         current_session=current_session,
+                         current_level=current_level_info)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))

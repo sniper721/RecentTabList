@@ -1,0 +1,165 @@
+{% extends "layout.html" %}
+
+{% block title %}Admin - Polls{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">📊 Create Poll</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">Question</label>
+                            <input type="text" name="question" class="form-control" required placeholder="What's your question?">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Poll Type</label>
+                            <select name="type" class="form-select">
+                                <option value="info">ℹ️ Info (Blue)</option>
+                                <option value="success">✅ Success (Green)</option>
+                                <option value="warning">⚠️ Warning (Yellow)</option>
+                                <option value="danger">🚨 Important (Red)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Options</label>
+                            <div id="poll-options">
+                                <div class="input-group mb-2">
+                                    <span class="input-group-text">1</span>
+                                    <input type="text" name="option_1" class="form-control" placeholder="Option 1" required>
+                                </div>
+                                <div class="input-group mb-2">
+                                    <span class="input-group-text">2</span>
+                                    <input type="text" name="option_2" class="form-control" placeholder="Option 2" required>
+                                </div>
+                                <div class="input-group mb-2">
+                                    <span class="input-group-text">3</span>
+                                    <input type="text" name="option_3" class="form-control" placeholder="Option 3 (optional)">
+                                </div>
+                                <div class="input-group mb-2">
+                                    <span class="input-group-text">4</span>
+                                    <input type="text" name="option_4" class="form-control" placeholder="Option 4 (optional)">
+                                </div>
+                                <div class="input-group mb-2">
+                                    <span class="input-group-text">5</span>
+                                    <input type="text" name="option_5" class="form-control" placeholder="Option 5 (optional)">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="allow_multiple" id="allow_multiple">
+                                <label class="form-check-label" for="allow_multiple">
+                                    Allow multiple selections
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Expires In</label>
+                            <select name="expires_in_hours" class="form-select">
+                                <option value="24">24 Hours (1 Day)</option>
+                                <option value="72">72 Hours (3 Days)</option>
+                                <option value="168" selected>168 Hours (1 Week)</option>
+                                <option value="336">336 Hours (2 Weeks)</option>
+                                <option value="720">720 Hours (1 Month)</option>
+                            </select>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary w-100">📊 Create Poll</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">📊 All Polls</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if polls %}
+                        {% for poll in polls %}
+                        <div class="border-bottom p-3">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <span class="badge bg-{{ poll.type }} me-2">
+                                            {% if poll.type == 'info' %}ℹ️ INFO
+                                            {% elif poll.type == 'success' %}✅ SUCCESS
+                                            {% elif poll.type == 'warning' %}⚠️ WARNING
+                                            {% elif poll.type == 'danger' %}🚨 IMPORTANT
+                                            {% endif %}
+                                        </span>
+                                        <h6 class="mb-0">{{ poll.question }}</h6>
+                                        
+                                        {% if poll.expires_at > current_time %}
+                                            <span class="badge bg-success ms-2">ACTIVE</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary ms-2">EXPIRED</span>
+                                        {% endif %}
+                                        
+                                        {% if poll.allow_multiple %}
+                                            <span class="badge bg-info ms-1">MULTI</span>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <div class="small text-muted mb-2">Total votes: {{ poll.total_votes }}</div>
+                                        {% for option in poll.options %}
+                                        <div class="mb-1">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <span class="small">{{ option.text }}</span>
+                                                <span class="small text-muted">{{ option.votes }} votes</span>
+                                            </div>
+                                            {% set vote_percentage = (option.votes / poll.total_votes * 100) if poll.total_votes > 0 else 0 %}
+                                            <div class="progress" style="height: 4px;">
+                                                <div class="progress-bar bg-{{ poll.type }}" role="progressbar" 
+                                                     style="width: {{ vote_percentage }}%"></div>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    
+                                    <small class="text-muted">
+                                        Created by <strong>{{ poll.created_by }}</strong> 
+                                        on {{ poll.created_at.strftime('%Y-%m-%d %H:%M UTC') }}
+                                        <br>
+                                        Expires: {{ poll.expires_at.strftime('%Y-%m-%d %H:%M UTC') }}
+                                    </small>
+                                </div>
+                                
+                                <div class="ms-3">
+                                    <form method="POST" action="{{ url_for('admin_delete_poll') }}" class="d-inline">
+                                        <input type="hidden" name="poll_id" value="{{ poll._id }}">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm" 
+                                                onclick="return confirm('Delete this poll?')">
+                                            🗑️ Delete
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <div class="mb-4">
+                                <i class="fas fa-poll-h fa-4x text-muted"></i>
+                            </div>
+                            <h4 class="text-muted">No Polls Yet</h4>
+                            <p class="text-muted">Create your first poll to gather community feedback!</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

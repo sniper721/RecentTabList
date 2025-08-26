@@ -148,7 +148,7 @@
                     <div class="list-group list-group-flush">
                         {% for diff in difficulty_dist %}
                         <div class="list-group-item d-flex justify-content-between align-items-center">
-                            {{ diff._id }}/10 Difficulty
+                            {{ get_difficulty_text(diff._id or 5) }} Difficulty
                             <span class="badge bg-warning text-dark rounded-pill">{{ diff.count }} levels</span>
                         </div>
                         {% endfor %}

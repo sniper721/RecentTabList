@@ -1,0 +1,219 @@
+{% extends "layout.html" %}
+
+{% block title %}Advanced Search - GD Recent Tab List{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">🔍 Advanced Search & Filters</h5>
+            </div>
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('advanced_search') }}">
+                    <!-- Text Search -->
+                    <div class="mb-3">
+                        <label class="form-label">Search Query</label>
+                        <input type="text" name="q" class="form-control" placeholder="Level name, creator, or verifier..." 
+                               value="{{ search_params.get('q', '') }}">
+                        <small class="text-muted">Search in level names, creators, and verifiers</small>
+                    </div>
+                    
+                    <!-- Difficulty Selection -->
+                    <div class="mb-3">
+                        <label class="form-label">Difficulty</label>
+                        <div class="row">
+                            <div class="col-6">
+                                <select name="difficulty_min" class="form-select form-select-sm">
+                                    <option value="">Min</option>
+                                    <option value="easy" {% if search_params.get('difficulty_min') == 'easy' %}selected{% endif %}>Easy</option>
+                                    <option value="normal" {% if search_params.get('difficulty_min') == 'normal' %}selected{% endif %}>Normal</option>
+                                    <option value="hard" {% if search_params.get('difficulty_min') == 'hard' %}selected{% endif %}>Hard</option>
+                                    <option value="harder" {% if search_params.get('difficulty_min') == 'harder' %}selected{% endif %}>Harder</option>
+                                    <option value="insane" {% if search_params.get('difficulty_min') == 'insane' %}selected{% endif %}>Insane</option>
+                                    <option value="demon" {% if search_params.get('difficulty_min') == 'demon' %}selected{% endif %}>Demon</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <select name="difficulty_max" class="form-select form-select-sm">
+                                    <option value="">Max</option>
+                                    <option value="easy" {% if search_params.get('difficulty_max') == 'easy' %}selected{% endif %}>Easy</option>
+                                    <option value="normal" {% if search_params.get('difficulty_max') == 'normal' %}selected{% endif %}>Normal</option>
+                                    <option value="hard" {% if search_params.get('difficulty_max') == 'hard' %}selected{% endif %}>Hard</option>
+                                    <option value="harder" {% if search_params.get('difficulty_max') == 'harder' %}selected{% endif %}>Harder</option>
+                                    <option value="insane" {% if search_params.get('difficulty_max') == 'insane' %}selected{% endif %}>Insane</option>
+                                    <option value="demon" {% if search_params.get('difficulty_max') == 'demon' %}selected{% endif %}>Demon</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Position Range -->
+                    <div class="mb-3">
+                        <label class="form-label">Position Range</label>
+                        <div class="row">
+                            <div class="col-6">
+                                <input type="number" name="position_min" class="form-control form-control-sm" 
+                                       placeholder="Min position" min="1" 
+                                       value="{{ search_params.get('position_min', '') }}">
+                            </div>
+                            <div class="col-6">
+                                <input type="number" name="position_max" class="form-control form-control-sm" 
+                                       placeholder="Max position" min="1" 
+                                       value="{{ search_params.get('position_max', '') }}">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Points Filter -->
+                    <div class="mb-3">
+                        <label class="form-label">Minimum Points</label>
+                        <input type="number" name="points_min" class="form-control" step="0.1" 
+                               placeholder="e.g. 100" value="{{ search_params.get('points_min', '') }}">
+                    </div>
+                    
+                    <!-- Verifier Filter -->
+                    <div class="mb-3">
+                        <label class="form-label">Verifier</label>
+                        <input type="text" name="verifier" class="form-control" 
+                               placeholder="Verifier name..." list="verifier-list"
+                               value="{{ search_params.get('verifier', '') }}">
+                        <datalist id="verifier-list">
+                            {% for verifier in all_verifiers[:20] %}
+                            <option value="{{ verifier }}">
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                    
+                    <!-- Creator Filter -->
+                    <div class="mb-3">
+                        <label class="form-label">Creator</label>
+                        <input type="text" name="creator" class="form-control" 
+                               placeholder="Creator name..." list="creator-list"
+                               value="{{ search_params.get('creator', '') }}">
+                        <datalist id="creator-list">
+                            {% for creator in all_creators[:20] %}
+                            <option value="{{ creator }}">
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                    
+                    <!-- Player Filter -->
+                    <div class="mb-3">
+                        <label class="form-label">Player Who Beat It</label>
+                        <input type="text" name="player" class="form-control" 
+                               placeholder="Player username..."
+                               value="{{ search_params.get('player', '') }}">
+                        <small class="text-muted">Find levels completed by a specific player</small>
+                    </div>
+                    
+                    <!-- Include Legacy -->
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="show_legacy" 
+                                   {% if search_params.get('show_legacy') %}checked{% endif %}>
+                            <label class="form-check-label">
+                                Include Legacy List
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">🔍 Search</button>
+                        <a href="{{ url_for('advanced_search') }}" class="btn btn-outline-secondary">Clear Filters</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Search Tips -->
+        <div class="card shadow-sm mt-3">
+            <div class="card-header bg-info text-white">
+                <h6 class="mb-0">💡 Search Tips</h6>
+            </div>
+            <div class="card-body">
+                <ul class="small mb-0">
+                    <li>Leave fields empty to ignore that filter</li>
+                    <li>Use position range to find specific sections</li>
+                    <li>Player search shows levels they completed at 100%</li>
+                    <li>Combine multiple filters for precise results</li>
+                    <li>Difficulty options: Easy, Normal, Hard, Harder, Insane, Demon</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-success text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">📊 Search Results</h5>
+                    {% if levels %}
+                    <span class="badge bg-light text-dark">{{ total_results }} result{{ 's' if total_results != 1 else '' }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body p-0">
+                {% if levels %}
+                    {% for level in levels %}
+                    <div class="d-flex align-items-center p-3 border-bottom" style="cursor: pointer;" onclick="window.open('{{ level.video_url }}', '_blank')">
+                        <div class="me-3">
+                            <div class="bg-primary text-white rounded text-center" style="width: 40px; height: 40px; line-height: 40px;">
+                                <strong>{{ level.position }}</strong>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-1">
+                                {{ level.name }}
+                                {% if level.is_legacy %}
+                                <span class="badge bg-secondary ms-1">Legacy</span>
+                                {% endif %}
+                            </h6>
+                            <div class="text-muted small">
+                                <span class="me-3">👨‍🎨 {{ level.creator }}</span>
+                                <span class="me-3">✅ {{ level.verifier }}</span>
+                                <span class="me-3">⭐ {{ get_difficulty_text(level.difficulty) }}</span>
+                                <span>🏆 {{ format_points(level.points or 0) }} points</span>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            {% if level.video_url %}
+                            <i class="fab fa-youtube text-danger" title="Video available"></i>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-5">
+                        {% if request.args %}
+                        <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                        <h5>No results found</h5>
+                        <p class="text-muted">Try adjusting your search filters or criteria.</p>
+                        {% else %}
+                        <i class="fas fa-filter fa-3x text-muted mb-3"></i>
+                        <h5>Advanced Search</h5>
+                        <p class="text-muted">Use the filters on the left to find specific levels.</p>
+                        {% endif %}
+                        <a href="{{ url_for('index') }}" class="btn btn-primary">← Back to Main List</a>
+                    </div>
+                {% endif %}
+            </div>
+            
+            {% if levels %}
+            <div class="card-footer">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted">Found {{ total_results }} level{{ 's' if total_results != 1 else '' }}</span>
+                    <a href="{{ url_for('index') }}" class="btn btn-outline-primary btn-sm">← Back to Main List</a>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.card-body .row:hover {
+    background-color: rgba(0,0,0,0.05);
+}
+</style>
+{% endblock %}

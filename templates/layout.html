@@ -97,6 +97,18 @@
                 font-size: 1rem;
             }
         }
+        
+        /* Better spacing for navigation items */
+        @media (min-width: 992px) {
+            .navbar-nav .nav-item {
+                margin: 0 1px;
+            }
+            
+            .navbar-nav .nav-link {
+                font-size: 0.85rem;
+                padding: 0.5rem 0.6rem !important;
+            }
+        }
     </style>
 </head>
 <body data-bs-theme="{{ current_theme }}">
@@ -138,6 +150,26 @@
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('submit_record') }}">📝 Submit</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="toolsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            🔧 Tools
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="toolsDropdown">
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('recent_tab_roulette') }}">
+                                    🎯 Roulette
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('advanced_search') }}">
+                                    🔍 Advanced Search
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == url_for('news_blog') %}active{% endif %}" href="{{ url_for('news_blog') }}">📰 News</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('changelog') }}">📋 Changelog</a>
@@ -184,16 +216,22 @@
                         <a class="nav-link" href="{{ url_for('admin') }}">Admin Panel</a>
                     </li>
                     {% endif %}
-                </ul>
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('toggle_theme') }}" title="{% if current_theme == 'dark' %}Switch to Light Mode{% else %}Switch to Dark Mode{% endif %}">
-                            {% if current_theme == 'dark' %}
-                                <i class="fas fa-sun"></i>
-                            {% else %}
-                                <i class="fas fa-moon"></i>
-                            {% endif %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="themeDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-palette"></i>
                         </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="themeDropdown">
+                            <li><h6 class="dropdown-header">🎨 Appearance</h6></li>
+                            <li><a class="dropdown-item theme-option" href="#" data-theme="light">☀️ Light</a></li>
+                            <li><a class="dropdown-item theme-option" href="#" data-theme="dark">🌙 Dark</a></li>
+                            <li><a class="dropdown-item theme-option" href="#" data-theme="auto">🔄 Auto</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item theme-option" href="#" data-theme="blue">💙 Ocean Blue</a></li>
+                            <li><a class="dropdown-item theme-option" href="#" data-theme="purple">💜 Purple Night</a></li>
+                            <li><a class="dropdown-item theme-option" href="#" data-theme="green">💚 Forest Green</a></li>
+                            <li><a class="dropdown-item theme-option" href="#" data-theme="red">❤️ Cherry Red</a></li>
+                            <li><a class="dropdown-item theme-option" href="#" data-theme="orange">🧡 Sunset Orange</a></li>
+                        </ul>
                     </li>
                     {% if 'user_id' in session %}
                     <li class="nav-item dropdown">
@@ -219,7 +257,6 @@
                         <a class="nav-link {% if request.path == url_for('register') %}active{% endif %}" href="{{ url_for('register') }}">Register</a>
                     </li>
                     {% endif %}
-                </ul>
             </div>
         </div>
     </nav>
@@ -239,6 +276,11 @@
                     </a>
                 </div>
                 <div class="col-6">
+                    <a href="{{ url_for('future_list') }}" class="btn btn-outline-info w-100 btn-sm">
+                        🔮 Future List
+                    </a>
+                </div>
+                <div class="col-6">
                     <a href="{{ url_for('stats_players') }}" class="btn btn-outline-success w-100 btn-sm">
                         🏆 Leaderboard
                     </a>
@@ -246,6 +288,21 @@
                 <div class="col-6">
                     <a href="{{ url_for('submit_record') }}" class="btn btn-outline-warning w-100 btn-sm">
                         📝 Submit
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('recent_tab_roulette') }}" class="btn btn-outline-info w-100 btn-sm">
+                        🎯 Roulette
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('news_blog') }}" class="btn btn-outline-primary w-100 btn-sm">
+                        📰 News
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('timemachine') }}" class="btn btn-outline-info w-100 btn-sm">
+                        🕒 Time Machine
                     </a>
                 </div>
                 <div class="col-6">
@@ -330,6 +387,89 @@
             </div>
             {% endfor %}
         {% endif %}
+        
+        <!-- Active Polls -->
+        {% set active_polls = get_active_polls() %}
+        {% if active_polls %}
+            {% for poll in active_polls %}
+            <div class="card mb-3 border-{{ poll.type }}" id="poll-{{ poll._id }}">
+                <div class="card-header bg-{{ poll.type }} text-white">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <div class="me-2">
+                                {% if poll.type == 'info' %}📊
+                                {% elif poll.type == 'success' %}✅
+                                {% elif poll.type == 'warning' %}⚠️
+                                {% elif poll.type == 'danger' %}🚨
+                                {% endif %}
+                            </div>
+                            <h6 class="mb-0">{{ poll.question }}</h6>
+                            {% if poll.allow_multiple %}
+                                <span class="badge bg-light text-dark ms-2">Multiple Choice</span>
+                            {% endif %}
+                        </div>
+                        {% if 'user_id' in session %}
+                        <button type="button" class="btn-close btn-close-white" 
+                                onclick="closePoll('{{ poll._id }}')"
+                                title="Close poll"></button>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if poll.user_has_voted %}
+                        <!-- Show results if user has voted -->
+                        <div class="mb-2 text-success">✓ You have voted in this poll</div>
+                        <div class="mb-3">
+                            <small class="text-muted">Total votes: {{ poll.total_votes }}</small>
+                            {% for option in poll.options %}
+                            <div class="mb-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>{{ option.text }}</span>
+                                    <span class="text-muted">{{ option.votes }} votes</span>
+                                </div>
+                                {% set vote_percentage = (option.votes / poll.total_votes * 100) if poll.total_votes > 0 else 0 %}
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-{{ poll.type }}" role="progressbar" 
+                                         style="width: {{ vote_percentage }}%"></div>
+                                </div>
+                                <small class="text-muted">{{ "%.1f" | format(vote_percentage) }}%</small>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% elif 'user_id' in session %}
+                        <!-- Show voting form if user is logged in and hasn't voted -->
+                        <form method="POST" action="{{ url_for('vote_poll') }}">
+                            <input type="hidden" name="poll_id" value="{{ poll._id }}">
+                            {% for option in poll.options %}
+                            <div class="form-check mb-2">
+                                {% if poll.allow_multiple %}
+                                <input class="form-check-input" type="checkbox" name="poll_option" value="{{ loop.index0 }}" id="poll_{{ poll._id }}_option_{{ loop.index0 }}">
+                                {% else %}
+                                <input class="form-check-input" type="radio" name="poll_option" value="{{ loop.index0 }}" id="poll_{{ poll._id }}_option_{{ loop.index0 }}">
+                                {% endif %}
+                                <label class="form-check-label" for="poll_{{ poll._id }}_option_{{ loop.index0 }}">
+                                    {{ option.text }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                            <button type="submit" class="btn btn-{{ poll.type }} btn-sm mt-2">Vote</button>
+                        </form>
+                    {% else %}
+                        <!-- Show login prompt if user is not logged in -->
+                        <div class="text-muted mb-2">Please <a href="{{ url_for('login') }}">log in</a> to vote in this poll.</div>
+                        {% for option in poll.options %}
+                        <div class="mb-1">• {{ option.text }}</div>
+                        {% endfor %}
+                    {% endif %}
+                    
+                    <small class="text-muted d-block mt-2">
+                        Posted by {{ poll.created_by }} • 
+                        Expires {{ poll.expires_at.strftime('%Y-%m-%d %H:%M UTC') }}
+                    </small>
+                </div>
+            </div>
+            {% endfor %}
+        {% endif %}
 
         {% block content %}{% endblock %}
     </div>
@@ -348,6 +488,41 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script src="{{ url_for('static', filename='js/country-search.js') }}"></script>
+    
+    <!-- Poll Close Functionality -->
+    <script>
+        // Function to close polls
+        function closePoll(pollId) {
+            fetch('/close_poll', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'poll_id=' + encodeURIComponent(pollId)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Hide the poll with a smooth fade out
+                    const pollElement = document.getElementById('poll-' + pollId);
+                    if (pollElement) {
+                        pollElement.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                        pollElement.style.opacity = '0';
+                        pollElement.style.transform = 'translateX(100%)';
+                        setTimeout(() => {
+                            pollElement.style.display = 'none';
+                        }, 300);
+                    }
+                } else {
+                    console.error('Failed to close poll:', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error closing poll:', error);
+            });
+        }
+    </script>
+    
     {% block extra_js %}{% endblock %}
 </body>
 </html>

@@ -27,8 +27,8 @@
                     <a href="#sessions" class="list-group-item list-group-item-action" data-bs-toggle="pill">
                         📱 Active Sessions
                     </a>
-                    <a href="#data" class="list-group-item list-group-item-action" data-bs-toggle="pill">
-                        📊 Data & Export
+                    <a href="#recovery" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                        🔧 Account Recovery
                     </a>
                     <a href="#danger" class="list-group-item list-group-item-action text-danger" data-bs-toggle="pill">
                         ⚠️ Danger Zone
@@ -162,9 +162,12 @@
                                     <div class="alert alert-warning">
                                         <strong>⚠️ 2FA is disabled</strong> - Enable two-factor authentication for better security
                                     </div>
-                                    <button type="button" class="btn btn-success" onclick="setup2FA()">
-                                        🔐 Enable 2FA
-                                    </button>
+                                    <form method="POST" action="{{ url_for('update_user_settings') }}">
+                                        <input type="hidden" name="action" value="enable_2fa">
+                                        <button type="submit" class="btn btn-success" onclick="return confirm('Enable 2FA? You will need an authenticator app like Google Authenticator or Authy.')">
+                                            🔐 Enable 2FA
+                                        </button>
+                                    </form>
                                 {% endif %}
                             </div>
                             
@@ -365,38 +368,35 @@
                     </div>
                 </div>
                 
-                <!-- Data & Export -->
-                <div class="tab-pane fade" id="data">
+                <!-- Account Recovery -->
+                <div class="tab-pane fade" id="recovery">
                     <div class="card">
                         <div class="card-header">
-                            <h5 class="mb-0">📊 Data Management & Export</h5>
+                            <h5 class="mb-0">🔧 Account Recovery</h5>
                         </div>
                         <div class="card-body">
-                            <div class="mb-4">
-                                <h6>📥 Export Your Data (GDPR Compliant)</h6>
-                                <p class="text-muted">Download all your data including profile, records, and activity history.</p>
-                                <form method="POST" action="{{ url_for('update_user_settings') }}">
-                                    <input type="hidden" name="action" value="export_data">
-                                    <button type="submit" class="btn btn-info">📥 Download My Data</button>
-                                </form>
+                            <div class="alert alert-info">
+                                <strong>📝 Recovery Options</strong><br>
+                                Set up backup methods to recover your account if you lose access to your primary email or 2FA device.
                             </div>
                             
-                            <div class="mb-4">
-                                <h6>🔄 Account Recovery Options</h6>
-                                <form method="POST" action="{{ url_for('update_user_settings') }}">
-                                    <input type="hidden" name="action" value="recovery_options">
-                                    <div class="mb-3">
-                                        <label class="form-label">Backup Email</label>
-                                        <input type="email" name="backup_email" class="form-control" value="{{ user.backup_email or '' }}">
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">Discord Username (for recovery)</label>
-                                        <input type="text" name="discord_username" class="form-control" value="{{ user.discord_username or '' }}">
-                                    </div>
-                                    <button type="submit" class="btn btn-primary">💾 Save Recovery Options</button>
-                                </form>
-                            </div>
-                            
+                            <form method="POST" action="{{ url_for('update_user_settings') }}">
+                                <input type="hidden" name="action" value="recovery_options">
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Backup Email</label>
+                                    <input type="email" name="backup_email" class="form-control" value="{{ user.backup_email or '' }}" placeholder="backup@example.com">
+                                    <small class="text-muted">Alternative email for account recovery</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Discord Username (for recovery)</label>
+                                    <input type="text" name="discord_username" class="form-control" value="{{ user.discord_username or '' }}" placeholder="username#1234">
+                                    <small class="text-muted">Discord username for manual account recovery verification</small>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary">💾 Save Recovery Options</button>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -445,10 +445,6 @@
 
 {% block extra_js %}
 <script>
-function setup2FA() {
-    alert('2FA setup will be implemented with QR code generation for authenticator apps!');
-}
-
 // Show verification instructions based on selected method
 document.querySelector('select[name="verification_method"]').addEventListener('change', function() {
     const instructions = document.getElementById('verification_instructions');
