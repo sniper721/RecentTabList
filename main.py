@@ -1175,8 +1175,7 @@ def admin_edit_record(record_id):
             updates = {
                 'percentage': int(request.form.get('percentage', record['percentage'])),
                 'status': request.form.get('status', record['status']),
-                'video_url': request.form.get('video_url', record.get('video_url', '')).strip(),
-                'raw_footage_url': request.form.get('raw_footage_url', record.get('raw_footage_url', '')).strip()
+                'video_url': request.form.get('video_url', record.get('video_url', '')).strip()
             }
             
             # Add admin edit info
@@ -4781,7 +4780,7 @@ def submit_record():
         level_id_str = request.form.get('level_id', '').strip()
         progress_str = request.form.get('progress', '').strip()
         video_url = request.form.get('video_url', '').strip()
-        raw_footage_url = request.form.get('raw_footage_url', '').strip()
+        comments = request.form.get('comments', '').strip()
         
         # Check for empty fields - use cached levels for faster response
         if not level_id_str:
@@ -4796,17 +4795,6 @@ def submit_record():
             
         if not video_url:
             flash('Please provide a video URL', 'danger')
-            levels = get_cached_levels(is_legacy=False)
-            return render_template('submit_record.html', levels=levels)
-        
-        if not raw_footage_url:
-            flash('Please provide a raw footage Google Drive link', 'danger')
-            levels = get_cached_levels(is_legacy=False)
-            return render_template('submit_record.html', levels=levels)
-        
-        # Validate that raw footage URL is from Google Drive
-        if 'drive.google.com' not in raw_footage_url.lower():
-            flash('Raw footage must be a Google Drive link', 'danger')
             levels = get_cached_levels(is_legacy=False)
             return render_template('submit_record.html', levels=levels)
         
@@ -4848,7 +4836,7 @@ def submit_record():
             "level_id": level_id,
             "progress": progress,
             "video_url": video_url,
-            "raw_footage_url": raw_footage_url,
+            "comments": comments,
             "status": "pending",
             "date_submitted": datetime.now(timezone.utc)
         }
@@ -8196,19 +8184,9 @@ def recent_tab_roulette():
                     return redirect(url_for('recent_tab_roulette'))
                 
                 if percentage < required_percentage:
-                    # User didn't reach the target, end the roulette
-                    mongo_db.roulette_sessions.update_one(
-                        {"_id": current_session['_id']},
-                        {"$set": {
-                            "active": False,
-                            "ended_at": datetime.now(timezone.utc),
-                            "failed_at_level": current_session['current_level'],
-                            "failed_at_percentage": required_percentage,
-                            "actual_percentage": percentage
-                        }}
-                    )
-                    flash(f'💥 Challenge failed! You got {percentage}% but needed {required_percentage}%. You reached level {current_session["current_level"]}!', 'warning')
-                    current_session = None
+                    # User didn't reach the target, show error but don't end session
+                    flash(f'❌ Not enough! You got {percentage}% but need at least {required_percentage}%. Try again!', 'warning')
+                    return redirect(url_for('recent_tab_roulette'))
                 else:
                     # User reached or exceeded the target
                     # Calculate smart progression

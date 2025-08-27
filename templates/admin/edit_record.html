@@ -72,13 +72,6 @@
                             <div class="form-text">Proof video URL (optional)</div>
                         </div>
                         
-                        <div class="mb-3">
-                            <label for="raw_footage_url" class="form-label">Raw Footage (Google Drive)</label>
-                            <input type="url" class="form-control" id="raw_footage_url" name="raw_footage_url" 
-                                   value="{{ record.raw_footage_url or '' }}" placeholder="https://drive.google.com/...">
-                            <div class="form-text">Raw footage Google Drive link for verification</div>
-                        </div>
-                        
                         <!-- Current Video Preview -->
                         {% if record.video_url %}
                         <div class="mb-3">
