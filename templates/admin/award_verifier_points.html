@@ -1,0 +1,70 @@
+{% extends "layout.html" %}
+
+{% block title %}Award Verifier Points - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>🏆 Award Verifier Points</h1>
+                <a href="{{ url_for('admin') }}" class="btn btn-secondary">← Back to Admin</a>
+            </div>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <div class="row">
+        <div class="col-lg-8 offset-lg-2">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">🏅 Award Verifier Points</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-4">Manually award points to users who have verified levels.</p>
+                    
+                    <form method="POST" action="{{ url_for('admin_award_verifier_points_dedicated') }}">
+                        <div class="mb-3">
+                            <label for="verifierName" class="form-label">Verifier Name</label>
+                            <input type="text" class="form-control" id="verifierName" name="verifier_name" placeholder="Enter verifier name (e.g., RobTop)" required>
+                            <div class="form-text">The name of the person who verified the levels</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="username" name="username" placeholder="Enter username to award points to" required>
+                            <div class="form-text">The username of the person to award verifier points to</div>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-trophy"></i> Award Verifier Points
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div class="mt-4">
+                        <h6>💡 How it works:</h6>
+                        <ul>
+                            <li>Enter the exact name of the verifier (e.g., "RobTop")</li>
+                            <li>Enter the username of the person who should receive the points</li>
+                            <li>The system will find all levels verified by that person</li>
+                            <li>Points will be awarded for each level they verified (if not already awarded)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
