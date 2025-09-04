@@ -5093,17 +5093,6 @@ def admin():
         flash('Access denied. Admin privileges required.', 'danger')
         return redirect(url_for('index'))
     
-    # Handle Award Verifier Points form submission
-@app.route('/admin', methods=['GET', 'POST'])
-def admin():
-    if 'user_id' not in session:
-        flash('Please log in to access admin panel', 'warning')
-        return redirect(url_for('login'))
-    
-    if not session.get('is_admin'):
-        flash('Access denied. Admin privileges required.', 'danger')
-        return redirect(url_for('index'))
-    
     if request.method == 'POST':
         try:
             verifier_name = request.form.get('verifier_name', '').strip()
