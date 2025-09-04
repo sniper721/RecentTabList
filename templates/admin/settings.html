@@ -220,6 +220,53 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <div class="row">
+        <!-- Webhook Settings -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">📡 Webhook Settings</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('admin_update_changelog_settings') }}">
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="pingEnabled" name="ping_enabled" 
+                                       {% if changelog_settings.ping_enabled %}checked{% endif %}>
+                                <label class="form-check-label" for="pingEnabled">
+                                    <strong>Enable @Changelog Role Ping</strong>
+                                </label>
+                            </div>
+                            <p class="text-muted small">When enabled, the bot will ping the Changelog role in Discord notifications</p>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="pingThreshold" class="form-label">
+                                <strong>Ping Threshold</strong>
+                            </label>
+                            <input type="number" class="form-control" id="pingThreshold" name="ping_threshold" 
+                                   value="{{ changelog_settings.ping_threshold }}" min="1">
+                            <p class="text-muted small">Number of messages that need to be sent before pinging the role (to prevent spam)</p>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="roleId" class="form-label">
+                                <strong>Role ID</strong>
+                            </label>
+                            <input type="text" class="form-control" id="roleId" name="role_id" 
+                                   value="{{ changelog_settings.role_id }}">
+                            <p class="text-muted small">Discord role ID to ping (default: 1388326130183966720)</p>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100">
+                            💾 Save Changelog Settings
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
 
         <!-- System Controls -->
         <div class="col-lg-6 mb-4">

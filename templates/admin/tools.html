@@ -1,0 +1,184 @@
+{% extends "layout.html" %}
+
+{% block title %}Admin Tools - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>🛠️ Admin Tools</h1>
+                <a href="{{ url_for('admin') }}" class="btn btn-secondary">← Back to Admin</a>
+            </div>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <div class="row">
+        <!-- User Management Tools -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">👥 User Management</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Find User Section -->
+                    <div class="mb-4">
+                        <h6>🔍 Find User</h6>
+                        <form id="findUserForm">
+                            <div class="mb-3">
+                                <label for="username" class="form-label">Username</label>
+                                <input type="text" class="form-control" id="username" name="username" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Find User</button>
+                        </form>
+                        
+                        <div id="userResult" class="mt-3" style="display: none;">
+                            <div class="alert alert-info">
+                                <h6>User Found:</h6>
+                                <p><strong>Username:</strong> <span id="resultUsername"></span></p>
+                                <p><strong>User ID:</strong> <span id="resultUserId"></span></p>
+                                <div class="mt-2">
+                                    <a href="#" id="ipBanLink" class="btn btn-danger btn-sm">IP Ban User</a>
+                                    <a href="#" id="resetPointsLink" class="btn btn-warning btn-sm">Reset Points & Records</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reset Own Points Section -->
+                    <div>
+                        <h6>🔄 Reset Your Own Points</h6>
+                        <p>Use this to reset your own points and records if they've disappeared.</p>
+                        <form method="POST" action="{{ url_for('admin_reset_own_points') }}" 
+                              onsubmit="return confirm('Are you sure you want to reset your own points and records? This cannot be undone!');">
+                            <button type="submit" class="btn btn-warning">Reset My Points & Records</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Security Tools -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">🛡️ Security Tools</h5>
+                </div>
+                <div class="card-body">
+                    <!-- IP Ban Section -->
+                    <div class="mb-4">
+                        <h6>🚫 IP Ban User</h6>
+                        <p>Permanently ban a user and all accounts associated with their IP address(es).</p>
+                        <form id="ipBanForm">
+                            <div class="mb-3">
+                                <label for="banUsername" class="form-label">Username to Ban</label>
+                                <input type="text" class="form-control" id="banUsername" name="username" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="banReason" class="form-label">Ban Reason</label>
+                                <select class="form-select" id="banReason" name="reason" required>
+                                    <option value="Hacking/Cheating">Hacking/Cheating</option>
+                                    <option value="Speedhacking">Speedhacking</option>
+                                    <option value="Noclip Usage">Noclip Usage</option>
+                                    <option value="Macro/Bot Usage">Macro/Bot Usage</option>
+                                    <option value="Fake Records">Fake Records</option>
+                                    <option value="Multiple Accounts">Multiple Accounts</option>
+                                    <option value="Severe Rule Violation">Severe Rule Violation</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-danger">IP Ban User</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('ipBanForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('banUsername').value.trim();
+    const reason = document.getElementById('banReason').value;
+    
+    if (!username) {
+        alert('Please enter a username');
+        return;
+    }
+    
+    // First, find the user
+    fetch('/admin/find_user', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({username: username})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error: ' + data.error);
+        } else {
+            // Confirm ban action
+            const confirmMsg = `🚨 IRREVERSIBLE ACTION 🚨\n\nYou are about to IP BAN user: ${data.username}\n\nThis will:\n• Permanently ban all IP addresses associated with this user\n• Delete ALL their records\n• Reset their points to 0\n• Prevent creation of new accounts from same IP(s)\n\nBan Reason: ${reason}\n\nAre you absolutely sure you want to proceed?`;
+            
+            if (confirm(confirmMsg)) {
+                // Proceed with IP ban
+                window.location.href = `/admin/ip_ban/${data.user_id}?reason=${encodeURIComponent(reason)}`;
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while finding the user');
+    });
+});
+
+document.getElementById('findUserForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('username').value.trim();
+    if (!username) {
+        alert('Please enter a username');
+        return;
+    }
+    
+    fetch('/admin/find_user', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({username: username})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error: ' + data.error);
+        } else {
+            document.getElementById('resultUsername').textContent = data.username;
+            document.getElementById('resultUserId').textContent = data.user_id;
+            document.getElementById('ipBanLink').href = '/admin/ip_ban/' + data.user_id;
+            document.getElementById('resetPointsLink').href = '/admin/reset_user/' + data.user_id;
+            document.getElementById('userResult').style.display = 'block';
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while finding the user');
+    });
+});
+</script>
+{% endblock %}

@@ -1,438 +1,209 @@
 {% extends "layout.html" %}
 
-{% block title %}Admin Dashboard - GD Recent Tab List{% endblock %}
+{% block title %}Admin Panel{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card shadow-sm">
-            <div class="card-header bg-dark text-white">
-                <h2 class="mb-0">Admin Dashboard</h2>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>🔐 Admin Panel</h1>
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">← Back to Site</a>
             </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-4">
-                        <div class="card mb-3">
-                            <div class="card-body text-center">
-                                <h1 class="display-4">{{ pending_records|length }}</h1>
-                                <p class="lead">Pending Records</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-8">
-                        <div class="d-flex gap-2 mb-3 flex-wrap">
-                            <a href="{{ url_for('admin_levels') }}" class="btn btn-primary">
-                                <i class="fas fa-list"></i> Manage Levels
-                            </a>
-                            <a href="{{ url_for('admin_records') }}" class="btn btn-success">
-                                <i class="fas fa-trophy"></i> Manage Records
-                            </a>
-                            <a href="{{ url_for('admin_future_levels') }}" class="btn btn-success">
-                                Future Levels
-                            </a>
-                            <a href="{{ url_for('admin_announcements') }}" class="btn btn-warning">
-                                📢 Announcements
-                            </a>
-                            <a href="{{ url_for('admin_polls') }}" class="btn btn-info">
-                                📊 Polls
-                            </a>
-                            <a href="{{ url_for('admin_level_stats') }}" class="btn btn-success">
-                                Statistics
-                            </a>
-                            <a href="{{ url_for('admin_users') }}" class="btn btn-secondary">
-                                <i class="fas fa-users"></i> Manage Users
-                            </a>
-                            <a href="{{ url_for('admin_news') }}" class="btn btn-info">
-                                <i class="fas fa-newspaper"></i> Manage News
-                            </a>
-                            <a href="{{ url_for('admin_settings') }}" class="btn btn-info">
-                                <i class="fas fa-cog"></i> Settings
-                            </a>
-                        </div>
-                        
-                        <!-- Admin Power Tools -->
-                        <div class="card mb-3 border-danger">
-                            <div class="card-header bg-danger text-white">
-                                <h5 class="mb-0">Admin Power Tools</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-4">
-                                        <form method="POST" action="{{ url_for('admin_reset_own_points') }}" onsubmit="return confirm('Are you sure you want to reset your own points and delete all your records? This cannot be undone!')">
-                                            <button type="submit" class="btn btn-warning w-100">
-                                                <i class="fas fa-redo"></i> Reset My Points & Records
-                                            </button>
-                                        </form>
-                                        <small class="text-muted">Reset your own points to 0 and delete all your records</small>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <button type="button" class="btn btn-danger w-100" onclick="showIpBanForm()">
-                                            <i class="fas fa-ban"></i> IP Ban User
-                                        </button>
-                                        <small class="text-muted">Permanently ban a user and their IP address</small>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <button type="button" class="btn btn-dark w-100" onclick="showResetPointsForm()">
-                                            <i class="fas fa-trash"></i> Reset User Points
-                                        </button>
-                                        <small class="text-muted">Reset any user's points and delete their records</small>
-                                    </div>
-                                </div>
-                                
-                                <!-- IP Ban Form (Hidden by default) -->
-                                <div id="ipBanForm" style="display: none;" class="mt-4 p-3 border border-danger rounded bg-light">
-                                    <h6 class="text-danger">IP Ban User</h6>
-                                    <div class="alert alert-danger">
-                                        <strong>WARNING:</strong> This will permanently ban the user's IP address and delete all their data!
-                                    </div>
-                                    <form id="ipBanFormReal" method="POST">
-                                        <div class="row">
-                                            <div class="col-md-4">
-                                                <label class="form-label">Username to Ban:</label>
-                                                <input type="text" class="form-control" id="banUsername" name="username" placeholder="Enter username" required>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">Ban Reason:</label>
-                                                <select class="form-select" id="banReason" name="reason" required>
-                                                    <option value="Hacking/Cheating">Hacking/Cheating</option>
-                                                    <option value="Speedhacking">Speedhacking</option>
-                                                    <option value="Noclip Usage">Noclip Usage</option>
-                                                    <option value="Macro/Bot Usage">Macro/Bot Usage</option>
-                                                    <option value="Fake Records">Fake Records</option>
-                                                    <option value="Multiple Accounts">Multiple Accounts</option>
-                                                    <option value="Severe Rule Violation">Severe Rule Violation</option>
-                                                </select>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <label class="form-label">&nbsp;</label>
-                                                <div>
-                                                    <button type="button" class="btn btn-danger" onclick="executeIpBan()">Execute IP Ban</button>
-                                                    <button type="button" class="btn btn-secondary" onclick="hideIpBanForm()">Cancel</button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </form>
-                                </div>
-                                
-                                <!-- Reset Points Form (Hidden by default) -->
-                                <div id="resetPointsForm" style="display: none;" class="mt-4 p-3 border border-dark rounded bg-light">
-                                    <h6 class="text-dark">Reset User Points</h6>
-                                    <div class="alert alert-warning">
-                                        <strong>WARNING:</strong> This will reset the user's points to 0 and delete all their records!
-                                    </div>
-                                    <form id="resetPointsFormReal" method="POST">
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <label class="form-label">Username to Reset:</label>
-                                                <input type="text" class="form-control" id="resetUsername" name="username" placeholder="Enter username" required>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label">&nbsp;</label>
-                                                <div>
-                                                    <button type="button" class="btn btn-dark" onclick="executeResetPoints()">Reset Points</button>
-                                                    <button type="button" class="btn btn-secondary" onclick="hideResetPointsForm()">Cancel</button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
+        </div>
+    </div>
 
-                        <script>
-                        function showIpBanForm() {
-                            document.getElementById('ipBanForm').style.display = 'block';
-                            document.getElementById('resetPointsForm').style.display = 'none';
-                            document.getElementById('banUsername').focus();
-                        }
-                        
-                        function hideIpBanForm() {
-                            document.getElementById('ipBanForm').style.display = 'none';
-                        }
-                        
-                        function showResetPointsForm() {
-                            document.getElementById('resetPointsForm').style.display = 'block';
-                            document.getElementById('ipBanForm').style.display = 'none';
-                            document.getElementById('resetUsername').focus();
-                        }
-                        
-                        function hideResetPointsForm() {
-                            document.getElementById('resetPointsForm').style.display = 'none';
-                        }
-                        
-                        function executeIpBan() {
-                            const username = document.getElementById('banUsername').value.trim();
-                            const reason = document.getElementById('banReason').value;
-                            
-                            if (!username) {
-                                alert('Please enter a username');
-                                return;
-                            }
-                            
-                            if (confirm(`Are you sure you want to IP BAN "${username}"? This action is PERMANENT and IRREVERSIBLE!\n\nThis will:\n- Permanently ban their IP address\n- Delete ALL their records\n- Reset their points to 0\n- Prevent them from creating new accounts`)) {
-                                // Find user and execute ban
-                                fetch('/admin/find_user', {
-                                    method: 'POST',
-                                    headers: {'Content-Type': 'application/json'},
-                                    body: JSON.stringify({username: username})
-                                })
-                                .then(response => response.json())
-                                .then(data => {
-                                    if (data.user_id) {
-                                        // Create form and submit
-                                        const form = document.createElement('form');
-                                        form.method = 'POST';
-                                        form.action = `/admin/ip_ban/${data.user_id}`;
-                                        
-                                        const reasonInput = document.createElement('input');
-                                        reasonInput.type = 'hidden';
-                                        reasonInput.name = 'reason';
-                                        reasonInput.value = reason;
-                                        form.appendChild(reasonInput);
-                                        
-                                        document.body.appendChild(form);
-                                        form.submit();
-                                    } else {
-                                        alert(`User "${username}" not found. Please check the spelling.`);
-                                    }
-                                })
-                                .catch(error => {
-                                    alert('Error finding user. Please try again.');
-                                    console.error(error);
-                                });
-                            }
-                        }
-                        
-                        function executeResetPoints() {
-                            const username = document.getElementById('resetUsername').value.trim();
-                            
-                            if (!username) {
-                                alert('Please enter a username');
-                                return;
-                            }
-                            
-                            if (confirm(`Are you sure you want to reset "${username}"'s points and delete all their records?\n\nThis will:\n- Reset their points to 0\n- Delete ALL their records\n- This action cannot be undone`)) {
-                                // Find user and execute reset
-                                fetch('/admin/find_user', {
-                                    method: 'POST',
-                                    headers: {'Content-Type': 'application/json'},
-                                    body: JSON.stringify({username: username})
-                                })
-                                .then(response => response.json())
-                                .then(data => {
-                                    if (data.user_id) {
-                                        // Create form and submit
-                                        const form = document.createElement('form');
-                                        form.method = 'POST';
-                                        form.action = `/admin/reset_points/${data.user_id}`;
-                                        
-                                        document.body.appendChild(form);
-                                        form.submit();
-                                    } else {
-                                        alert(`User "${username}" not found. Please check the spelling.`);
-                                    }
-                                })
-                                .catch(error => {
-                                    alert('Error finding user. Please try again.');
-                                    console.error(error);
-                                });
-                            }
-                        }
-                        </script>
-                        
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
 
-
-                        <!-- Verifier Points Award Section -->
-                        <div class="card mt-3">
-                            <div class="card-header">
-                                <h5 class="mb-0">🏆 Award Verifier Points</h5>
-                            </div>
-                            <div class="card-body">
-                                <form method="POST" action="{{ url_for('admin_award_verifier_points') }}" class="row g-3">
-                                    <div class="col-md-4">
-                                        <label for="verifier_name" class="form-label">Verifier Name</label>
-                                        <input type="text" class="form-control" name="verifier_name" placeholder="e.g. miifin" required>
-                                        <small class="text-muted">Awards points for ALL levels verified by this person</small>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label for="username" class="form-label">Username</label>
-                                        <input type="text" class="form-control" name="username" placeholder="Enter username" required>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label">&nbsp;</label>
-                                        <button type="submit" class="btn btn-success w-100">
-                                            🎖️ Award Verifier Points
-                                        </button>
-                                    </div>
-                                </form>
-                                <small class="text-muted">Award points to level verifiers (like first victors). They'll get full completion points.</small>
-                            </div>
-                        </div>
-                    </div>
+    <!-- Stats Overview -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <h5 class="card-title">Users</h5>
+                    <h3>{{ stats.total_users }}</h3>
+                    <p class="mb-0">{{ stats.new_users_24h }} new in 24h</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h5 class="card-title">Levels</h5>
+                    <h3>{{ stats.total_levels }}</h3>
+                    <p class="mb-0">{{ stats.new_levels_24h }} new in 24h</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <h5 class="card-title">Records</h5>
+                    <h3>{{ stats.total_records }}</h3>
+                    <p class="mb-0">{{ stats.new_records_24h }} new in 24h</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-danger">
+                <div class="card-body">
+                    <h5 class="card-title">Pending</h5>
+                    <h3>{{ stats.pending_records }}</h3>
+                    <p class="mb-0">Records to review</p>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<div class="row">
-    <div class="col-12">
-        <div class="card shadow-sm">
-            <div class="card-header bg-warning text-dark">
-                <h3 class="mb-0">Pending Records</h3>
+    <!-- Main Content -->
+    <div class="row">
+        <!-- Left Column -->
+        <div class="col-md-6">
+            <!-- Level Management -->
+            <div class="card mb-4">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">📋 Level Management</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('admin_levels') }}" class="btn btn-success">
+                            📋 Manage Main List
+                        </a>
+                        <a href="{{ url_for('admin_levels') }}?filter=legacy" class="btn btn-info">
+                            📚 Manage Legacy List
+                        </a>
+                        <a href="{{ url_for('admin_future_levels') }}" class="btn btn-primary">
+                            🔮 Manage Future List
+                        </a>
+                        <a href="{{ url_for('admin_levels') }}" class="btn btn-warning">
+                            ➕ Add New Level
+                        </a>
+                    </div>
+                </div>
             </div>
-            <div class="card-body p-0">
-                {% if pending_records %}
-                <!-- Bulk Actions -->
-                <div class="p-3 bg-light border-bottom">
-                    <form method="POST" action="{{ url_for('admin_bulk_records') }}" id="bulkForm">
-                        <div class="row align-items-center">
-                            <div class="col-md-6">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="selectAll">
-                                    <label class="form-check-label" for="selectAll">
-                                        <strong>Select All Records</strong>
-                                    </label>
-                                </div>
-                            </div>
-                            <div class="col-md-6 text-end">
-                                <button type="submit" name="action" value="approve" class="btn btn-success btn-sm me-2" onclick="return confirmBulk('approve')">
-                                    <i class="fas fa-check"></i> Bulk Approve
-                                </button>
-                                <button type="submit" name="action" value="reject" class="btn btn-danger btn-sm" onclick="return confirmBulk('reject')">
-                                    <i class="fas fa-times"></i> Bulk Reject
-                                </button>
-                            </div>
-                        </div>
-                    </form>
+
+            <!-- User Management -->
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">👥 User Management</h5>
                 </div>
-                {% endif %}
-                
-                <div class="table-responsive">
-                    <table class="table table-striped mb-0">
-                        <thead class="table-dark">
-                            <tr>
-                                {% if pending_records %}<th width="40"><input type="checkbox" id="selectAllHeader" class="form-check-input"></th>{% endif %}
-                                <th>User</th>
-                                <th>Level</th>
-                                <th>Progress</th>
-                                <th>Submitted</th>
-                                <th>Video</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for record in pending_records %}
-                            <tr>
-                                <td>
-                                    <input type="checkbox" name="record_ids" value="{{ record._id }}" 
-                                           class="form-check-input record-checkbox" form="bulkForm">
-                                </td>
-                                <td>
-                                    <strong>{{ record.user.username }}</strong>
-                                    <br><small class="text-muted">{{ record.user.points or 0 }} pts</small>
-                                </td>
-                                <td>
-                                    <a href="{{ url_for('level_detail', level_id=record.level._id) }}" class="text-decoration-none">
-                                        <strong>{{ record.level.name }}</strong>
-                                    </a>
-                                    <br><small class="text-muted">Position #{{ record.level.position or '?' }}</small>
-                                </td>
-                                <td>
-                                    {% if record.progress == 100 %}
-                                    <span class="badge bg-success fs-6">100% ✓</span>
-                                    {% else %}
-                                    <span class="badge bg-warning fs-6">{{ record.progress }}%</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <small>{{ record.date_submitted.strftime('%m/%d/%Y') }}</small>
-                                    <br><small class="text-muted">{{ record.date_submitted.strftime('%H:%M') }}</small>
-                                </td>
-                                <td>
-                                    {% if record.video_url %}
-                                        {% set video_info = get_video_embed_info(record.video_url) %}
-                                        {% if video_info %}
-                                            {% if video_info.platform == 'youtube' %}
-                                                <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-danger" title="YouTube Video">
-                                                    <i class="fab fa-youtube"></i> YouTube
-                                                </a>
-                                            {% elif video_info.platform == 'streamable' %}
-                                                <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-primary" title="Streamable Video">
-                                                    <i class="fas fa-play"></i> Streamable
-                                                </a>
-                                            {% elif video_info.platform == 'tiktok' %}
-                                                <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-dark" title="TikTok Video">
-                                                    <i class="fab fa-tiktok"></i> TikTok
-                                                </a>
-                                            {% else %}
-                                                <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-secondary" title="Video Link">
-                                                    <i class="fas fa-external-link-alt"></i> Video
-                                                </a>
-                                            {% endif %}
-                                        {% else %}
-                                            <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-secondary" title="Video Link">
-                                                <i class="fas fa-external-link-alt"></i> Video
-                                            </a>
-                                        {% endif %}
-                                    {% else %}
-                                        <span class="text-muted">No video</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <div class="btn-group" role="group">
-                                        <form method="POST" action="{{ url_for('admin_approve_record', record_id=record._id) }}" class="d-inline">
-                                            <button type="submit" class="btn btn-sm btn-success" title="Approve Record" 
-                                                    onclick="return confirm('Approve this record?')">
-                                                <i class="fas fa-check"></i>
-                                            </button>
-                                        </form>
-                                        <form method="POST" action="{{ url_for('admin_reject_record', record_id=record._id) }}" class="d-inline">
-                                            <button type="submit" class="btn btn-sm btn-danger" title="Reject Record"
-                                                    onclick="return confirm('Reject this record?')">
-                                                <i class="fas fa-times"></i>
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="7" class="text-center py-4">
-                                    <div class="text-muted">
-                                        <i class="fas fa-check-circle fa-3x mb-3"></i>
-                                        <h5>No pending records!</h5>
-                                        <p>All records have been reviewed.</p>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('admin_users') }}" class="btn btn-primary">
+                            👥 Manage Users
+                        </a>
+                        <a href="{{ url_for('admin_records') }}" class="btn btn-success">
+                            📝 Manage Records
+                        </a>
+                        <a href="{{ url_for('admin_records') }}?status=pending" class="btn btn-info">
+                            ✅ Approve Records ({{ stats.pending_records }})
+                        </a>
+                        <a href="{{ url_for('admin_records') }}?status=rejected" class="btn btn-warning">
+                            ❌ Rejected Records
+                        </a>
+                    </div>
                 </div>
-                
-                <script>
-                // Bulk selection functionality
-                document.getElementById('selectAll')?.addEventListener('change', function() {
-                    const checkboxes = document.querySelectorAll('.record-checkbox');
-                    checkboxes.forEach(cb => cb.checked = this.checked);
-                });
-                
-                document.getElementById('selectAllHeader')?.addEventListener('change', function() {
-                    const checkboxes = document.querySelectorAll('.record-checkbox');
-                    checkboxes.forEach(cb => cb.checked = this.checked);
-                    document.getElementById('selectAll').checked = this.checked;
-                });
-                
-                function confirmBulk(action) {
-                    const selected = document.querySelectorAll('.record-checkbox:checked').length;
-                    if (selected === 0) {
-                        alert('Please select at least one record.');
-                        return false;
-                    }
-                    return confirm(`Are you sure you want to ${action} ${selected} record(s)?`);
-                }
-                </script>
+            </div>
+
+            <!-- Content Management -->
+            <div class="card mb-4">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">📝 Content Management</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('admin_news') }}" class="btn btn-primary">
+                            📰 Manage News
+                        </a>
+                        <a href="{{ url_for('admin_polls') }}" class="btn btn-success">
+                            📊 Manage Polls
+                        </a>
+                        <a href="{{ url_for('admin_announcements') }}" class="btn btn-info">
+                            📢 Manage Announcements
+                        </a>
+                        <a href="{{ url_for('admin_create_news') }}" class="btn btn-warning">
+                            ✍️ Create News Article
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="col-md-6">
+            <!-- System Controls -->
+            <div class="card mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">⚙️ System Controls</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('admin_settings') }}" class="btn btn-primary">
+                            ⚙️ General Settings
+                        </a>
+                        <a href="{{ url_for('admin_webhook_settings') }}" class="btn btn-success">
+                            📡 Webhook Settings
+                        </a>
+                        <a href="{{ url_for('admin_level_stats') }}" class="btn btn-info">
+                            📈 Level Statistics
+                        </a>
+                        <a href="{{ url_for('changelog') }}" class="btn btn-warning">
+                            📝 View Changelog
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin Tools -->
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">🛠️ Admin Tools</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="/admin/tools" class="btn btn-danger">
+                            🚫 IP Ban & User Tools
+                        </a>
+                        <a href="/debug_db" class="btn btn-outline-primary">
+                            🔍 Debug Database
+                        </a>
+                        <a href="/virtual" class="btn btn-outline-success">
+                            🚀 Virtual View
+                        </a>
+                        <a href="/test_speed" class="btn btn-outline-info">
+                            ⏱️ Speed Test
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">⚡ Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="/debug_levels" class="btn btn-outline-warning">
+                            🐛 Debug Levels
+                        </a>
+                        <a href="/debug_images" class="btn btn-outline-danger">
+                            🖼️ Debug Images
+                        </a>
+                        <a href="/debug_thumbnails" class="btn btn-outline-dark">
+                            🖼️ Thumbnails
+                        </a>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
