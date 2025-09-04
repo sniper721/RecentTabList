@@ -16,8 +16,8 @@ import time
 # Load environment variables
 load_dotenv()
 
-# Changelog webhook URL from the user's provided URL
-CHANGELOG_WEBHOOK_URL = "https://discord.com/api/webhooks/1412683830539714632/KiH21Ciq1Qpz6im9ZxZ5VC2MXcfjVI18hHwLtY5ooDvygnJ3au9ofXHUzODHewqv9QVw"
+# Changelog webhook URL from environment variable or default
+CHANGELOG_WEBHOOK_URL = os.environ.get('CHANGELOG_WEBHOOK_URL', "https://discord.com/api/webhooks/1412683830539714632/KiH21Ciq1Qpz6im9ZxZ5VC2MXcfjVI18hHwLtY5ooDvygnJ3au9ofXHUzODHewqv9QVw")
 
 # Discord Bot configuration for message deletion
 CHANGELOG_BOT_TOKEN = os.environ.get('CHANGELOG_BOT_TOKEN')
