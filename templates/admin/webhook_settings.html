@@ -1,0 +1,194 @@
+{% extends "layout.html" %}
+
+{% block title %}Webhook Settings - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>📡 Webhook Settings</h1>
+                <div>
+                    <a href="{{ url_for('admin_settings') }}" class="btn btn-secondary me-2">General Settings</a>
+                    <a href="{{ url_for('admin') }}" class="btn btn-primary">Back to Admin</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <h5>Webhook Information</h5>
+                <p>These settings control the changelog notifications sent to Discord. The webhook URL is pre-configured.</p>
+                <p><strong>Note:</strong> Messages can be deleted using the Discord bot integration. Configure CHANGELOG_BOT_TOKEN and CHANGELOG_CHANNEL_ID in your .env file for full functionality.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Main Settings -->
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">⚙️ Main Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('admin_update_webhook_settings') }}" id="webhookSettingsForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="webhookEnabled" name="webhook_enabled" 
+                                               {% if changelog_settings.webhook_enabled %}checked{% endif %}>
+                                        <label class="form-check-label" for="webhookEnabled">
+                                            <strong>Enable Webhook</strong>
+                                        </label>
+                                    </div>
+                                    <p class="text-muted small">Enable or disable all changelog notifications</p>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="pingEnabled" name="ping_enabled" 
+                                               {% if changelog_settings.ping_enabled %}checked{% endif %}>
+                                        <label class="form-check-label" for="pingEnabled">
+                                            <strong>Enable Role Ping</strong>
+                                        </label>
+                                    </div>
+                                    <p class="text-muted small">Ping the Changelog role in Discord notifications</p>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="pingThreshold" class="form-label">
+                                        <strong>Ping Threshold</strong>
+                                    </label>
+                                    <input type="number" class="form-control" id="pingThreshold" name="ping_threshold" 
+                                           value="{{ changelog_settings.ping_threshold }}" min="1" max="100">
+                                    <p class="text-muted small">Messages before pinging role (prevent spam)</p>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="roleId" class="form-label">
+                                        <strong>Role ID</strong>
+                                    </label>
+                                    <input type="text" class="form-control" id="roleId" name="role_id" 
+                                           value="{{ changelog_settings.role_id }}">
+                                    <p class="text-muted small">Discord role ID to ping</p>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="messageFormat" class="form-label">
+                                        <strong>Message Format</strong>
+                                    </label>
+                                    <select class="form-select" id="messageFormat" name="message_format">
+                                        <option value="detailed" {% if changelog_settings.message_format == 'detailed' %}selected{% endif %}>Detailed</option>
+                                        <option value="compact" {% if changelog_settings.message_format == 'compact' %}selected{% endif %}>Compact</option>
+                                        <option value="minimal" {% if changelog_settings.message_format == 'minimal' %}selected{% endif %}>Minimal</option>
+                                    </select>
+                                    <p class="text-muted small">How detailed the notifications should be</p>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="includeTimestamp" name="include_timestamp" 
+                                               {% if changelog_settings.include_timestamp %}checked{% endif %}>
+                                        <label class="form-check-label" for="includeTimestamp">
+                                            <strong>Include Timestamp</strong>
+                                        </label>
+                                    </div>
+                                    <p class="text-muted small">Add timestamp to notifications</p>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="includeAdmin" name="include_admin" 
+                                               {% if changelog_settings.include_admin %}checked{% endif %}>
+                                        <label class="form-check-label" for="includeAdmin">
+                                            <strong>Include Admin Name</strong>
+                                        </label>
+                                    </div>
+                                    <p class="text-muted small">Show which admin made the change</p>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="colorMode" class="form-label">
+                                        <strong>Color Mode</strong>
+                                    </label>
+                                    <select class="form-select" id="colorMode" name="color_mode">
+                                        <option value="default" {% if changelog_settings.color_mode == 'default' %}selected{% endif %}>Default</option>
+                                        <option value="level_based" {% if changelog_settings.color_mode == 'level_based' %}selected{% endif %}>Level-Based</option>
+                                        <option value="action_based" {% if changelog_settings.color_mode == 'action_based' %}selected{% endif %}>Action-Based</option>
+                                    </select>
+                                    <p class="text-muted small">Color coding for notifications</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="rateLimit" class="form-label">
+                                        <strong>Rate Limit</strong>
+                                    </label>
+                                    <input type="number" class="form-control" id="rateLimit" name="rate_limit" 
+                                           value="{{ changelog_settings.rate_limit }}" min="1" max="1000">
+                                    <p class="text-muted small">Messages per hour</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="logLevel" class="form-label">
+                                        <strong>Log Level</strong>
+                                    </label>
+                                    <select class="form-select" id="logLevel" name="log_level">
+                                        <option value="debug" {% if changelog_settings.log_level == 'debug' %}selected{% endif %}>Debug</option>
+                                        <option value="info" {% if changelog_settings.log_level == 'info' %}selected{% endif %}>Info</option>
+                                        <option value="warning" {% if changelog_settings.log_level == 'warning' %}selected{% endif %}>Warning</option>
+                                        <option value="error" {% if changelog_settings.log_level == 'error' %}selected{% endif %}>Error</option>
+                                    </select>
+                                    <p class="text-muted small">Minimum level of events to log</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-success w-100">
+                            💾 Save Webhook Settings
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Send Custom Message -->
+        <div class="col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">📤 Send Direct Message</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('admin_send_custom_message') }}">
+                        <div class="mb-3">
+                            <label for="customMessageText" class="form-label">
+                                <strong>Message Content</strong>
+                            </label>
+                            <textarea class="form-control" id="customMessageText" name="message_content" rows="4" 
+                                      placeholder="Enter the message you want to send to Discord..." required></textarea>
+                            <p class="text-muted small mt-2">This message will be sent directly to the Discord webhook</p>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">
+                            🚀 Send Message
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+
+</script>
+{% endblock %}

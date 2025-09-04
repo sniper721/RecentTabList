@@ -20,6 +20,18 @@ except ImportError as e:
         print("❌ Discord integration not available - notify_record_approved")  
     def notify_record_rejected(*args, **kwargs):
         print("❌ Discord integration not available - notify_record_rejected")
+
+# Try to import Changelog Discord integration
+try:
+    from changelog_discord import notify_changelog
+    CHANGELOG_DISCORD_AVAILABLE = True
+    print("✅ Changelog Discord integration loaded successfully")
+except ImportError as e:
+    print(f"❌ Changelog Discord integration failed to load: {e}")
+    CHANGELOG_DISCORD_AVAILABLE = False
+    # Create dummy function so the app doesn't crash
+    def notify_changelog(*args, **kwargs):
+        print("❌ Changelog Discord integration not available - notify_changelog")
 from dotenv import load_dotenv
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
@@ -76,6 +88,14 @@ while retry_count < max_retries:
         # Test connection with timeout
         mongo_client.admin.command('ping', maxTimeMS=30000)
         print("✓ MongoDB initialized successfully")
+        
+        # Set MongoDB reference for changelog notifier
+        try:
+            from changelog_discord import set_mongo_db
+            set_mongo_db(mongo_db)
+            print("✓ Changelog Discord notifier database reference set")
+        except Exception as e:
+            print(f"⚠️  Warning: Could not set changelog notifier database reference: {e}")
         break
     except Exception as e:
         retry_count += 1
@@ -129,6 +149,49 @@ levels_cache = {
     'legacy_list': None,
     'last_updated': None
 }
+
+@app.before_request
+def check_ip_ban():
+    """Check if the current IP is banned before processing any request"""
+    try:
+        # Skip IP ban check for static files and certain routes
+        if (request.endpoint and 
+            (request.endpoint.startswith('static') or 
+             request.endpoint in ['login', 'register'])):
+            return None
+            
+        # Get client IP address
+        client_ip = request.remote_addr
+        
+        # Check if IP is banned in the database
+        if client_ip:
+            ban_record = mongo_db.ip_bans.find_one({
+                "ip_addresses": client_ip,
+                "active": True
+            })
+            
+            if ban_record:
+                # Log the blocked attempt
+                try:
+                    mongo_db.security_logs.insert_one({
+                        "event_type": "blocked_login_attempt",
+                        "ip_address": client_ip,
+                        "timestamp": datetime.now(timezone.utc),
+                        "user_agent": request.headers.get('User-Agent', 'Unknown'),
+                        "ban_record_id": ban_record.get('_id')
+                    })
+                except:
+                    pass  # Don't fail if logging fails
+                
+                # Return a generic error to avoid revealing system details
+                return "Access denied", 403
+                
+    except Exception as e:
+        # Don't block users if there's an error in the ban check
+        print(f"IP ban check error: {e}")
+        pass
+    
+    return None
 
 def get_cached_levels(is_legacy=False, quick_load=False):
     """Return cached levels only - auto-loading happens in routes"""
@@ -614,7 +677,7 @@ def recalculate_all_points():
         print(f"Updated points for {len(bulk_operations)} levels")
 
 def log_level_change(action, level_name, admin_username, **kwargs):
-    """Log level placement/movement changes to changelog"""
+    """Log level placement/movement changes to changelog and send Discord notification"""
     try:
         changelog_entry = {
             "timestamp": datetime.now(timezone.utc),
@@ -627,8 +690,75 @@ def log_level_change(action, level_name, admin_username, **kwargs):
         mongo_db.level_changelog.insert_one(changelog_entry)
         print(f"📝 Logged level change: {action} - {level_name}")
         
+        # Send Discord notification for changelog
+        if CHANGELOG_DISCORD_AVAILABLE:
+            send_changelog_notification(action, level_name, admin_username, **kwargs)
+        
     except Exception as e:
         print(f"Error logging level change: {e}")
+
+def send_changelog_notification(action, level_name, admin_username, **kwargs):
+    """Send changelog notification to Discord webhook"""
+    try:
+        # Generate appropriate message based on action type
+        message = ""
+        if action == "placed":
+            # New level placement
+            position = kwargs.get("position", 1)
+            list_type = kwargs.get("list_type", "main")
+            
+            if position == 1:
+                # New #1 placement
+                # Find the previous #1 level
+                above_level_doc = mongo_db.levels.find_one({"position": 1, "is_legacy": False})
+                above_level_name = above_level_doc['name'] if above_level_doc and above_level_doc['name'] != level_name else None
+                
+                if above_level_name:
+                    message = f"{level_name} has been placed on #1 dethroning {above_level_name}."
+                else:
+                    message = f"{level_name} has been placed on #1."
+            else:
+                # Placement at another position
+                above_level = kwargs.get("above_level")
+                below_level = kwargs.get("below_level")
+                
+                message = f"{level_name} has been placed on #{position}"
+                
+                if above_level:
+                    message += f" below {above_level}"
+                if below_level:
+                    message += f" and above {below_level}"
+                
+        elif action == "moved":
+            # Level moved within the same list
+            old_position = kwargs.get("old_position")
+            new_position = kwargs.get("new_position")
+            above_level = kwargs.get("above_level")
+            below_level = kwargs.get("below_level")
+            list_type = kwargs.get("list_type", "main")
+            
+            message = f"{level_name} has been moved from #{old_position} to #{new_position}"
+            
+            if above_level:
+                message += f" below {above_level}"
+            if below_level:
+                message += f" and above {below_level}"
+                
+        elif action == "legacy":
+            # Level moved to legacy list
+            old_position = kwargs.get("old_position")
+            message = f"{level_name} has been moved to the legacy list from position #{old_position}"
+        else:
+            # Generic message for other actions
+            message = f"Level '{level_name}' has been updated ({action})"
+        
+        # Send the notification (without custom message)
+        notify_changelog(message, admin_username)
+        
+    except Exception as e:
+        print(f"Error sending changelog notification: {e}")
+        import traceback
+        traceback.print_exc()
 
 def log_admin_action(admin_username, action, details=""):
     """Log admin actions to Discord"""
@@ -1800,117 +1930,92 @@ def ip_ban_user(user_id):
             flash('Cannot IP ban admin users!', 'danger')
             return redirect(url_for('admin'))
         
+        # Get reason from form or query parameter
         if request.method == 'POST':
             reason = request.form.get('reason', 'Hacking/Cheating').strip()
-            admin_username = session.get('username', 'Unknown Admin')
+        else:
+            reason = request.args.get('reason', 'Hacking/Cheating').strip()
             
-            # Get user's IP addresses from login logs (if available)
-            user_ips = []
+        admin_username = session.get('username', 'Unknown Admin')
+        
+        # Get user's IP addresses from login logs (if available)
+        user_ips = []
+        
+        # Add current IP if available
+        if hasattr(flask_request, 'remote_addr') and flask_request.remote_addr:
+            user_ips.append(flask_request.remote_addr)
+        
+        # Get historical IPs from login history
+        try:
+            historical_ips = mongo_db.login_history.find(
+                {"user_id": ObjectId(user_id)},
+                {"ip_address": 1}
+            ).distinct("ip_address")
             
-            # Add current IP if available
-            if hasattr(flask_request, 'remote_addr'):
-                user_ips.append(flask_request.remote_addr)
-            
-            # Create IP ban record
-            ip_ban = {
-                "_id": ObjectId(),
-                "user_id": ObjectId(user_id),
-                "username": user.get('username', 'Unknown'),
-                "ip_addresses": user_ips,
-                "reason": reason,
-                "banned_by": admin_username,
-                "ban_date": datetime.now(timezone.utc),
-                "active": True
-            }
-            
-            # Insert IP ban
-            mongo_db.ip_bans.insert_one(ip_ban)
-            
-            # Find and delete ALL accounts with same IP
-            deleted_accounts = []
-            for ip in user_ips:
-                # This would require IP tracking in user records
-                # For now, just delete the main account
-                pass
-            
-            # Delete all user's records
-            deleted_records = mongo_db.records.delete_many({"user_id": ObjectId(user_id)})
-            
-            # Reset user points to 0 and mark as banned
-            mongo_db.users.update_one(
-                {"_id": ObjectId(user_id)},
-                {
-                    "$set": {
-                        "points": 0,
-                        "banned": True,
-                        "ip_banned": True,
-                        "ban_reason": reason,
-                        "banned_by": admin_username,
-                        "ban_date": datetime.now(timezone.utc)
-                    }
+            # Add historical IPs to the ban list
+            for ip in historical_ips:
+                if ip and ip not in user_ips:
+                    user_ips.append(ip)
+        except Exception as e:
+            print(f"Error retrieving historical IPs: {e}")
+        
+        # Also check the user's last_ip field
+        if user.get('last_ip') and user['last_ip'] not in user_ips:
+            user_ips.append(user['last_ip'])
+        
+        # Create IP ban record
+        ip_ban = {
+            "_id": ObjectId(),
+            "user_id": ObjectId(user_id),
+            "username": user.get('username', 'Unknown'),
+            "ip_addresses": user_ips,
+            "reason": reason,
+            "banned_by": admin_username,
+            "ban_date": datetime.now(timezone.utc),
+            "active": True
+        }
+        
+        # Insert IP ban
+        mongo_db.ip_bans.insert_one(ip_ban)
+        
+        # Find and delete ALL accounts with same IP
+        deleted_accounts = 0
+        for ip in user_ips:
+            if ip:
+                # Delete accounts with same IP
+                accounts_with_ip = mongo_db.users.find({"_id": {"$ne": ObjectId(user_id)}, "last_ip": ip})
+                for account in accounts_with_ip:
+                    # Delete all records for this account
+                    mongo_db.records.delete_many({"user_id": account["_id"]})
+                    # Delete the account
+                    mongo_db.users.delete_one({"_id": account["_id"]})
+                    deleted_accounts += 1
+        
+        # Delete all user's records
+        deleted_records = mongo_db.records.delete_many({"user_id": ObjectId(user_id)})
+        
+        # Reset user points to 0 and mark as banned
+        mongo_db.users.update_one(
+            {"_id": ObjectId(user_id)},
+            {
+                "$set": {
+                    "points": 0,
+                    "banned": True,
+                    "ip_banned": True,
+                    "ban_reason": reason,
+                    "banned_by": admin_username,
+                    "ban_date": datetime.now(timezone.utc),
+                    "last_ip": user_ips[0] if user_ips else None
                 }
-            )
-            
-            # Log admin action
-            log_admin_action(admin_username, f"IP BANNED USER: {user.get('username')}", f"Reason: {reason}, Records deleted: {deleted_records.deleted_count}")
-            
-            flash(f'User {user.get("username")} has been IP banned and all data deleted', 'success')
-            return redirect(url_for('admin'))
+            }
+        )
         
-        # GET request - show confirmation form
-        return f"""
-        <div class="container mt-4">
-            <div class="card border-danger">
-                <div class="card-header bg-danger text-white">
-                    <h2>🚨 IP BAN USER: {user.get('username', 'Unknown')}</h2>
-                </div>
-                <div class="card-body">
-                    <div class="alert alert-danger">
-                        <h4>⚠️ WARNING: This action is IRREVERSIBLE!</h4>
-                        <p>This will:</p>
-                        <ul>
-                            <li>✅ Permanently ban the user's IP address</li>
-                            <li>✅ Delete ALL their records ({mongo_db.records.count_documents({"user_id": ObjectId(user_id)})} records)</li>
-                            <li>✅ Reset their points to 0</li>
-                            <li>✅ Mark account as permanently banned</li>
-                            <li>✅ Prevent creation of new accounts from same IP</li>
-                        </ul>
-                    </div>
-                    
-                    <form method="POST">
-                        <div class="mb-3">
-                            <label class="form-label">Ban Reason:</label>
-                            <select name="reason" class="form-select" required>
-                                <option value="Hacking/Cheating">Hacking/Cheating</option>
-                                <option value="Speedhacking">Speedhacking</option>
-                                <option value="Noclip Usage">Noclip Usage</option>
-                                <option value="Macro/Bot Usage">Macro/Bot Usage</option>
-                                <option value="Fake Records">Fake Records</option>
-                                <option value="Multiple Accounts">Multiple Accounts</option>
-                                <option value="Severe Rule Violation">Severe Rule Violation</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="confirm" required>
-                                <label class="form-check-label text-danger" for="confirm">
-                                    <strong>I understand this action is permanent and irreversible</strong>
-                                </label>
-                            </div>
-                        </div>
-                        
-                        <button type="submit" class="btn btn-danger btn-lg">
-                            🔨 EXECUTE IP BAN
-                        </button>
-                        <a href="/admin" class="btn btn-secondary btn-lg ms-2">Cancel</a>
-                    </form>
-                </div>
-            </div>
-        </div>
-        """
+        # Log admin action
+        log_admin_action(admin_username, f"IP BANNED USER: {user.get('username')}", f"Reason: {reason}, Records deleted: {deleted_records.deleted_count}, Additional accounts deleted: {deleted_accounts}")
         
+        flash(f'User {user.get("username")} has been IP banned and all data deleted', 'success')
+        return redirect(url_for('admin'))
+    
     except Exception as e:
         flash(f'Error: {str(e)}', 'danger')
         return redirect(url_for('admin'))
@@ -3917,7 +4022,7 @@ def fix_all_points():
     except Exception as e:
         return f"❌ Error fixing all points: {e}"
 
-@app.route('/admin/reset_user/<int:user_id>', methods=['POST'])
+@app.route('/admin/reset_user/<user_id>', methods=['POST'])
 def admin_reset_user(user_id):
     """Reset a user's points and records (admin only)"""
     if 'user_id' not in session or not session.get('is_admin'):
@@ -3925,8 +4030,17 @@ def admin_reset_user(user_id):
         return redirect(url_for('index'))
     
     try:
+        from bson.objectid import ObjectId
+        
+        # Convert user_id to ObjectId
+        try:
+            user_obj_id = ObjectId(user_id)
+        except Exception:
+            flash('Invalid user ID', 'danger')
+            return redirect(url_for('admin_users'))
+        
         # Get user info
-        user = mongo_db.users.find_one({"_id": user_id})
+        user = mongo_db.users.find_one({"_id": user_obj_id})
         if not user:
             flash('User not found', 'danger')
             return redirect(url_for('admin_users'))
@@ -3936,15 +4050,15 @@ def admin_reset_user(user_id):
         admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
         
         # Count records before deletion
-        record_count = mongo_db.records.count_documents({"user_id": user_id})
+        record_count = mongo_db.records.count_documents({"user_id": user_obj_id})
         old_points = user.get('points', 0)
         
         # Delete all user's records
-        mongo_db.records.delete_many({"user_id": user_id})
+        mongo_db.records.delete_many({"user_id": user_obj_id})
         
         # Reset user points to 0
         mongo_db.users.update_one(
-            {"_id": user_id},
+            {"_id": user_obj_id},
             {"$set": {"points": 0}}
         )
         
@@ -3965,7 +4079,7 @@ def admin_reset_user(user_id):
     
     return redirect(url_for('admin_users'))
 
-@app.route('/admin/reset_user_api/<int:user_id>', methods=['POST'])
+@app.route('/admin/reset_user_api/<user_id>', methods=['POST'])
 def admin_reset_user_api(user_id):
     """Reset a user's API key (admin only)"""
     if 'user_id' not in session or not session.get('is_admin'):
@@ -3973,8 +4087,17 @@ def admin_reset_user_api(user_id):
         return redirect(url_for('index'))
     
     try:
+        from bson.objectid import ObjectId
+        
+        # Convert user_id to ObjectId
+        try:
+            user_obj_id = ObjectId(user_id)
+        except Exception:
+            flash('Invalid user ID', 'danger')
+            return redirect(url_for('admin_users'))
+        
         # Get user info
-        user = mongo_db.users.find_one({"_id": user_id})
+        user = mongo_db.users.find_one({"_id": user_obj_id})
         if not user:
             flash('User not found', 'danger')
             return redirect(url_for('admin_users'))
@@ -3985,7 +4108,7 @@ def admin_reset_user_api(user_id):
         
         # Update user's API key
         mongo_db.users.update_one(
-            {"_id": user_id},
+            {"_id": user_obj_id},
             {"$set": {"api_key": new_api_key}}
         )
         
@@ -4570,6 +4693,15 @@ def login():
             }
             mongo_db.login_history.insert_one(login_entry)
             
+            # Update user's last IP address
+            try:
+                mongo_db.users.update_one(
+                    {"_id": user['_id']},
+                    {"$set": {"last_ip": request.remote_addr}}
+                )
+            except Exception as e:
+                print(f"Error updating user IP: {e}")
+            
             flash('Login successful!', 'success')
             return redirect(url_for('index'))
         else:
@@ -4605,10 +4737,25 @@ def register():
             "password_hash": generate_password_hash(password),
             "is_admin": False,
             "points": 0,
-            "date_joined": datetime.now(timezone.utc)
+            "date_joined": datetime.now(timezone.utc),
+            "last_ip": request.remote_addr
         }
         
         mongo_db.users.insert_one(new_user)
+        
+        # Log registration activity
+        try:
+            login_entry = {
+                "user_id": new_user['_id'],
+                "timestamp": datetime.now(timezone.utc),
+                "ip_address": request.remote_addr,
+                "user_agent": request.headers.get('User-Agent', 'Unknown'),
+                "login_method": "registration"
+            }
+            mongo_db.login_history.insert_one(login_entry)
+        except Exception as e:
+            print(f"Error logging registration: {e}")
+        
         flash('Registration successful! You can now log in.', 'success')
         return redirect(url_for('login'))
     
@@ -4729,6 +4876,15 @@ def google_callback():
             "login_method": "google"
         }
         mongo_db.login_history.insert_one(login_entry)
+        
+        # Update user's last IP address
+        try:
+            mongo_db.users.update_one(
+                {"_id": user['_id']},
+                {"$set": {"last_ip": request.remote_addr}}
+            )
+        except Exception as e:
+            print(f"Error updating user IP: {e}")
         
         flash('Successfully logged in with Google!', 'success')
         return redirect(url_for('index'))
@@ -4883,6 +5039,7 @@ def admin():
         flash('Access denied. Admin privileges required.', 'danger')
         return redirect(url_for('index'))
     
+    # Get pending records for the existing functionality
     pending_records = list(mongo_db.records.aggregate([
         {"$match": {"status": "pending"}},
         {"$lookup": {
@@ -4901,13 +5058,96 @@ def admin():
         {"$unwind": "$level"}
     ]))
     
-    return render_template('admin/index.html', pending_records=pending_records)
+    # Generate stats for the admin dashboard
+    try:
+        from datetime import datetime, timedelta, timezone
+        
+        # Basic counts
+        total_users = mongo_db.users.count_documents({})
+        total_levels = mongo_db.levels.count_documents({})
+        total_records = mongo_db.records.count_documents({})
+        pending_records_count = mongo_db.records.count_documents({"status": "pending"})
+        main_levels_count = mongo_db.levels.count_documents({"is_legacy": False})
+        legacy_levels_count = mongo_db.levels.count_documents({"is_legacy": True})
+        future_levels_count = mongo_db.future_levels.count_documents({})
+        
+        # Time-based counts (24 hours)
+        twenty_four_hours_ago = datetime.now(timezone.utc) - timedelta(hours=24)
+        new_users_24h = mongo_db.users.count_documents({"date_joined": {"$gte": twenty_four_hours_ago}})
+        new_records_24h = mongo_db.records.count_documents({"date_submitted": {"$gte": twenty_four_hours_ago}})
+        new_levels_24h = mongo_db.levels.count_documents({"date_added": {"$gte": twenty_four_hours_ago}})
+        
+        # Active users (7 days)
+        seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+        active_users_7d = mongo_db.users.count_documents({"last_active": {"$gte": seven_days_ago}})
+        
+        # Top player (by points)
+        top_player = mongo_db.users.find_one(
+            {"points": {"$gt": 0}},
+            {"username": 1, "points": 1, "nickname": 1}
+        )
+        if top_player:
+            # Convert ObjectId to string for template
+            top_player['_id'] = str(top_player['_id'])
+        
+        # Create stats object
+        stats = {
+            'total_users': total_users,
+            'total_levels': total_levels,
+            'total_records': total_records,
+            'pending_records': pending_records_count,
+            'new_users_24h': new_users_24h,
+            'new_records_24h': new_records_24h,
+            'new_levels_24h': new_levels_24h,
+            'active_users_7d': active_users_7d,
+            'main_levels': main_levels_count,
+            'legacy_levels': legacy_levels_count,
+            'future_levels': future_levels_count,
+            'top_player': top_player
+        }
+        
+    except Exception as e:
+        # Fallback stats in case of error
+        stats = {
+            'total_users': 0,
+            'total_levels': 0,
+            'total_records': 0,
+            'pending_records': 0,
+            'new_users_24h': 0,
+            'new_records_24h': 0,
+            'new_levels_24h': 0,
+            'active_users_7d': 0,
+            'main_levels': 0,
+            'legacy_levels': 0,
+            'future_levels': 0,
+            'top_player': None
+        }
+        print(f"Error generating admin stats: {e}")
+    
+    return render_template('admin/index.html', pending_records=pending_records, stats=stats)
+
+@app.route('/admin/tools')
+def admin_tools():
+    """Admin tools page for IP ban and user reset functionality"""
+    if 'user_id' not in session:
+        flash('Please log in to access admin panel', 'warning')
+        return redirect(url_for('login'))
+    
+    if not session.get('is_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('index'))
+    
+    return render_template('admin/tools.html')
 
 @app.route('/admin/levels', methods=['GET', 'POST'])
 def admin_levels():
     if 'user_id' not in session or not session.get('is_admin'):
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
+    
+    # Check if we're filtering for legacy levels
+    filter_type = request.args.get('filter')
+    is_legacy_filter = (filter_type == 'legacy')
     
     if request.method == 'POST':
         # Get next level ID
@@ -4993,15 +5233,22 @@ def admin_levels():
         above_level = None
         below_level = None
         
-        # Find levels above and below
-        if position > 1:
-            above_level_doc = mongo_db.levels.find_one({"position": position - 1, "is_legacy": is_legacy})
-            if above_level_doc:
-                above_level = above_level_doc['name']
-        
-        below_level_doc = mongo_db.levels.find_one({"position": position + 1, "is_legacy": is_legacy})
-        if below_level_doc:
-            below_level = below_level_doc['name']
+        # Special case: if placing at position 1, check if there was a previous #1
+        if position == 1:
+            # Find the previous #1 level (if any)
+            previous_top_level = mongo_db.levels.find_one({"position": 1, "is_legacy": is_legacy})
+            if previous_top_level and previous_top_level['name'] != name:
+                above_level = previous_top_level['name']
+        else:
+            # Find levels above and below for positions > 1
+            if position > 1:
+                above_level_doc = mongo_db.levels.find_one({"position": position - 1, "is_legacy": is_legacy})
+                if above_level_doc:
+                    above_level = above_level_doc['name']
+            
+            below_level_doc = mongo_db.levels.find_one({"position": position + 1, "is_legacy": is_legacy})
+            if below_level_doc:
+                below_level = below_level_doc['name']
         
         log_level_change(
             action="placed",
@@ -5031,13 +5278,17 @@ def admin_levels():
     
     if main_cache or legacy_cache:
         # Use cached data
-        levels = main_cache + legacy_cache
+        if is_legacy_filter:
+            levels = legacy_cache
+        else:
+            levels = main_cache
     else:
         # Fallback to database with minimal fields
-        levels = list(mongo_db.levels.find({}, {
+        query = {"is_legacy": is_legacy_filter}
+        levels = list(mongo_db.levels.find(query, {
             "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, 
             "level_id": 1, "difficulty": 1, "is_legacy": 1, "level_type": 1
-        }).sort([("is_legacy", 1), ("position", 1)]))
+        }).sort("position", 1))
     
     # Debug: Check thumbnail URLs and file existence
     import os
@@ -5051,7 +5302,7 @@ def admin_levels():
             else:
                 print(f"Level {level['name']}: URL {thumb}")
     
-    return render_template('admin/levels.html', levels=levels)
+    return render_template('admin/levels.html', levels=levels, is_legacy_filter=is_legacy_filter)
 
 @app.route('/admin/edit_level', methods=['POST'])
 def admin_edit_level():
@@ -5767,11 +6018,76 @@ def admin_settings():
     except Exception as e:
         site_settings = {"future_list_enabled": False, "submissions_enabled": True, "timemachine_enabled": True}
     
+    # Get changelog webhook settings
+    try:
+        changelog_settings = mongo_db.site_settings.find_one({"_id": "changelog"})
+        if not changelog_settings:
+            changelog_settings = {
+                "ping_enabled": False,
+                "ping_threshold": 1,
+                "role_id": "1388326130183966720"
+            }
+        
+        # Set environment variables for changelog settings
+        os.environ['CHANGELOG_PING_ENABLED'] = str(changelog_settings.get("ping_enabled", False)).lower()
+        os.environ['CHANGELOG_ROLE_ID'] = str(changelog_settings.get("role_id", "1388326130183966720"))
+        
+    except Exception as e:
+        changelog_settings = {
+            "ping_enabled": False,
+            "ping_threshold": 1,
+            "role_id": "1388326130183966720"
+        }
+    
     return render_template('admin/settings.html', 
                          system_info=system_info,
                          cache_info=cache_info,
                          db_stats=db_stats,
-                         site_settings=site_settings)
+                         site_settings=site_settings,
+                         changelog_settings=changelog_settings)
+
+@app.route('/admin/webhook_settings')
+def admin_webhook_settings():
+    """Dedicated webhook settings panel"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    # Get changelog webhook settings
+    try:
+        changelog_settings = mongo_db.site_settings.find_one({"_id": "changelog"})
+        if not changelog_settings:
+            changelog_settings = {
+                "ping_enabled": False,
+                "ping_threshold": 1,
+                "role_id": "1388326130183966720",
+                "message_count": 0,
+                "webhook_enabled": True,
+                "message_format": "detailed",
+                "include_timestamp": True,
+                "include_admin": True,
+                "color_mode": "default",
+                "rate_limit": 10,
+                "log_level": "info",
+                "custom_message": ""
+            }
+    except Exception as e:
+        changelog_settings = {
+            "ping_enabled": False,
+            "ping_threshold": 1,
+            "role_id": "1388326130183966720",
+            "message_count": 0,
+            "webhook_enabled": True,
+            "message_format": "detailed",
+            "include_timestamp": True,
+            "include_admin": True,
+            "color_mode": "default",
+            "rate_limit": 10,
+            "log_level": "info",
+            "custom_message": ""
+        }
+    
+    return render_template('admin/webhook_settings.html', changelog_settings=changelog_settings)
 
 @app.route('/admin/settings/clear_cache', methods=['POST'])
 def admin_clear_cache():
@@ -5951,12 +6267,252 @@ def admin_toggle_timemachine():
     
     return redirect(url_for('admin_settings'))
 
+@app.route('/admin/settings/changelog', methods=['POST'])
+def admin_update_changelog_settings():
+    """Update changelog webhook settings"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Get form data
+        ping_enabled = request.form.get('ping_enabled') == 'on'
+        ping_threshold = int(request.form.get('ping_threshold', 1))
+        role_id = request.form.get('role_id', '1388326130183966720')
+        
+        # Update settings in database
+        mongo_db.site_settings.update_one(
+            {"_id": "changelog"},
+            {"$set": {
+                "ping_enabled": ping_enabled,
+                "ping_threshold": ping_threshold,
+                "role_id": role_id
+            }},
+            upsert=True
+        )
+        
+        # Log admin action
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        log_admin_action(admin_username, "Changelog Settings Updated", 
+                        f"Ping: {ping_enabled}, Threshold: {ping_threshold}, Role ID: {role_id}")
+        
+        flash('Changelog settings updated successfully!', 'success')
+        
+    except Exception as e:
+        flash(f'Error updating changelog settings: {e}', 'danger')
+    
+    return redirect(url_for('admin_settings'))
+
+@app.route('/admin/webhook_settings', methods=['POST'])
+def admin_update_webhook_settings():
+    """Update advanced webhook settings"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Get form data with proper error handling
+        webhook_enabled = request.form.get('webhook_enabled') == 'on'
+        ping_enabled = request.form.get('ping_enabled') == 'on'
+        
+        # Handle integer fields with defaults
+        try:
+            ping_threshold = int(request.form.get('ping_threshold', 1) or 1)
+        except (ValueError, TypeError):
+            ping_threshold = 1
+            
+        try:
+            rate_limit = int(request.form.get('rate_limit', 10) or 10)
+        except (ValueError, TypeError):
+            rate_limit = 10
+            
+        role_id = request.form.get('role_id', '1388326130183966720')
+        message_format = request.form.get('message_format', 'detailed')
+        include_timestamp = request.form.get('include_timestamp') == 'on'
+        include_admin = request.form.get('include_admin') == 'on'
+        color_mode = request.form.get('color_mode', 'default')
+        log_level = request.form.get('log_level', 'info')
+        custom_message = request.form.get('custom_message', '').strip()
+        
+        # Get current settings to preserve message count
+        current_settings = mongo_db.site_settings.find_one({"_id": "changelog"})
+        message_count = current_settings.get("message_count", 0) if current_settings else 0
+        
+        # Update settings in database
+        mongo_db.site_settings.update_one(
+            {"_id": "changelog"},
+            {"$set": {
+                "webhook_enabled": webhook_enabled,
+                "ping_enabled": ping_enabled,
+                "ping_threshold": ping_threshold,
+                "role_id": role_id,
+                "message_format": message_format,
+                "include_timestamp": include_timestamp,
+                "include_admin": include_admin,
+                "color_mode": color_mode,
+                "rate_limit": rate_limit,
+                "log_level": log_level,
+                "custom_message": custom_message,
+                "message_count": message_count
+            }},
+            upsert=True
+        )
+        
+        # Update environment variables
+        os.environ['CHANGELOG_PING_ENABLED'] = str(ping_enabled).lower()
+        os.environ['CHANGELOG_ROLE_ID'] = str(role_id)
+        
+        # Log admin action
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        log_admin_action(admin_username, "Webhook Settings Updated", 
+                        f"Webhook: {webhook_enabled}, Ping: {ping_enabled}, Format: {message_format}")
+        
+        flash('Webhook settings updated successfully!', 'success')
+        
+    except Exception as e:
+        flash(f'Error updating webhook settings: {e}', 'danger')
+    
+    return redirect(url_for('admin_webhook_settings'))
+
+@app.route('/admin/webhook_settings/test', methods=['POST'])
+def admin_test_webhook():
+    """Send a test webhook message"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Import the notification function
+        from changelog_discord import notify_changelog
+        
+        # Get admin username for the message
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        
+        # Send test message without custom message
+        test_message = "🔔 **Webhook Test Message**\nThis is a test message to verify that the changelog webhook is working correctly."
+        
+        result = notify_changelog(test_message, admin_username)
+        
+        if result:
+            flash('✅ Test webhook message sent successfully!', 'success')
+        else:
+            flash('❌ Failed to send test webhook message. Check logs for details.', 'danger')
+            
+    except Exception as e:
+        flash(f'Error sending test webhook: {e}', 'danger')
+    
+    return redirect(url_for('admin_webhook_settings'))
+
+@app.route('/admin/webhook_settings/send_custom', methods=['POST'])
+def admin_send_custom_message():
+    """Send a custom message via the webhook"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Get the custom message from form
+        message_content = request.form.get('message_content', '').strip()
+        
+        if not message_content:
+            flash('Message content cannot be empty', 'danger')
+            return redirect(url_for('admin_webhook_settings'))
+        
+        # Import the notification function
+        from changelog_discord import notify_changelog
+        
+        # Get admin username for the message
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        
+        # Send the custom message
+        result = notify_changelog(message_content, admin_username)
+        
+        if result:
+            flash('✅ Custom message sent successfully!', 'success')
+        else:
+            flash('❌ Failed to send custom message. Check logs for details.', 'danger')
+            
+    except Exception as e:
+        flash(f'Error sending custom message: {e}', 'danger')
+    
+    return redirect(url_for('admin_webhook_settings'))
+
+@app.route('/admin/webhook_settings/delete_message', methods=['POST'])
+def admin_delete_webhook_message():
+    """Delete a specific webhook message"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        message_id = request.form.get('message_id')
+        
+        # Import the deletion function
+        from changelog_discord import delete_changelog_message
+        
+        # Attempt to delete the message
+        if delete_changelog_message(message_id):
+            flash(f'Message {message_id} deletion requested. Note: Due to Discord limitations, deletion may not be immediate.', 'success')
+        else:
+            flash(f'Failed to delete message {message_id}. Check logs for details.', 'danger')
+        
+        # Log admin action
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        log_admin_action(admin_username, "Webhook Message Delete", f"Attempted to delete message {message_id}")
+        
+    except Exception as e:
+        flash(f'Error processing message deletion: {e}', 'danger')
+    
+    return redirect(url_for('admin_webhook_settings'))
+
+@app.route('/admin/webhook_settings/delete_all_messages', methods=['POST'])
+def admin_delete_all_webhook_messages():
+    """Delete all webhook messages"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Import the deletion function
+        from changelog_discord import delete_all_changelog_messages
+        
+        # Attempt to delete all messages
+        if delete_all_changelog_messages():
+            # Reset message counter
+            mongo_db.site_settings.update_one(
+                {"_id": "changelog"},
+                {"$set": {"message_count": 0}},
+                upsert=True
+            )
+            flash('All messages deletion requested. Message counter has been reset.', 'success')
+        else:
+            flash('Failed to delete messages. Check logs for details.', 'danger')
+        
+        # Log admin action
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        log_admin_action(admin_username, "Webhook Messages Clear", "Attempted to clear all webhook messages")
+        
+    except Exception as e:
+        flash(f'Error processing message clearing: {e}', 'danger')
+    
+    return redirect(url_for('admin_webhook_settings'))
+
 @app.route('/admin/settings/delete_website', methods=['POST'])
 def admin_delete_website():
     """Definitely delete the website (not a rickroll)"""
     if 'user_id' not in session or not session.get('is_admin'):
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
+    
+    # This is totally a real delete function 😉
+    return redirect('https://www.youtube.com/watch?v=dQw4w9WgXcQ')
+
     
     # This is totally a real delete function 😉
     return redirect('https://www.youtube.com/watch?v=dQw4w9WgXcQ')
