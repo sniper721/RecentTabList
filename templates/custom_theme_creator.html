@@ -1,0 +1,252 @@
+{% extends "layout.html" %}
+
+{% block title %}Custom Theme Creator{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3 class="mb-0">🎨 {% if edit_theme %}Edit Theme{% else %}Custom Theme Creator{% endif %}</h3>
+                        <p class="mb-0 text-muted">{% if edit_theme %}Modify your existing theme{% else %}Design your own personalized theme{% endif %}</p>
+                    </div>
+                    <a href="{{ url_for('theme_manager') }}" class="btn btn-outline-secondary btn-sm">
+                        <i class="fas fa-arrow-left"></i> Back to Manager
+                    </a>
+                </div>
+                <div class="card-body">
+                    <form id="customThemeForm" method="POST">
+                        <div class="row">
+                            <!-- Theme Info -->
+                            <div class="col-md-6">
+                                <h5>Theme Information</h5>
+                                <div class="mb-3">
+                                    <label for="themeName" class="form-label">Theme Name</label>
+                                    <input type="text" class="form-control" id="themeName" name="theme_name" 
+                                           placeholder="My Awesome Theme" required maxlength="50"
+                                           value="{% if edit_theme %}{{ edit_theme.name }}{% endif %}">
+                                </div>
+                                
+                                <!-- Color Pickers -->
+                                <h5 class="mt-4">Colors</h5>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="primaryColor" class="form-label">Primary Color</label>
+                                            <input type="color" class="form-control form-control-color" 
+                                                   id="primaryColor" name="primary_color" 
+                                                   value="{% if edit_theme %}{{ edit_theme.primary_color }}{% else %}#0d6efd{% endif %}">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="secondaryColor" class="form-label">Secondary Color</label>
+                                            <input type="color" class="form-control form-control-color" 
+                                                   id="secondaryColor" name="secondary_color" 
+                                                   value="{% if edit_theme %}{{ edit_theme.secondary_color }}{% else %}#6c757d{% endif %}">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="backgroundColor" class="form-label">Background Color</label>
+                                            <input type="color" class="form-control form-control-color" 
+                                                   id="backgroundColor" name="background_color" 
+                                                   value="{% if edit_theme %}{{ edit_theme.background_color }}{% else %}#ffffff{% endif %}">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="textColor" class="form-label">Text Color</label>
+                                            <input type="color" class="form-control form-control-color" 
+                                                   id="textColor" name="text_color" 
+                                                   value="{% if edit_theme %}{{ edit_theme.text_color }}{% else %}#212529{% endif %}">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="cardColor" class="form-label">Card Background</label>
+                                            <input type="color" class="form-control form-control-color" 
+                                                   id="cardColor" name="card_color" 
+                                                   value="{% if edit_theme %}{{ edit_theme.card_color }}{% else %}#f8f9fa{% endif %}">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label for="accentColor" class="form-label">Accent Color</label>
+                                            <input type="color" class="form-control form-control-color" 
+                                                   id="accentColor" name="accent_color" 
+                                                   value="{% if edit_theme %}{{ edit_theme.accent_color }}{% else %}#198754{% endif %}">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Live Preview -->
+                            <div class="col-md-6">
+                                <h5>Live Preview</h5>
+                                <div id="themePreview" class="border rounded p-3" style="min-height: 400px;">
+                                    <div class="preview-navbar p-2 mb-3 rounded">
+                                        <strong>RTL Navigation</strong>
+                                        <span class="float-end">🎮 Demo</span>
+                                    </div>
+                                    
+                                    <div class="preview-card p-3 mb-3 rounded">
+                                        <h6>Sample Level Card</h6>
+                                        <p class="mb-2">This is how level cards will look</p>
+                                        <div class="preview-button px-3 py-1 rounded d-inline-block">
+                                            View Level
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="preview-card p-3 mb-3 rounded">
+                                        <h6>Player Stats</h6>
+                                        <p class="mb-1">Points: <span class="preview-accent">1,234</span></p>
+                                        <p class="mb-1">Rank: <span class="preview-accent">#42</span></p>
+                                    </div>
+                                    
+                                    <div class="preview-text">
+                                        <p>This is regular text content that will appear throughout the site.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-save"></i> {% if edit_theme %}Update Theme{% else %}Save Custom Theme{% endif %}
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" onclick="resetToDefaults()">
+                                        <i class="fas fa-undo"></i> Reset to Defaults
+                                    </button>
+                                    <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                                        <i class="fas fa-times"></i> Cancel
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+#themePreview {
+    background-color: var(--preview-bg, #ffffff);
+    color: var(--preview-text, #212529);
+}
+
+.preview-navbar {
+    background-color: var(--preview-primary, #0d6efd);
+    color: white;
+}
+
+.preview-card {
+    background-color: var(--preview-card, #f8f9fa);
+    color: var(--preview-text, #212529);
+    border: 1px solid var(--preview-secondary, #6c757d);
+}
+
+.preview-button {
+    background-color: var(--preview-primary, #0d6efd);
+    color: white;
+    cursor: pointer;
+}
+
+.preview-accent {
+    color: var(--preview-accent, #198754);
+    font-weight: bold;
+}
+
+.preview-text {
+    color: var(--preview-text, #212529);
+}
+</style>
+
+<script>
+// Live preview updates
+function updatePreview() {
+    const root = document.documentElement;
+    const preview = document.getElementById('themePreview');
+    
+    const primaryColor = document.getElementById('primaryColor').value;
+    const secondaryColor = document.getElementById('secondaryColor').value;
+    const backgroundColor = document.getElementById('backgroundColor').value;
+    const textColor = document.getElementById('textColor').value;
+    const cardColor = document.getElementById('cardColor').value;
+    const accentColor = document.getElementById('accentColor').value;
+    
+    root.style.setProperty('--preview-primary', primaryColor);
+    root.style.setProperty('--preview-secondary', secondaryColor);
+    root.style.setProperty('--preview-bg', backgroundColor);
+    root.style.setProperty('--preview-text', textColor);
+    root.style.setProperty('--preview-card', cardColor);
+    root.style.setProperty('--preview-accent', accentColor);
+}
+
+// Add event listeners to all color inputs
+document.addEventListener('DOMContentLoaded', function() {
+    const colorInputs = document.querySelectorAll('input[type="color"]');
+    colorInputs.forEach(input => {
+        input.addEventListener('input', updatePreview);
+    });
+    
+    // Initial preview update
+    updatePreview();
+});
+
+function resetToDefaults() {
+    document.getElementById('primaryColor').value = '#0d6efd';
+    document.getElementById('secondaryColor').value = '#6c757d';
+    document.getElementById('backgroundColor').value = '#ffffff';
+    document.getElementById('textColor').value = '#212529';
+    document.getElementById('cardColor').value = '#f8f9fa';
+    document.getElementById('accentColor').value = '#198754';
+    updatePreview();
+}
+
+// Form submission
+document.getElementById('customThemeForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    
+    {% if edit_theme %}
+    // Edit mode - use update endpoint
+    const url = '{{ url_for("update_theme", theme_id=edit_theme.id) }}';
+    {% else %}
+    // Create mode - use create endpoint
+    const url = '{{ url_for("custom_theme_creator") }}';
+    {% endif %}
+    
+    fetch(url, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('{% if edit_theme %}Theme updated successfully!{% else %}Custom theme saved successfully!{% endif %}');
+            window.location.href = '{{ url_for("theme_manager") }}';
+        } else {
+            alert('Error {% if edit_theme %}updating{% else %}saving{% endif %} theme: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error {% if edit_theme %}updating{% else %}saving{% endif %} theme');
+    });
+});
+</script>
+{% endblock %}

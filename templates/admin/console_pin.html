@@ -1,0 +1,40 @@
+{% extends "layout.html" %}
+
+{% block title %}Console PIN Entry{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card mt-5">
+                <div class="card-header bg-dark text-white">
+                    <h4 class="mb-0">🔒 Console PIN Required</h4>
+                </div>
+                <div class="card-body">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                    {% endwith %}
+
+                    <p>Enter the PIN to access the Admin Console:</p>
+                    
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="pin" class="form-label">PIN:</label>
+                            <input type="password" class="form-control" id="pin" name="pin" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Verify PIN</button>
+                        <a href="{{ url_for('admin') }}" class="btn btn-secondary">Back to Admin Panel</a>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

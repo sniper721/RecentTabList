@@ -110,60 +110,6 @@
             }
         }
     </style>
-    
-    {% if current_theme.startswith('custom_') and 'user_id' in session %}
-    <!-- Custom Theme CSS -->
-    <style id="customThemeCSS">
-        {% set user = get_user_by_id(session['user_id']) %}
-        {% if user and user.custom_themes %}
-            {% set theme_id = current_theme.replace('custom_', '') %}
-            {% for theme in user.custom_themes %}
-                {% if theme.id == theme_id %}
-        :root {
-            --bs-primary: {{ theme.primary_color }};
-            --bs-secondary: {{ theme.secondary_color }};
-            --bs-success: {{ theme.accent_color }};
-            --bs-body-bg: {{ theme.background_color }};
-            --bs-body-color: {{ theme.text_color }};
-            --bs-card-bg: {{ theme.card_color }};
-        }
-        
-        body {
-            background-color: {{ theme.background_color }} !important;
-            color: {{ theme.text_color }} !important;
-        }
-        
-        .card {
-            background-color: {{ theme.card_color }} !important;
-            color: {{ theme.text_color }} !important;
-        }
-        
-        .navbar {
-            background-color: {{ theme.primary_color }} !important;
-        }
-        
-        .btn-primary {
-            background-color: {{ theme.primary_color }} !important;
-            border-color: {{ theme.primary_color }} !important;
-        }
-        
-        .btn-success {
-            background-color: {{ theme.accent_color }} !important;
-            border-color: {{ theme.accent_color }} !important;
-        }
-        
-        .text-primary {
-            color: {{ theme.primary_color }} !important;
-        }
-        
-        .bg-primary {
-            background-color: {{ theme.primary_color }} !important;
-        }
-                {% endif %}
-            {% endfor %}
-        {% endif %}
-    </style>
-    {% endif %}
 </head>
 <body data-bs-theme="{{ current_theme }}">
     <nav class="navbar navbar-expand-lg navbar-dark">
@@ -177,7 +123,7 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle {% if request.path in [url_for('index'), url_for('legacy'), url_for('future_list')] %}active{% endif %}" 
+                        <a class="nav-link dropdown-toggle {% if request.path in [url_for('index'), url_for('legacy')] %}active{% endif %}" 
                            href="#" id="listsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             📋 Lists
                         </a>
@@ -193,7 +139,7 @@
                                 </a>
                             </li>
                             <li>
-                                <a class="dropdown-item {% if request.path == url_for('future_list') %}active{% endif %}" href="{{ url_for('future_list') }}">
+                                <a class="dropdown-item" href="/future">
                                     Future List
                                 </a>
                             </li>
@@ -269,9 +215,6 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('admin') }}">Admin Panel</a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('admin_console') }}">Console</a>
-                    </li>
                     {% endif %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="themeDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -288,19 +231,6 @@
                             <li><a class="dropdown-item theme-option" href="#" data-theme="green">💚 Forest Green</a></li>
                             <li><a class="dropdown-item theme-option" href="#" data-theme="red">❤️ Cherry Red</a></li>
                             <li><a class="dropdown-item theme-option" href="#" data-theme="orange">🧡 Sunset Orange</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            {% if 'user_id' in session %}
-                                {% set user = get_user_by_id(session['user_id']) %}
-                                {% if user and user.custom_themes %}
-                                    {% for theme in user.custom_themes %}
-                                    <li><a class="dropdown-item theme-option" href="#" data-theme="custom_{{ theme.id }}">🎨 {{ theme.name }}</a></li>
-                                    {% endfor %}
-                                {% endif %}
-                            <li><a class="dropdown-item" href="{{ url_for('theme_manager') }}">🎨 Manage Themes</a></li>
-                            <li><a class="dropdown-item" href="{{ url_for('custom_theme_creator') }}">➕ Create New Theme</a></li>
-                            {% else %}
-                            <li><a class="dropdown-item" href="{{ url_for('login') }}">🎨 Login to Create Custom Theme</a></li>
-                            {% endif %}
                         </ul>
                     </li>
                     {% if 'user_id' in session %}
@@ -346,7 +276,7 @@
                     </a>
                 </div>
                 <div class="col-6">
-                    <a href="{{ url_for('future_list') }}" class="btn btn-outline-info w-100 btn-sm">
+                    <a href="/future" class="btn btn-outline-info w-100 btn-sm">
                         🔮 Future List
                     </a>
                 </div>
@@ -400,11 +330,6 @@
                 <div class="col-12">
                     <a href="{{ url_for('admin') }}" class="btn btn-danger w-100 btn-sm">
                         🔧 Admin Panel
-                    </a>
-                </div>
-                <div class="col-12">
-                    <a href="{{ url_for('admin_console') }}" class="btn btn-dark w-100 btn-sm">
-                        👑 Console
                     </a>
                 </div>
                 {% endif %}

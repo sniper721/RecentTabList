@@ -1,0 +1,72 @@
+{% extends "layout.html" %}
+
+{% block title %}Debug Verifiers - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>🔍 Debug Verifiers</h1>
+                <a href="{{ url_for('admin') }}" class="btn btn-secondary">← Back to Admin</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">Check Specific Verifier</h5>
+        </div>
+        <div class="card-body">
+            <form method="GET" action="/admin/debug_verifier_lookup">
+                <div class="input-group">
+                    <input type="text" class="form-control" name="verifier_name" placeholder="Enter verifier name to check" required>
+                    <button class="btn btn-primary" type="submit">Check Verifier</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">All Verifiers in Database</h5>
+        </div>
+        <div class="card-body">
+            <p>Total unique verifiers: {{ verifiers|length }}</p>
+            
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Verifier Name</th>
+                            <th>Levels Verified</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for verifier, count in verifiers %}
+                        <tr>
+                            <td><code>{{ verifier }}</code></td>
+                            <td>{{ count }}</td>
+                            <td>
+                                <a href="{{ url_for('admin_debug_verifier', verifier_name=verifier) }}" class="btn btn-sm btn-info">Debug</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="mt-4">
+                <h6>💡 How to use this information:</h6>
+                <ul>
+                    <li>Click "Debug" next to a verifier name to see detailed information</li>
+                    <li>Copy the exact verifier name from this list when awarding verifier points</li>
+                    <li>Note that verifier names are case-sensitive</li>
+                    <li>Some names might have extra spaces or special characters</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
