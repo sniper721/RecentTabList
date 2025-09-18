@@ -1,0 +1,206 @@
+{% extends "layout.html" %}
+
+{% block title %}Theme Manager{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3 class="mb-0">🎨 Theme Manager</h3>
+                        <p class="mb-0 text-muted">Manage your custom themes</p>
+                    </div>
+                    <a href="{{ url_for('custom_theme_creator') }}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> Create New Theme
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if custom_themes %}
+                    <div class="row">
+                        {% for theme in custom_themes %}
+                        <div class="col-md-6 col-lg-4 mb-4">
+                            <div class="card theme-preview-card" style="border: 2px solid {{ theme.primary_color }};">
+                                <div class="card-header text-white" style="background-color: {{ theme.primary_color }};">
+                                    <h6 class="mb-0">{{ theme.name }}</h6>
+                                    <small>Created: {{ theme.created_at.strftime('%Y-%m-%d') if theme.created_at else 'Unknown' }}</small>
+                                </div>
+                                <div class="card-body" style="background-color: {{ theme.background_color }}; color: {{ theme.text_color }};">
+                                    <!-- Theme Preview -->
+                                    <div class="theme-preview mb-3">
+                                        <div class="d-flex gap-2 mb-2">
+                                            <div class="color-swatch" style="background-color: {{ theme.primary_color }};" title="Primary"></div>
+                                            <div class="color-swatch" style="background-color: {{ theme.secondary_color }};" title="Secondary"></div>
+                                            <div class="color-swatch" style="background-color: {{ theme.accent_color }};" title="Accent"></div>
+                                        </div>
+                                        <div class="mini-card p-2 rounded mb-2" style="background-color: {{ theme.card_color }}; color: {{ theme.text_color }};">
+                                            <small>Sample Card</small>
+                                        </div>
+                                        <div class="mini-button px-2 py-1 rounded text-white" style="background-color: {{ theme.primary_color }};">
+                                            <small>Button</small>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Theme Actions -->
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        <button class="btn btn-sm btn-outline-primary apply-theme-btn" 
+                                                data-theme-id="{{ theme.id }}" title="Apply Theme">
+                                            <i class="fas fa-check"></i> Apply
+                                        </button>
+                                        <a href="{{ url_for('edit_theme', theme_id=theme.id) }}" 
+                                           class="btn btn-sm btn-outline-secondary" title="Edit Theme">
+                                            <i class="fas fa-edit"></i> Edit
+                                        </a>
+                                        <button class="btn btn-sm btn-outline-danger delete-theme-btn" 
+                                                data-theme-id="{{ theme.id }}" 
+                                                data-theme-name="{{ theme.name }}" title="Delete Theme">
+                                            <i class="fas fa-trash"></i> Delete
+                                        </button>
+                                    </div>
+                                    
+                                    {% if session.get('theme') == 'custom_' + theme.id %}
+                                    <div class="mt-2">
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check"></i> Currently Active
+                                        </span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-palette fa-3x text-muted mb-3"></i>
+                        <h5>No Custom Themes Yet</h5>
+                        <p class="text-muted">Create your first custom theme to get started!</p>
+                        <a href="{{ url_for('custom_theme_creator') }}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Create Your First Theme
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteThemeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete Theme</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the theme "<span id="deleteThemeName"></span>"?</p>
+                <p class="text-muted">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete Theme</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.theme-preview-card {
+    transition: transform 0.2s;
+}
+
+.theme-preview-card:hover {
+    transform: translateY(-2px);
+}
+
+.color-swatch {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.mini-card {
+    border: 1px solid rgba(0,0,0,0.1);
+}
+
+.mini-button {
+    font-size: 0.75rem;
+    display: inline-block;
+}
+</style>
+
+<script>
+// Apply theme functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Apply theme buttons
+    document.querySelectorAll('.apply-theme-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const themeId = this.dataset.themeId;
+            
+            fetch(`{{ url_for('toggle_theme') }}?theme=custom_${themeId}`, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    location.reload(); // Reload to apply theme
+                } else {
+                    alert('Error applying theme');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error applying theme');
+            });
+        });
+    });
+    
+    // Delete theme functionality
+    let themeToDelete = null;
+    
+    document.querySelectorAll('.delete-theme-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            themeToDelete = this.dataset.themeId;
+            const themeName = this.dataset.themeName;
+            
+            document.getElementById('deleteThemeName').textContent = themeName;
+            new bootstrap.Modal(document.getElementById('deleteThemeModal')).show();
+        });
+    });
+    
+    document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+        if (!themeToDelete) return;
+        
+        fetch(`{{ url_for('delete_theme', theme_id='THEME_ID') }}`.replace('THEME_ID', themeToDelete), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload(); // Reload to update the list
+            } else {
+                alert('Error deleting theme: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error deleting theme');
+        });
+        
+        // Hide modal
+        bootstrap.Modal.getInstance(document.getElementById('deleteThemeModal')).hide();
+    });
+});
+</script>
+{% endblock %}

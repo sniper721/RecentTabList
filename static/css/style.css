@@ -1306,3 +1306,34 @@ body, .card, .navbar, .btn, .form-control, .form-select, .dropdown-menu, .alert,
     padding: 0.375rem 0.75rem;
     font-size: 0.875rem;
 }
+
+/* Level completion grid items - Fix hover effect */
+.levels-grid .level-item {
+    transition: all 0.2s ease;
+    text-decoration: none !important;
+}
+
+.levels-grid .level-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    text-decoration: none !important;
+}
+
+/* Fix text decoration issues on hover */
+.levels-grid .level-item.text-success:hover {
+    color: #0f5132 !important; /* Darker green on hover */
+    text-decoration: none !important;
+}
+
+.levels-grid .level-item.text-danger:hover {
+    color: #58151c !important; /* Darker red on hover */
+    text-decoration: none !important;
+}
+
+.levels-grid a.level-item {
+    text-decoration: none !important;
+}
+
+.levels-grid a.level-item:hover {
+    text-decoration: none !important;
+}

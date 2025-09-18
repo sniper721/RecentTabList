@@ -184,29 +184,7 @@
             </div>
         </div>
         
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-info text-white">
-                <h4 class="mb-0">Top Players (by Points)</h4>
-            </div>
-            <div class="card-body p-0">
-                <ul class="list-group list-group-flush">
-                    {% for player in top_players %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        {{ loop.index }}. {{ player.username }}
-                        <div>
-                            <span class="badge bg-primary rounded-pill me-1">
-                                {% if player is mapping %}
-                                    {{ format_points(player.points) }} points
-                                {% else %}
-                                    {{ player[2] }} records
-                                {% endif %}
-                            </span>
-                        </div>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </div>
-        </div>
+
         
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-primary text-white">
@@ -225,7 +203,7 @@
             </div>
             <div class="card-body">
                 <p><strong>List Admin:</strong> Miifin</p>
-                <p><strong>List Moderators:</strong> Kye, Monika, DairyFarmer</p>
+                <p><strong>List Moderators:</strong> Kye, Monika, ApplePi, DairyFarmer</p>
                 <p><strong>List Coder:</strong> ENGINE</p>
                 <p><strong>Server Moderator:</strong> Cesium</p>
             </div>

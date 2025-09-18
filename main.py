@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 
 # Try to import Discord integration, but don't fail if it's missing
 try:
-    from discord_integration import notify_record_submitted, notify_record_approved, notify_record_rejected
+    from discord_integration import notify_record_submitted, notify_record_approved, notify_record_rejected, notify_admin_action
     DISCORD_AVAILABLE = True
     print("✅ Discord integration loaded successfully")
 except ImportError as e:
@@ -20,6 +20,8 @@ except ImportError as e:
         print("❌ Discord integration not available - notify_record_approved")  
     def notify_record_rejected(*args, **kwargs):
         print("❌ Discord integration not available - notify_record_rejected")
+    def notify_admin_action(*args, **kwargs):
+        print("❌ Discord integration not available - notify_admin_action")
 
 # Try to import Changelog Discord integration
 try:
@@ -122,6 +124,23 @@ else:
     subprocess.run(['python', 'main_sqlite_backup.py'])
     exit()
     
+# Initialize console settings
+try:
+    console_settings = mongo_db.site_settings.find_one({"_id": "console"})
+    if not console_settings:
+        # Create default console settings
+        default_console_settings = {
+            "_id": "console",
+            "pin_required": False,
+            "pin": "1234"
+        }
+        mongo_db.site_settings.insert_one(default_console_settings)
+        print("✓ Default console settings created")
+    else:
+        print("✓ Console settings loaded")
+except Exception as e:
+    print(f"Warning: Could not initialize console settings: {e}")
+
 print("Initializing OAuth...")
 oauth = OAuth(app)
 
@@ -364,6 +383,13 @@ def utility_processor():
             print(f"Error getting active polls: {e}")
             return []
     
+    def get_user_by_id(user_id):
+        """Helper function to get user data by ID"""
+        try:
+            return mongo_db.users.find_one({"_id": user_id})
+        except:
+            return None
+    
     # Get current theme from session
     current_theme = session.get('theme', 'light')
     
@@ -378,7 +404,8 @@ def utility_processor():
         get_demon_difficulty_display=get_demon_difficulty_display,
         get_demon_type_display=get_demon_type_display,
         get_difficulty_text=get_difficulty_text,
-        datetime=datetime
+        datetime=datetime,
+        get_user_by_id=get_user_by_id
     )
 
 def calculate_level_points(position, is_legacy=False, level_type="Level"):
@@ -761,60 +788,30 @@ def send_changelog_notification(action, level_name, admin_username, **kwargs):
         traceback.print_exc()
 
 def log_admin_action(admin_username, action, details=""):
-    """Log admin actions to Discord"""
+    """Log admin actions to database and Discord"""
     try:
-        import requests
-        import os
-        
-        webhook_url = os.environ.get('DISCORD_WEBHOOK_URL')
-        if not webhook_url:
-            print("No Discord webhook URL configured for admin logs")
-            return
-        
-        embed = {
-            "title": "🔧 Admin Action",
-            "color": 0xff9500,  # Orange color
-            "fields": [
-                {
-                    "name": "👤 Admin",
-                    "value": admin_username,
-                    "inline": True
-                },
-                {
-                    "name": "⚡ Action",
-                    "value": action,
-                    "inline": True
-                },
-                {
-                    "name": "🕒 Time",
-                    "value": datetime.now().strftime("%Y-%m-%d %H:%M:%S UTC"),
-                    "inline": True
-                }
-            ],
-            "footer": {
-                "text": "RTL Admin Logs"
-            }
-        }
-        
-        if details:
-            embed["fields"].append({
-                "name": "📝 Details",
-                "value": details,
-                "inline": False
+        # Log to database (without IP address)
+        try:
+            mongo_db.admin_logs.insert_one({
+                "action": action,
+                "admin_user": admin_username,
+                "details": details,
+                "timestamp": datetime.now(timezone.utc)
             })
+        except Exception as e:
+            print(f"Error logging to database: {e}")
         
-        payload = {
-            "embeds": [embed]
-        }
-        
-        response = requests.post(webhook_url, json=payload, timeout=10)
-        if response.status_code == 204:
-            print(f"Admin action logged: {action}")
+        # Send Discord notification using the new system
+        if DISCORD_AVAILABLE:
+            try:
+                notify_admin_action(admin_username, action, details)
+            except Exception as e:
+                print(f"Error sending Discord admin notification: {e}")
         else:
-            print(f"Failed to log admin action: {response.status_code}")
+            print("Discord integration not available for admin notifications")
             
     except Exception as e:
-        print(f"Error logging admin action: {e}")
+        print(f"Error in log_admin_action: {e}")
 
 def convert_image_to_base64(file_stream, max_kb=50, target_size=(320, 180)):
     """
@@ -1912,8 +1909,8 @@ def fix_youtube_thumbnails():
 @app.route('/admin/ip_ban/<user_id>', methods=['GET', 'POST'])
 def ip_ban_user(user_id):
     """Admin route to IP ban a user and delete all their accounts"""
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied - Admin only', 'danger')
+    if 'user_id' not in session or not session.get('head_admin'):
+        flash('Access denied - Head Admin only', 'danger')
         return redirect(url_for('index'))
     
     try:
@@ -1925,9 +1922,9 @@ def ip_ban_user(user_id):
             flash('User not found', 'danger')
             return redirect(url_for('admin'))
         
-        # PREVENT IP BANNING OF ADMIN USERS
-        if user.get('is_admin', False):
-            flash('Cannot IP ban admin users!', 'danger')
+        # PREVENT IP BANNING OF HEAD ADMIN USERS
+        if user.get('head_admin', False):
+            flash('Cannot IP ban head admin users!', 'danger')
             return redirect(url_for('admin'))
         
         # Get reason from form or query parameter
@@ -1936,32 +1933,29 @@ def ip_ban_user(user_id):
         else:
             reason = request.args.get('reason', 'Hacking/Cheating').strip()
             
-        admin_username = session.get('username', 'Unknown Admin')
+        # Get admin username for logging
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
         
-        # Get user's IP addresses from login logs (if available)
+        # Get all IP addresses associated with this user
         user_ips = []
         
-        # Add current IP if available
-        if hasattr(flask_request, 'remote_addr') and flask_request.remote_addr:
-            user_ips.append(flask_request.remote_addr)
+        # Add current IP
+        current_ip = request.remote_addr
+        if current_ip and current_ip not in user_ips:
+            user_ips.append(current_ip)
         
-        # Get historical IPs from login history
-        try:
-            historical_ips = mongo_db.login_history.find(
-                {"user_id": ObjectId(user_id)},
-                {"ip_address": 1}
-            ).distinct("ip_address")
-            
-            # Add historical IPs to the ban list
-            for ip in historical_ips:
-                if ip and ip not in user_ips:
-                    user_ips.append(ip)
-        except Exception as e:
-            print(f"Error retrieving historical IPs: {e}")
+        # Add historical IPs from login history
+        login_history = mongo_db.login_history.find({"user_id": ObjectId(user_id)})
+        for login_entry in login_history:
+            ip = login_entry.get('ip_address')
+            if ip and ip not in user_ips:
+                user_ips.append(ip)
         
-        # Also check the user's last_ip field
-        if user.get('last_ip') and user['last_ip'] not in user_ips:
-            user_ips.append(user['last_ip'])
+        # Add last IP from user document
+        last_ip = user.get('last_ip')
+        if last_ip and last_ip not in user_ips:
+            user_ips.append(last_ip)
         
         # Create IP ban record
         ip_ban = {
@@ -4062,22 +4056,132 @@ def admin_reset_user(user_id):
             {"$set": {"points": 0}}
         )
         
+        # Log the reset action
+        log_message = (
+            f"Admin {admin_username} reset user {user['username']}'s points "
+            f"from {old_points} to 0 and deleted {record_count} records."
+        )
+        mongo_db.logs.insert_one({"message": log_message, "timestamp": datetime.utcnow()})
+        
+        flash('User reset successfully', 'success')
+        return redirect(url_for('admin_users'))
+    except Exception as e:
+        flash(f'Error resetting user: {str(e)}', 'danger')
+        return redirect(url_for('admin_users'))
+
+
+@app.route('/debug_session')
+def debug_session():
+    """Debug route to check session variables"""
+    if 'user_id' not in session:
+        return "Not logged in"
+    
+    user = mongo_db.users.find_one({"_id": session['user_id']})
+    if not user:
+        return "User not found"
+    
+    return f"""
+    <h1>Session Debug</h1>
+    <p>User: {user['username']}</p>
+    <p>Session user_id: {session.get('user_id')}</p>
+    <p>Session is_admin: {session.get('is_admin', 'NOT SET')}</p>
+    <p>Session head_admin: {session.get('head_admin', 'NOT SET')}</p>
+    <p>DB is_admin: {user.get('is_admin', False)}</p>
+    <p>DB head_admin: {user.get('head_admin', False)}</p>
+    <a href="/">Back to home</a>
+    """
+
+@app.route('/admin/reset_user', methods=['POST'])
+def reset_user():
+    """Reset a user's points and delete their records"""
+    if not session.get('head_admin'):
+        return redirect(url_for('login'))
+
+    user_id = request.form.get('user_id')
+    if not user_id:
+        flash('User ID is required', 'danger')
+        return redirect(url_for('admin_users'))
+
+    try:
+        user = mongo_db.users.find_one({"_id": user_id})
+        if not user:
+            flash('User not found', 'danger')
+            return redirect(url_for('admin_users'))
+
+        user_obj_id = ObjectId(user_id)
+        old_points = user['points']
+        record_count = mongo_db.records.count_documents({"user_id": user_obj_id})
+        mongo_db.records.delete_many({"user_id": user_obj_id})
+        mongo_db.users.update_one(
+            {"_id": user_obj_id},
+            {"$set": {"points": 0}}
+        )
+        
+        # Log the reset action
+        log_message = (
+            f"Admin {admin_username} reset user {user['username']}'s points "
+            f"from {old_points} to 0 and deleted {record_count} records."
+        )
+        mongo_db.logs.insert_one({"message": log_message, "timestamp": datetime.utcnow()})
+        
+        flash('User reset successfully', 'success')
+        return redirect(url_for('admin_users'))
+    except Exception as e:
+        flash(f'Error resetting user: {str(e)}', 'danger')
+        return redirect(url_for('admin_users'))
+
+
+
+@app.route('/admin/users/promote/<user_id>')
+def admin_promote_user(user_id):
+    """Admin promote user"""
+    if not session.get('is_admin'):
+        return redirect(url_for('login'))
+
+    try:
+        user = mongo_db.users.find_one({"_id": user_id})
+        if not user:
+            flash('User not found', 'danger')
+            return redirect(url_for('admin_users'))
+
+        admin_username = session.get('username')
+
+        # Promote user to admin
+        mongo_db.users.update_one({"_id": user_id}, {"$set": {"is_admin": True}})
+
         # Log admin action
         log_admin_action(
             admin_username,
-            "User Reset",
-            f"Reset {user['username']}: Deleted {record_count} records, Points {old_points} → 0"
+            "User Promote",
+            f"Promoted {user['username']} to admin"
         )
         
-        flash(f'✅ Reset {user["username"]}: Deleted {record_count} records and reset {old_points} points to 0', 'success')
-        
+        flash(f'{user["username"]} has been promoted to admin', 'success')
+        return redirect(url_for('admin_console'))
+
     except Exception as e:
-        flash(f'Error resetting user: {str(e)}', 'danger')
-        print(f"Admin reset user error: {e}")
+        flash(f'Error promoting user: {str(e)}', 'danger')
+        print(f"Admin promote user error: {e}")
+        import traceback
+
+@app.route('/admin/demote/<username>')
+def admin_demote(username):
+    try:
+        user = db.get_user(username)
+        if not user:
+            flash(f'User {username} not found', 'danger')
+            return redirect(url_for('admin_console'))
+
+        db.demote_user(username)
+        flash(f'{user["username"]} has been demoted to regular user', 'success')
+        return redirect(url_for('admin_console'))
+    except Exception as e:
+        flash(f'Error demoting user: {str(e)}', 'danger')
+        print(f"Admin demote user error: {e}")
         import traceback
         traceback.print_exc()
     
-    return redirect(url_for('admin_users'))
+    return redirect(url_for('admin_console'))
 
 @app.route('/admin/reset_user_api/<user_id>', methods=['POST'])
 def admin_reset_user_api(user_id):
@@ -4679,6 +4783,7 @@ def login():
             session['user_id'] = user['_id']
             session['username'] = user['username']
             session['is_admin'] = user.get('is_admin', False)
+            session['head_admin'] = user.get('head_admin', False)  # Add this line
             session.permanent = True  # Make session permanent
             
             # Load user preferences
@@ -4765,6 +4870,7 @@ def register():
 def logout():
     session.pop('user_id', None)
     session.pop('is_admin', None)
+    session.pop('head_admin', None)
     flash('You have been logged out', 'info')
     return redirect(url_for('index'))
 
@@ -4773,7 +4879,7 @@ def toggle_theme():
     # Get the requested theme from query parameter or toggle between light/dark
     requested_theme = request.args.get('theme')
     
-    if requested_theme and requested_theme in ['light', 'dark', 'auto', 'blue', 'purple', 'green', 'red', 'orange']:
+    if requested_theme and (requested_theme in ['light', 'dark', 'auto', 'blue', 'purple', 'green', 'red', 'orange'] or requested_theme.startswith('custom_')):
         new_theme = requested_theme
     else:
         # Fallback to simple toggle for old functionality
@@ -4798,6 +4904,189 @@ def toggle_theme():
         return {'theme': new_theme, 'status': 'success'}
     
     return redirect(request.referrer or url_for('index'))
+
+@app.route('/custom-theme-creator', methods=['GET', 'POST'])
+def custom_theme_creator():
+    """Custom theme creator page"""
+    if 'user_id' not in session:
+        flash('Please log in to create custom themes', 'warning')
+        return redirect(url_for('login'))
+    
+    if request.method == 'POST':
+        try:
+            # Get form data
+            theme_name = request.form.get('theme_name', '').strip()
+            primary_color = request.form.get('primary_color', '#0d6efd')
+            secondary_color = request.form.get('secondary_color', '#6c757d')
+            background_color = request.form.get('background_color', '#ffffff')
+            text_color = request.form.get('text_color', '#212529')
+            card_color = request.form.get('card_color', '#f8f9fa')
+            accent_color = request.form.get('accent_color', '#198754')
+            
+            if not theme_name:
+                return {'success': False, 'error': 'Theme name is required'}
+            
+            if len(theme_name) > 50:
+                return {'success': False, 'error': 'Theme name too long (max 50 characters)'}
+            
+            # Create custom theme object with unique ID
+            from bson import ObjectId
+            theme_id = str(ObjectId())
+            
+            custom_theme = {
+                'id': theme_id,
+                'name': theme_name,
+                'primary_color': primary_color,
+                'secondary_color': secondary_color,
+                'background_color': background_color,
+                'text_color': text_color,
+                'card_color': card_color,
+                'accent_color': accent_color,
+                'created_at': datetime.now(timezone.utc)
+            }
+            
+            # Save to user's profile (add to array of custom themes)
+            user_id = session['user_id']
+            mongo_db.users.update_one(
+                {"_id": user_id},
+                {
+                    "$push": {"custom_themes": custom_theme},
+                    "$set": {"theme_preference": f"custom_{theme_id}"}
+                }
+            )
+            
+            # Update session
+            session['theme'] = f'custom_{theme_id}'
+            
+            return {'success': True, 'message': 'Custom theme saved successfully!'}
+            
+        except Exception as e:
+            print(f"Error saving custom theme: {e}")
+            return {'success': False, 'error': 'Failed to save custom theme'}
+    
+    return render_template('custom_theme_creator.html')
+
+@app.route('/theme-manager')
+def theme_manager():
+    """Theme management page"""
+    if 'user_id' not in session:
+        flash('Please log in to manage themes', 'warning')
+        return redirect(url_for('login'))
+    
+    # Get user's custom themes
+    user = mongo_db.users.find_one({"_id": session['user_id']})
+    custom_themes = user.get('custom_themes', []) if user else []
+    
+    return render_template('theme_manager.html', custom_themes=custom_themes)
+
+@app.route('/delete-theme/<theme_id>', methods=['POST'])
+def delete_theme(theme_id):
+    """Delete a custom theme"""
+    if 'user_id' not in session:
+        return {'success': False, 'error': 'Not logged in'}
+    
+    try:
+        user_id = session['user_id']
+        
+        # Remove theme from user's custom_themes array
+        result = mongo_db.users.update_one(
+            {"_id": user_id},
+            {"$pull": {"custom_themes": {"id": theme_id}}}
+        )
+        
+        if result.modified_count > 0:
+            # If user was using this theme, switch to light theme
+            current_theme = session.get('theme', 'light')
+            if current_theme == f'custom_{theme_id}':
+                session['theme'] = 'light'
+                mongo_db.users.update_one(
+                    {"_id": user_id},
+                    {"$set": {"theme_preference": "light"}}
+                )
+            
+            return {'success': True, 'message': 'Theme deleted successfully'}
+        else:
+            return {'success': False, 'error': 'Theme not found'}
+            
+    except Exception as e:
+        print(f"Error deleting theme: {e}")
+        return {'success': False, 'error': 'Failed to delete theme'}
+
+@app.route('/edit-theme/<theme_id>')
+def edit_theme(theme_id):
+    """Edit an existing custom theme"""
+    if 'user_id' not in session:
+        flash('Please log in to edit themes', 'warning')
+        return redirect(url_for('login'))
+    
+    # Get the specific theme
+    user = mongo_db.users.find_one({"_id": session['user_id']})
+    if not user:
+        flash('User not found', 'error')
+        return redirect(url_for('theme_manager'))
+    
+    custom_themes = user.get('custom_themes', [])
+    theme_to_edit = None
+    
+    for theme in custom_themes:
+        if theme.get('id') == theme_id:
+            theme_to_edit = theme
+            break
+    
+    if not theme_to_edit:
+        flash('Theme not found', 'error')
+        return redirect(url_for('theme_manager'))
+    
+    return render_template('custom_theme_creator.html', edit_theme=theme_to_edit)
+
+@app.route('/update-theme/<theme_id>', methods=['POST'])
+def update_theme(theme_id):
+    """Update an existing custom theme"""
+    if 'user_id' not in session:
+        return {'success': False, 'error': 'Not logged in'}
+    
+    try:
+        # Get form data
+        theme_name = request.form.get('theme_name', '').strip()
+        primary_color = request.form.get('primary_color', '#0d6efd')
+        secondary_color = request.form.get('secondary_color', '#6c757d')
+        background_color = request.form.get('background_color', '#ffffff')
+        text_color = request.form.get('text_color', '#212529')
+        card_color = request.form.get('card_color', '#f8f9fa')
+        accent_color = request.form.get('accent_color', '#198754')
+        
+        if not theme_name:
+            return {'success': False, 'error': 'Theme name is required'}
+        
+        if len(theme_name) > 50:
+            return {'success': False, 'error': 'Theme name too long (max 50 characters)'}
+        
+        # Update the theme in the array
+        user_id = session['user_id']
+        result = mongo_db.users.update_one(
+            {"_id": user_id, "custom_themes.id": theme_id},
+            {
+                "$set": {
+                    "custom_themes.$.name": theme_name,
+                    "custom_themes.$.primary_color": primary_color,
+                    "custom_themes.$.secondary_color": secondary_color,
+                    "custom_themes.$.background_color": background_color,
+                    "custom_themes.$.text_color": text_color,
+                    "custom_themes.$.card_color": card_color,
+                    "custom_themes.$.accent_color": accent_color,
+                    "custom_themes.$.updated_at": datetime.now(timezone.utc)
+                }
+            }
+        )
+        
+        if result.modified_count > 0:
+            return {'success': True, 'message': 'Theme updated successfully!'}
+        else:
+            return {'success': False, 'error': 'Theme not found or no changes made'}
+            
+    except Exception as e:
+        print(f"Error updating theme: {e}")
+        return {'success': False, 'error': 'Failed to update theme'}
 
 @app.route('/auth/google')
 def google_login():
@@ -4853,6 +5142,7 @@ def google_callback():
                     "password_hash": "",
                     "google_id": google_id,
                     "is_admin": False,
+                    "head_admin": False,
                     "points": 0,
                     "date_joined": datetime.now(timezone.utc)
                 }
@@ -4862,10 +5152,12 @@ def google_callback():
         session['user_id'] = user['_id']
         session['username'] = user['username']
         session['is_admin'] = user.get('is_admin', False)
+        session['head_admin'] = user.get('head_admin', False)
         session.permanent = True  # Make session permanent
         
         # Load user preferences
         session['theme'] = user.get('theme_preference', 'light')
+
         
         # Log login activity
         login_entry = {
@@ -4891,6 +5183,8 @@ def google_callback():
     
     except Exception as e:
         flash(f'Google login failed: {str(e)}', 'danger')
+        return redirect(url_for('login'))
+
         return redirect(url_for('login'))
 
 @app.route('/profile')
@@ -5090,6 +5384,10 @@ def admin():
             # Convert ObjectId to string for template
             top_player['_id'] = str(top_player['_id'])
         
+        # Count admin and head admin users
+        admin_users_count = mongo_db.users.count_documents({"is_admin": True})
+        head_admin_users_count = mongo_db.users.count_documents({"head_admin": True})
+        
         # Create stats object
         stats = {
             'total_users': total_users,
@@ -5103,7 +5401,9 @@ def admin():
             'main_levels': main_levels_count,
             'legacy_levels': legacy_levels_count,
             'future_levels': future_levels_count,
-            'top_player': top_player
+            'top_player': top_player,
+            'admin_users': admin_users_count,
+            'head_admin_users': head_admin_users_count
         }
         
     except Exception as e:
@@ -5120,22 +5420,941 @@ def admin():
             'main_levels': 0,
             'legacy_levels': 0,
             'future_levels': 0,
-            'top_player': None
+            'top_player': None,
+            'admin_users': 0,
+            'head_admin_users': 0
         }
         print(f"Error generating admin stats: {e}")
     
     return render_template('admin/index.html', pending_records=pending_records, stats=stats)
 
-@app.route('/admin/tools')
-def admin_tools():
-    """Admin tools page for IP ban and user reset functionality"""
+@app.route('/admin/console')
+def admin_console():
+    """Admin Console - Protected by PIN"""
     if 'user_id' not in session:
         flash('Please log in to access admin panel', 'warning')
         return redirect(url_for('login'))
     
-    if not session.get('is_admin'):
+    # Allow both regular admins and head admins to access
+    if not session.get('is_admin') and not session.get('head_admin'):
         flash('Access denied. Admin privileges required.', 'danger')
-        return redirect(url_for('index'))
+        return redirect(url_for('admin'))
+    
+    # Check if PIN is required
+    console_settings = mongo_db.site_settings.find_one({"_id": "console"})
+    if console_settings and console_settings.get('pin_required', False):
+        # Check for temporary PIN verification for this request only
+        if not session.get('console_pin_verified_temp'):
+            # Redirect to PIN entry page
+            return redirect(url_for('admin_console_pin'))
+        else:
+            # Clear the temporary verification flag so PIN is required again next time
+            session.pop('console_pin_verified_temp', None)
+    
+    # Generate stats for the console
+    try:
+        from datetime import datetime, timedelta, timezone
+        
+        # Basic counts
+        total_users = mongo_db.users.count_documents({})
+        total_levels = mongo_db.levels.count_documents({})
+        total_records = mongo_db.records.count_documents({})
+        main_levels_count = mongo_db.levels.count_documents({"is_legacy": False})
+        legacy_levels_count = mongo_db.levels.count_documents({"is_legacy": True})
+        future_levels_count = mongo_db.future_levels.count_documents({})
+        
+        # Count admin and head admin users
+        admin_users_count = mongo_db.users.count_documents({"is_admin": True})
+        head_admin_users_count = mongo_db.users.count_documents({"head_admin": True})
+        
+        # Create stats object
+        stats = {
+            'total_users': total_users,
+            'total_levels': total_levels,
+            'total_records': total_records,
+            'main_levels': main_levels_count,
+            'legacy_levels': legacy_levels_count,
+            'future_levels': future_levels_count,
+            'admin_users': admin_users_count,
+            'head_admin_users': head_admin_users_count
+        }
+        
+    except Exception as e:
+        # Fallback stats in case of error
+        stats = {
+            'total_users': 0,
+            'total_levels': 0,
+            'total_records': 0,
+            'main_levels': 0,
+            'legacy_levels': 0,
+            'future_levels': 0,
+            'admin_users': 0,
+            'head_admin_users': 0
+        }
+        print(f"Error generating console stats: {e}")
+    
+    return render_template('admin/console.html', stats=stats)
+
+@app.route('/admin/console/execute', methods=['POST'])
+def admin_console_execute():
+    """Execute console commands - Admin only"""
+    if 'user_id' not in session:
+        return {'success': False, 'error': 'Not logged in'}
+    
+    if not session.get('is_admin') and not session.get('head_admin'):
+        return {'success': False, 'error': 'Admin privileges required'}
+    
+    try:
+        command = request.json.get('command', '').strip()
+        if not command:
+            return {'success': False, 'error': 'No command provided'}
+        
+        # Track console command execution
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        
+        # Don't log PIN entries for security
+        if not command.isdigit():
+            # Special handling for RTL commands to flag them as dangerous
+            if command.startswith('rtl.'):
+                rtl_cmd = command[4:].split('(')[0]  # Extract just the command name
+                if rtl_cmd in ['login_as', 'ban_user', 'unban_user', 'clear_cache', 'recalc_points', 'backup_db']:
+                    log_admin_action(admin_username, f"RTL DANGEROUS COMMAND", f"Executed: {command[:100]}")
+                else:
+                    log_admin_action(admin_username, f"RTL COMMAND", f"Executed: {command[:100]}")
+            else:
+                log_admin_action(admin_username, "CONSOLE COMMAND", f"Executed: {command[:100]}")
+        
+        # Check if this is a PIN verification for login_as
+        if 'pending_login_as' in session and command.isdigit():
+            return handle_super_admin_pin_verification(command)
+        
+        # Execute the command
+        result = execute_console_command(command)
+        return {'success': True, 'result': result}
+        
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+def handle_super_admin_pin_verification(provided_pin):
+    """Handle Super Admin PIN verification for login_as command"""
+    try:
+        username = session.get('pending_login_as')
+        if not username:
+            return {'success': False, 'error': 'No pending login_as command'}
+        
+        # Check super admin PIN
+        console_settings = mongo_db.site_settings.find_one({"_id": "console"})
+        correct_super_pin = console_settings.get('super_admin_pin', '9999') if console_settings else '9999'
+        
+        if provided_pin != correct_super_pin:
+            # Log failed attempt
+            try:
+                mongo_db.admin_logs.insert_one({
+                    "action": "failed_login_as_attempt",
+                    "admin_user": session.get('username', 'Unknown'),
+                    "target_user": username,
+                    "timestamp": datetime.now(timezone.utc),
+                    "reason": "Invalid super admin PIN"
+                })
+            except:
+                pass
+            
+            # Clear pending login
+            session.pop('pending_login_as', None)
+            return {'success': True, 'result': "❌ INVALID SUPER ADMIN PIN!\nAccess denied. This attempt has been logged."}
+        
+        # PIN is correct, proceed with login
+        user = mongo_db.users.find_one({"username": username})
+        if not user:
+            session.pop('pending_login_as', None)
+            return {'success': True, 'result': f"User '{username}' not found"}
+        
+        # Get current session info for logging
+        current_user = session.get('username', 'Unknown')
+        
+        # Log the successful admin login action
+        try:
+            mongo_db.admin_logs.insert_one({
+                "action": "admin_login_as",
+                "admin_user": current_user,
+                "target_user": username,
+                "timestamp": datetime.now(timezone.utc)
+            })
+        except:
+            pass  # Don't fail if logging fails
+        
+        # Send Discord notification for this critical action
+        log_admin_action(current_user, "ADMIN LOGIN AS USER", f"Logged in as user: {username}")
+        
+        # Switch session to target user
+        session['user_id'] = user['_id']
+        session['username'] = user['username']
+        session['is_admin'] = user.get('is_admin', False)
+        session['head_admin'] = user.get('head_admin', False)
+        session.permanent = True
+        
+        # Clear pending login
+        session.pop('pending_login_as', None)
+        
+        admin_status = ""
+        if user.get('head_admin'):
+            admin_status = " [HEAD ADMIN]"
+        elif user.get('is_admin'):
+            admin_status = " [ADMIN]"
+        
+        return {'success': True, 'result': f"✅ Successfully logged in as '{username}'{admin_status}\nUser ID: {user['_id']}\nPoints: {user.get('points', 0)}\n\n⚠️ SECURITY WARNING: This action has been logged!"}
+        
+    except Exception as e:
+        session.pop('pending_login_as', None)
+        return {'success': False, 'error': str(e)}
+
+def execute_console_command(command):
+    """Execute console commands with custom RTL commands and Python support"""
+    import sys
+    from io import StringIO
+    
+    # Custom RTL commands
+    if command.startswith('rtl.'):
+        return execute_rtl_command(command[4:])  # Remove 'rtl.' prefix
+    
+    # System info commands
+    elif command == 'help':
+        return """Available commands:
+        
+RTL Database Commands:
+  rtl.stats() - Show database statistics
+  rtl.users() - List all users (max 20)
+  rtl.levels() - List all levels (max 20)
+  rtl.records() - Show recent approved records
+  rtl.pending_records() - Show pending records
+  rtl.admins() - List all admins
+  rtl.top_players() - Show top players by points
+  rtl.recent_activity() - Show recent system activity
+  
+RTL User Commands:
+  rtl.user('username') - Get detailed user info
+  rtl.ban_user('username') - Ban a user
+  rtl.unban_user('username') - Unban a user
+  rtl.make_admin('username') - Promote user to admin
+  rtl.check_admin('username') - Check user admin status
+  rtl.fix_admin_session('username') - Check admin session info
+  
+RTL Level Commands:
+  rtl.level('name') - Get detailed level info
+  rtl.search_levels('term') - Search levels by name
+  
+RTL System Commands:
+  rtl.clear_cache() - Clear levels cache
+  rtl.recalc_points() - Recalculate all level points
+  rtl.system_info() - Show system information
+  rtl.backup_db() - Initiate database backup
+  rtl.login_as('user') - Login as any user (REQUIRES SUPER PIN!)
+  rtl.whoami() - Show current session info
+  rtl.admin_logs() - Show recent admin actions
+
+  
+Python Commands:
+  Any valid Python expression or statement
+  mongo_db - Direct database access
+  datetime - Date/time functions
+  
+System Commands:
+  help - Show this help
+  clear - Clear console output
+  stats - Quick stats overview
+"""
+    
+    elif command == 'stats':
+        total_users = mongo_db.users.count_documents({})
+        total_levels = mongo_db.levels.count_documents({})
+        total_records = mongo_db.records.count_documents({})
+        return f"Users: {total_users} | Levels: {total_levels} | Records: {total_records}"
+    
+    elif command == 'clear':
+        return '__CLEAR__'
+    
+    # Python code execution
+    else:
+        return execute_python_code(command)
+
+def execute_rtl_command(command):
+    """Execute RTL-specific commands"""
+    try:
+        if command == 'stats()':
+            stats = {
+                'users': mongo_db.users.count_documents({}),
+                'levels': mongo_db.levels.count_documents({}),
+                'records': mongo_db.records.count_documents({}),
+                'main_levels': mongo_db.levels.count_documents({"is_legacy": False}),
+                'legacy_levels': mongo_db.levels.count_documents({"is_legacy": True}),
+                'admins': mongo_db.users.count_documents({"is_admin": True}),
+                'head_admins': mongo_db.users.count_documents({"head_admin": True})
+            }
+            return f"""Database Statistics:
+Users: {stats['users']} total, {stats['admins']} admins, {stats['head_admins']} head admins
+Levels: {stats['levels']} total ({stats['main_levels']} main, {stats['legacy_levels']} legacy)
+Records: {stats['records']} total"""
+        
+        elif command == 'users()':
+            users = list(mongo_db.users.find({}, {"username": 1, "is_admin": 1, "head_admin": 1, "points": 1}).limit(20))
+            result = "Recent Users (max 20):\n"
+            for user in users:
+                admin_status = ""
+                if user.get('head_admin'):
+                    admin_status = " [HEAD ADMIN]"
+                elif user.get('is_admin'):
+                    admin_status = " [ADMIN]"
+                result += f"  {user['username']} (ID: {user['_id']}) - {user.get('points', 0)} points{admin_status}\n"
+            return result
+        
+        elif command == 'levels()':
+            levels = list(mongo_db.levels.find({}, {"name": 1, "position": 1, "is_legacy": 1, "points": 1}).sort("position", 1).limit(20))
+            result = "Levels (max 20):\n"
+            for level in levels:
+                legacy_status = " [LEGACY]" if level.get('is_legacy') else ""
+                result += f"  #{level['position']} {level['name']} - {level.get('points', 0)} points{legacy_status}\n"
+            return result
+        
+        elif command == 'records()':
+            records = list(mongo_db.records.aggregate([
+                {"$match": {"status": "approved"}},
+                {"$lookup": {"from": "users", "localField": "user_id", "foreignField": "_id", "as": "user"}},
+                {"$lookup": {"from": "levels", "localField": "level_id", "foreignField": "_id", "as": "level"}},
+                {"$unwind": "$user"},
+                {"$unwind": "$level"},
+                {"$sort": {"date_submitted": -1}},
+                {"$limit": 10}
+            ]))
+            result = "Recent Records (max 10):\n"
+            for record in records:
+                result += f"  {record['user']['username']} - {record['level']['name']} ({record['progress']}%)\n"
+            return result
+        
+        elif command == 'admins()':
+            admins = list(mongo_db.users.find({"is_admin": True}, {"username": 1, "head_admin": 1}))
+            result = "All Admins:\n"
+            for admin in admins:
+                status = "HEAD ADMIN" if admin.get('head_admin') else "ADMIN"
+                result += f"  {admin['username']} (ID: {admin['_id']}) [{status}]\n"
+            return result
+        
+        elif command == 'clear_cache()':
+            global levels_cache
+            levels_cache = {'main_list': None, 'legacy_list': None, 'last_updated': None}
+            return "Levels cache cleared successfully"
+        
+        elif command == 'recalc_points()':
+            recalculate_all_points()
+            return "All level points recalculated successfully"
+        
+        elif command.startswith('user('):
+            # Extract username from user('username')
+            username = command[5:-1].strip('\'"')
+            user = mongo_db.users.find_one({"username": username})
+            if user:
+                admin_status = ""
+                if user.get('head_admin'):
+                    admin_status = " [HEAD ADMIN]"
+                elif user.get('is_admin'):
+                    admin_status = " [ADMIN]"
+                return f"""User: {user['username']} (ID: {user['_id']})
+Points: {user.get('points', 0)}
+Status: {'Public' if user.get('public_profile', True) else 'Private'} Profile{admin_status}
+Joined: {user.get('date_joined', 'Unknown')}
+Bio: {user.get('bio', 'No bio')}"""
+            else:
+                return f"User '{username}' not found"
+        
+        elif command.startswith('level('):
+            # Extract level name from level('name')
+            level_name = command[6:-1].strip('\'"')
+            level = mongo_db.levels.find_one({"name": {"$regex": level_name, "$options": "i"}})
+            if level:
+                legacy_status = " [LEGACY]" if level.get('is_legacy') else ""
+                return f"""Level: {level['name']} (ID: {level['_id']})
+Position: #{level['position']}{legacy_status}
+Creator: {level.get('creator', 'Unknown')}
+Points: {level.get('points', 0)}
+Difficulty: {level.get('difficulty', 'Unknown')}
+Min %: {level.get('min_percentage', 100)}%"""
+            else:
+                return f"Level matching '{level_name}' not found"
+        
+        elif command == 'pending_records()':
+            records = list(mongo_db.records.aggregate([
+                {"$match": {"status": "pending"}},
+                {"$lookup": {"from": "users", "localField": "user_id", "foreignField": "_id", "as": "user"}},
+                {"$lookup": {"from": "levels", "localField": "level_id", "foreignField": "_id", "as": "level"}},
+                {"$unwind": "$user"},
+                {"$unwind": "$level"},
+                {"$sort": {"date_submitted": -1}},
+                {"$limit": 15}
+            ]))
+            if records:
+                result = f"Pending Records ({len(records)}):\n"
+                for record in records:
+                    result += f"  {record['user']['username']} - {record['level']['name']} ({record['progress']}%) - {record.get('date_submitted', 'Unknown')}\n"
+                return result
+            else:
+                return "No pending records"
+        
+        elif command == 'top_players()':
+            players = list(mongo_db.users.find(
+                {"points": {"$gt": 0}},
+                {"username": 1, "points": 1, "is_admin": 1, "head_admin": 1}
+            ).sort("points", -1).limit(15))
+            result = "Top Players by Points:\n"
+            for i, player in enumerate(players, 1):
+                admin_status = ""
+                if player.get('head_admin'):
+                    admin_status = " [HEAD]"
+                elif player.get('is_admin'):
+                    admin_status = " [ADMIN]"
+                result += f"  {i}. {player['username']} - {player['points']} points{admin_status}\n"
+            return result
+        
+        elif command == 'recent_activity()':
+            # Get recent records, level additions, user registrations
+            recent_records = list(mongo_db.records.find(
+                {"status": "approved"},
+                {"user_id": 1, "level_id": 1, "progress": 1, "date_submitted": 1}
+            ).sort("date_submitted", -1).limit(5))
+            
+            recent_users = list(mongo_db.users.find(
+                {},
+                {"username": 1, "date_joined": 1}
+            ).sort("date_joined", -1).limit(3))
+            
+            result = "Recent Activity:\n\nRecent Records:\n"
+            for record in recent_records:
+                result += f"  Record submitted - {record.get('date_submitted', 'Unknown')}\n"
+            
+            result += "\nRecent Users:\n"
+            for user in recent_users:
+                result += f"  {user['username']} joined - {user.get('date_joined', 'Unknown')}\n"
+            
+            return result
+        
+        elif command.startswith('ban_user('):
+            # Extract username from ban_user('username')
+            username = command[9:-1].strip('\'"')
+            user = mongo_db.users.find_one({"username": username})
+            if user:
+                if user.get('is_admin') or user.get('head_admin'):
+                    return f"Cannot ban admin user: {username}"
+                # Add to banned users (you might want to implement a proper ban system)
+                mongo_db.users.update_one(
+                    {"_id": user["_id"]},
+                    {"$set": {"banned": True, "ban_date": datetime.now(timezone.utc)}}
+                )
+                return f"User '{username}' has been banned"
+            else:
+                return f"User '{username}' not found"
+        
+        elif command.startswith('unban_user('):
+            # Extract username from unban_user('username')
+            username = command[11:-1].strip('\'"')
+            user = mongo_db.users.find_one({"username": username})
+            if user:
+                mongo_db.users.update_one(
+                    {"_id": user["_id"]},
+                    {"$unset": {"banned": "", "ban_date": ""}}
+                )
+                return f"User '{username}' has been unbanned"
+            else:
+                return f"User '{username}' not found"
+        
+        elif command == 'system_info()':
+            import platform
+            try:
+                import psutil
+                cpu_percent = psutil.cpu_percent(interval=1)
+                memory = psutil.virtual_memory()
+                disk = psutil.disk_usage('/')
+                
+                return f"""System Information:
+OS: {platform.system()} {platform.release()}
+Python: {platform.python_version()}
+CPU Usage: {cpu_percent}%
+Memory: {memory.percent}% used ({memory.used // (1024**3)}GB / {memory.total // (1024**3)}GB)
+Disk: {disk.percent}% used ({disk.used // (1024**3)}GB / {disk.total // (1024**3)}GB)"""
+            except ImportError:
+                return f"""System Information (Basic):
+OS: {platform.system()} {platform.release()}
+Python: {platform.python_version()}
+Note: Install psutil for detailed system metrics"""
+        
+        elif command == 'backup_db()':
+            # Simple backup command (you might want to implement proper backup)
+            from datetime import datetime
+            backup_time = datetime.now().strftime("%Y%m%d_%H%M%S")
+            return f"Database backup initiated at {backup_time}\n(Note: Implement proper backup logic in production)"
+        
+        elif command.startswith('search_levels('):
+            # Extract search term from search_levels('term')
+            search_term = command[14:-1].strip('\'"')
+            levels = list(mongo_db.levels.find(
+                {"name": {"$regex": search_term, "$options": "i"}},
+                {"name": 1, "position": 1, "creator": 1, "is_legacy": 1}
+            ).limit(10))
+            if levels:
+                result = f"Levels matching '{search_term}':\n"
+                for level in levels:
+                    legacy_status = " [LEGACY]" if level.get('is_legacy') else ""
+                    result += f"  #{level['position']} {level['name']} by {level.get('creator', 'Unknown')}{legacy_status}\n"
+                return result
+            else:
+                return f"No levels found matching '{search_term}'"
+        
+        elif command.startswith('make_admin('):
+            # Extract username from make_admin('username')
+            username = command[11:-1].strip('\'"')
+            user = mongo_db.users.find_one({"username": username})
+            if user:
+                if user.get('is_admin'):
+                    return f"User '{username}' is already an admin"
+                mongo_db.users.update_one(
+                    {"_id": user["_id"]},
+                    {"$set": {"is_admin": True}}
+                )
+                return f"User '{username}' has been promoted to admin"
+            else:
+                return f"User '{username}' not found"
+        
+        elif command.startswith('check_admin('):
+            # Extract username from check_admin('username')
+            username = command[12:-1].strip('\'"')
+            user = mongo_db.users.find_one({"username": username})
+            if user:
+                admin_status = "Regular User"
+                if user.get('head_admin'):
+                    admin_status = "HEAD ADMIN"
+                elif user.get('is_admin'):
+                    admin_status = "ADMIN"
+                return f"User '{username}' status: {admin_status}\nDatabase is_admin: {user.get('is_admin', False)}\nDatabase head_admin: {user.get('head_admin', False)}"
+            else:
+                return f"User '{username}' not found"
+        
+        elif command.startswith('fix_admin_session('):
+            # Extract username from fix_admin_session('username')
+            username = command[18:-1].strip('\'"')
+            user = mongo_db.users.find_one({"username": username})
+            if user:
+                # This is just informational - the user needs to log out and back in
+                return f"User '{username}' database status:\nis_admin: {user.get('is_admin', False)}\nhead_admin: {user.get('head_admin', False)}\n\nNote: User must log out and log back in for session to update"
+            else:
+                return f"User '{username}' not found"
+        
+        elif command.startswith('login_as('):
+            # Extract username from login_as('username') - DANGEROUS ADMIN COMMAND
+            username = command[9:-1].strip('\'"')
+            
+            if not username:
+                return "Usage: rtl.login_as('username')\nExample: rtl.login_as('john')"
+            
+            user = mongo_db.users.find_one({"username": username})
+            if not user:
+                return f"User '{username}' not found"
+            
+            # Store the target username in session for PIN verification
+            session['pending_login_as'] = username
+            
+            admin_status = ""
+            if user.get('head_admin'):
+                admin_status = " [HEAD ADMIN]"
+            elif user.get('is_admin'):
+                admin_status = " [ADMIN]"
+            
+            return f"🔐 SUPER ADMIN PIN REQUIRED\n\nTarget User: {username}{admin_status}\nUser ID: {user['_id']}\nPoints: {user.get('points', 0)}\n\nPlease enter the Super Admin PIN to proceed:"
+        
+        elif command == 'whoami()':
+            # Show current session info
+            if 'user_id' in session:
+                current_user = mongo_db.users.find_one({"_id": session['user_id']})
+                if current_user:
+                    admin_status = ""
+                    if current_user.get('head_admin'):
+                        admin_status = " [HEAD ADMIN]"
+                    elif current_user.get('is_admin'):
+                        admin_status = " [ADMIN]"
+                    
+                    return f"Current session:\nUsername: {current_user['username']}{admin_status}\nUser ID: {current_user['_id']}\nPoints: {current_user.get('points', 0)}\nSession is_admin: {session.get('is_admin', False)}\nSession head_admin: {session.get('head_admin', False)}"
+                else:
+                    return "Session user not found in database"
+            else:
+                return "Not logged in"
+        
+        elif command == 'admin_logs()':
+            # Show recent admin actions
+            try:
+                logs = list(mongo_db.admin_logs.find().sort("timestamp", -1).limit(10))
+                if logs:
+                    result = "Recent Admin Actions (last 10):\n"
+                    for log in logs:
+                        timestamp = log.get('timestamp', 'Unknown')
+                        action = log.get('action', 'Unknown')
+                        admin_user = log.get('admin_user', 'Unknown')
+                        target_user = log.get('target_user', 'N/A')
+                        reason = log.get('reason', '')
+                        
+                        if target_user != 'N/A':
+                            result += f"  {timestamp} - {admin_user}: {action} -> {target_user}"
+                            if reason:
+                                result += f" ({reason})"
+                            result += "\n"
+                        else:
+                            result += f"  {timestamp} - {admin_user}: {action}\n"
+                    return result
+                else:
+                    return "No admin logs found"
+            except Exception as e:
+                return f"Error retrieving admin logs: {str(e)}"
+        
+
+        
+        else:
+            return f"Unknown RTL command: {command}\nType 'help' for available commands"
+            
+    except Exception as e:
+        return f"Error executing RTL command: {str(e)}"
+
+def execute_python_code(code):
+    """Safely execute Python code with limited scope"""
+    import sys
+    from io import StringIO
+    
+    # Capture stdout
+    old_stdout = sys.stdout
+    sys.stdout = captured_output = StringIO()
+    
+    try:
+        # Create a safe execution environment
+        safe_globals = {
+            '__builtins__': {
+                'print': print,
+                'len': len,
+                'str': str,
+                'int': int,
+                'float': float,
+                'list': list,
+                'dict': dict,
+                'range': range,
+                'sum': sum,
+                'max': max,
+                'min': min,
+                'abs': abs,
+                'round': round,
+                'sorted': sorted,
+                'reversed': reversed,
+                'enumerate': enumerate,
+                'zip': zip,
+                'type': type,
+                'isinstance': isinstance,
+                'hasattr': hasattr,
+                'getattr': getattr,
+                'setattr': setattr,
+                'dir': dir,
+                'help': help,
+            },
+            'mongo_db': mongo_db,  # Allow database access for admins
+            'datetime': datetime,
+            'ObjectId': ObjectId,
+        }
+        
+        # Try to evaluate as expression first
+        try:
+            result = eval(code, safe_globals)
+            if result is not None:
+                print(result)
+        except SyntaxError:
+            # If it's not an expression, try to execute as statement
+            exec(code, safe_globals)
+        
+        # Get the output
+        output = captured_output.getvalue()
+        return output if output else "Command executed successfully (no output)"
+        
+    except Exception as e:
+        return f"Python Error: {str(e)}"
+    finally:
+        # Restore stdout
+        sys.stdout = old_stdout
+
+@app.route('/admin/console/pin', methods=['GET', 'POST'])
+def admin_console_pin():
+    """PIN entry page for admin console"""
+    if 'user_id' not in session:
+        flash('Please log in to access admin panel', 'warning')
+        return redirect(url_for('login'))
+    
+    # Allow both regular admins and head admins to access
+    if not session.get('is_admin') and not session.get('head_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('admin'))
+    
+    # Check if PIN is required
+    console_settings = mongo_db.site_settings.find_one({"_id": "console"})
+    if not console_settings or not console_settings.get('pin_required', False):
+        # PIN not required, redirect to console
+        return redirect(url_for('admin_console'))
+    
+    if request.method == 'POST':
+        pin = request.form.get('pin', '')
+        stored_pin = console_settings.get('pin', '')
+        
+        if pin == stored_pin:
+            # PIN correct, set temporary session flag for this request only
+            session['console_pin_verified_temp'] = True
+            flash('PIN verified successfully!', 'success')
+            return redirect(url_for('admin_console'))
+        else:
+            flash('Invalid PIN. Please try again.', 'danger')
+    
+    return render_template('admin/console_pin.html')
+
+@app.route('/admin/console/pin/change', methods=['GET', 'POST'])
+def admin_console_pin_change():
+    """Change the console PIN - Admin only"""
+    if 'user_id' not in session:
+        flash('Please log in to access admin panel', 'warning')
+        return redirect(url_for('login'))
+    
+    # Allow both regular admins and head admins to access
+    if not session.get('is_admin') and not session.get('head_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('admin'))
+    
+    console_settings = mongo_db.site_settings.find_one({"_id": "console"})
+    if not console_settings:
+        console_settings = {"pin_required": False, "pin": "1234", "super_admin_pin": "9999"}
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'change_pin':
+            new_pin = request.form.get('new_pin', '')
+            if new_pin:
+                mongo_db.site_settings.update_one(
+                    {"_id": "console"},
+                    {"$set": {"pin": new_pin}},
+                    upsert=True
+                )
+                flash('Console PIN changed successfully!', 'success')
+                return redirect(url_for('admin_console_pin_change'))
+            else:
+                flash('PIN cannot be empty.', 'danger')
+        
+        elif action == 'change_super_pin':
+            new_super_pin = request.form.get('new_super_pin', '')
+            if new_super_pin:
+                mongo_db.site_settings.update_one(
+                    {"_id": "console"},
+                    {"$set": {"super_admin_pin": new_super_pin}},
+                    upsert=True
+                )
+                flash('Super Admin PIN changed successfully!', 'success')
+                return redirect(url_for('admin_console_pin_change'))
+            else:
+                flash('Super Admin PIN cannot be empty.', 'danger')
+        
+        elif action == 'toggle_pin':
+            pin_required = console_settings.get('pin_required', False)
+            mongo_db.site_settings.update_one(
+                {"_id": "console"},
+                {"$set": {"pin_required": not pin_required}},
+                upsert=True
+            )
+            flash(f'PIN requirement {"enabled" if not pin_required else "disabled"}.', 'success')
+            # Update console_settings for rendering
+            console_settings['pin_required'] = not pin_required
+    
+    return render_template('admin/console_pin_change.html', settings=console_settings)
+
+@app.route('/admin/make_head_admin', methods=['POST'])
+def admin_make_head_admin():
+    """Make a user a head admin - Now accessible to regular admins too"""
+    if 'user_id' not in session:
+        flash('Please log in to access admin panel', 'warning')
+        return redirect(url_for('login'))
+    
+    # Allow both regular admins and head admins to access
+    if not session.get('is_admin') and not session.get('head_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('admin'))
+    
+    user_id = int(request.form.get('user_id'))
+    
+    # Find the user
+    user = mongo_db.users.find_one({"_id": user_id})
+    if not user:
+        flash('User not found', 'danger')
+        return redirect(url_for('admin_console'))
+    
+    # Check if user is already a head admin
+    if user.get('head_admin', False):
+        flash(f'{user["username"]} is already a head admin', 'warning')
+        return redirect(url_for('admin_console'))
+    
+    # Make the user a head admin
+    mongo_db.users.update_one(
+        {"_id": user_id},
+        {"$set": {"head_admin": True}}
+    )
+    
+    flash(f'{user["username"]} is now a head admin!', 'success')
+    return redirect(url_for('admin_console'))
+
+@app.route('/admin/remove_head_admin', methods=['POST'])
+def admin_remove_head_admin():
+    """Remove head admin status from a user - Now accessible to regular admins too"""
+    if 'user_id' not in session:
+        flash('Please log in to access admin panel', 'warning')
+        return redirect(url_for('login'))
+    
+    # Allow both regular admins and head admins to access
+    if not session.get('is_admin') and not session.get('head_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('admin'))
+    
+    user_id = int(request.form.get('user_id'))
+    
+    # Prevent removing head admin status from yourself
+    if user_id == session['user_id']:
+        flash('You cannot remove head admin status from yourself', 'danger')
+        return redirect(url_for('admin_console'))
+    
+    # Find the user
+    user = mongo_db.users.find_one({"_id": user_id})
+    if not user:
+        flash('User not found', 'danger')
+        return redirect(url_for('admin_console'))
+    
+    # Check if user is a head admin
+    if not user.get('head_admin', False):
+        flash(f'{user["username"]} is not a head admin', 'warning')
+        return redirect(url_for('admin_console'))
+    
+    # Remove head admin status
+    mongo_db.users.update_one(
+        {"_id": user_id},
+        {"$set": {"head_admin": False}}
+    )
+    
+    flash(f'{user["username"]} is no longer a head admin', 'success')
+    return redirect(url_for('admin_console'))
+
+@app.route('/admin/demote_admin', methods=['POST'])
+def admin_demote_admin():
+    """Demote an admin to regular user - Now accessible to regular admins too"""
+    if 'user_id' not in session:
+        flash('Please log in to access admin panel', 'warning')
+        return redirect(url_for('login'))
+    
+    # Allow both regular admins and head admins to access
+    if not session.get('is_admin') and not session.get('head_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('admin'))
+    
+    user_id = int(request.form.get('user_id'))
+    
+    # Prevent demoting yourself
+    if user_id == session['user_id']:
+        flash('You cannot demote yourself', 'danger')
+        return redirect(url_for('admin_console'))
+    
+    # Find the user
+    user = mongo_db.users.find_one({"_id": user_id})
+    if not user:
+        flash('User not found', 'danger')
+        return redirect(url_for('admin_console'))
+    
+    # Check if user is an admin
+    if not user.get('is_admin', False):
+        flash(f'{user["username"]} is not an admin', 'warning')
+        return redirect(url_for('admin_console'))
+    
+    # Prevent demoting head admins
+    if user.get('head_admin', False):
+        flash('Cannot demote a head admin', 'danger')
+        return redirect(url_for('admin_console'))
+    
+    # Demote the admin
+    mongo_db.users.update_one(
+        {"_id": user_id},
+        {"$set": {"is_admin": False}}
+    )
+    
+    flash(f'{user["username"]} has been demoted to regular user', 'success')
+    return redirect(url_for('admin_console'))
+
+def promote_user(user_id):
+    """Promote a user to admin - Now accessible to regular admins too"""
+    if 'user_id' not in session:
+        flash('Please log in to access admin panel', 'warning')
+        return redirect(url_for('login'))
+    
+    # Allow both regular admins and head admins to access
+    if not session.get('is_admin') and not session.get('head_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('admin'))
+    
+    user = mongo_db.users.find_one({"_id": user_id})
+    if not user:
+        flash('User not found', 'danger')
+        return redirect(url_for('admin_console'))
+    
+    # Promote the user
+    mongo_db.users.update_one(
+        {"_id": user_id},
+        {"$set": {"is_admin": True}}
+    )
+    
+    flash(f'{user["username"]} has been promoted to admin', 'success')
+    return redirect(url_for('admin_console'))
+
+@app.route('/admin/demote/<user_id>')
+def demote_user(user_id):
+    """Demote an admin to regular user - Now accessible to regular admins too"""
+    if 'user_id' not in session:
+        flash('Please log in to access admin panel', 'warning')
+        return redirect(url_for('login'))
+    
+    # Allow both regular admins and head admins to access
+    if not session.get('is_admin') and not session.get('head_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('admin'))
+    
+    user = mongo_db.users.find_one({"_id": user_id})
+    if not user:
+        flash('User not found', 'danger')
+        return redirect(url_for('admin_console'))
+    
+    # Prevent demoting the head admin
+    if user.get('head_admin'):
+        flash('Cannot demote a head admin', 'danger')
+        return redirect(url_for('admin_console'))
+    
+    # Demote the admin
+    mongo_db.users.update_one(
+        {"_id": user_id},
+        {"$set": {"is_admin": False}}
+    )
+    
+    flash(f'{user["username"]} has been demoted to regular user', 'success')
+    return redirect(url_for('admin_console'))
+
+@app.route('/admin/tools')
+def admin_tools():
+    """Admin tools page for IP ban and user reset functionality - Now accessible to regular admins too"""
+    if 'user_id' not in session:
+        flash('Please log in to access admin panel', 'warning')
+        return redirect(url_for('login'))
+    
+    # Allow both regular admins and head admins to access
+    if not session.get('is_admin') and not session.get('head_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('admin'))
     
     return render_template('admin/tools.html')
 
@@ -5179,7 +6398,7 @@ def admin_levels():
                 if base64_data:
                     thumbnail_url = base64_data
                     print(f"✅ Image converted to Base64 successfully")
-                    flash(f'Image uploaded and optimized successfully! ({len(base64_data)//1024}KB)', 'success')
+                    flash(f'Image uploaded and optimized successfully! ({len(base64_data)//1424}KB)', 'success')
                 else:
                     flash('Failed to process image. Please try a smaller image or different format.', 'danger')
                     return redirect(url_for('admin_levels'))
@@ -8531,7 +9750,25 @@ def public_profile(username):
         {"$limit": 50}
     ]))
     
-    return render_template('public_profile.html', user=user, records=user_records)
+    # Get all main list levels for completion grid
+    all_levels = list(mongo_db.levels.find({"is_legacy": False}).sort("position", 1))
+    
+    # Create a set of completed level IDs for quick lookup
+    completed_levels = {record['level_id']: record for record in user_records if record['progress'] == 100}
+    
+    # Hardest level beaten functionality removed per user request
+    
+    # Calculate stats
+    total_main_levels = len([level for level in all_levels if not level.get('is_legacy')])
+    completed_main_levels = len(completed_levels)
+    
+    return render_template('public_profile.html', 
+                         user=user, 
+                         records=user_records,
+                         all_levels=all_levels,
+                         completed_levels=completed_levels,
+                         total_main_levels=total_main_levels,
+                         completed_main_levels=completed_main_levels)
 
 @app.route('/world')
 def world_leaderboard():

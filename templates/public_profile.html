@@ -54,11 +54,98 @@
     </div>
 
     <div class="row">
-        <!-- Records -->
-        <div class="col-lg-8">
+        <!-- Enhanced Stats Section -->
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">📊 Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6 mb-3">
+                            <div class="h4 text-primary">{{ total_main_levels }}</div>
+                            <small class="text-muted">Main List Levels</small>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <div class="h4 text-success">{{ completed_main_levels }}</div>
+                            <small class="text-muted">Completed</small>
+                        </div>
+                        <div class="col-12 mb-3">
+                            <div class="h3 text-warning">{{ user.points or 0 }}</div>
+                            <small class="text-muted">Total Points</small>
+                        </div>
+                    </div>
+                    
+                    {% if completed_main_levels > 0 %}
+                    <div class="mb-2">
+                        <small class="text-muted">Completion Rate</small>
+                        {% set completion_rate = (completed_main_levels / total_main_levels * 100)|round|int %}
+                        <div class="progress">
+                            <div class="progress-bar bg-success" role="progressbar" 
+                                 style="width: {{ completion_rate }}%" 
+                                 aria-valuenow="{{ completion_rate }}" 
+                                 aria-valuemin="0" aria-valuemax="100">
+                                {{ completion_rate }}%
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+
+
+            <!-- Quick Actions -->
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0">🏆 Records ({{ records|length }})</h5>
+                    <h5 class="mb-0">🔗 Share Profile</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-primary" onclick="copyProfileLink()">
+                            📋 Copy Link
+                        </button>
+                        <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#shareQRModal">
+                            📱 QR Code
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Level Completion Grid -->
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🏁 Levels Completed</h5>
+                </div>
+                <div class="card-body">
+                    <div class="levels-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; max-height: 400px; overflow-y: auto;">
+                        {% for level in all_levels %}
+                            {% if level._id in completed_levels %}
+                                <!-- Completed level - green text (no link to prevent video thumbnails) -->
+                                <div class="level-item text-success" 
+                                     style="font-size: 0.75rem; padding: 4px; border-radius: 4px; background-color: rgba(40, 167, 69, 0.1); text-align: center;">
+                                    <div class="level-position fw-bold">#{{ level.position }}</div>
+                                    <div class="level-name text-truncate" style="font-size: 0.7rem;">{{ level.name }}</div>
+                                </div>
+                            {% else %}
+                                <!-- Not completed level - red text -->
+                                <div class="level-item text-danger" 
+                                     style="font-size: 0.75rem; padding: 4px; border-radius: 4px; background-color: rgba(220, 53, 69, 0.1); text-align: center;">
+                                    <div class="level-position fw-bold">#{{ level.position }}</div>
+                                    <div class="level-name text-truncate" style="font-size: 0.7rem;">{{ level.name }}</div>
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Records -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">🏆 Recent Records ({{ records|length }})</h5>
                 </div>
                 <div class="card-body">
                     {% if records %}
@@ -116,65 +203,6 @@
                             <p class="text-muted">{{ user.nickname or user.username }} hasn't submitted any records yet.</p>
                         </div>
                     {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <!-- Stats -->
-        <div class="col-lg-4">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">📊 Statistics</h5>
-                </div>
-                <div class="card-body">
-                    {% set total_records = records|length %}
-                    {% set completed_records = records|selectattr('progress', 'equalto', 100)|list|length %}
-                    {% set total_points = user.points or 0 %}
-                    
-                    <div class="row text-center">
-                        <div class="col-6 mb-3">
-                            <div class="h4 text-primary">{{ total_records }}</div>
-                            <small class="text-muted">Total Records</small>
-                        </div>
-                        <div class="col-6 mb-3">
-                            <div class="h4 text-success">{{ completed_records }}</div>
-                            <small class="text-muted">Completed</small>
-                        </div>
-                        <div class="col-12">
-                            <div class="h3 text-warning">{{ total_points }}</div>
-                            <small class="text-muted">Total Points</small>
-                        </div>
-                    </div>
-                    
-                    {% if total_records > 0 %}
-                    <hr>
-                    <div class="mb-2">
-                        <small class="text-muted">Completion Rate</small>
-                        <div class="progress">
-                            {% set completion_rate = (completed_records / total_records * 100)|round|int %}
-                            <div class="progress-bar bg-success" style="width: {{ completion_rate }}%">
-                                {{ completion_rate }}%
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Quick Actions -->
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">🔗 Share Profile</h5>
-                </div>
-                <div class="card-body">
-                    <div class="d-grid gap-2">
-                        <button class="btn btn-outline-primary" onclick="copyProfileLink()">
-                            📋 Copy Link
-                        </button>
-                        <button class="btn btn-outline-success" data-bs-toggle="modal" data-bs-target="#shareQRModal">
-                            📱 QR Code
-                        </button>
-                    </div>
                 </div>
             </div>
         </div>
