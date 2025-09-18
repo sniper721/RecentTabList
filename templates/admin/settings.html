@@ -1,0 +1,347 @@
+{% extends "layout.html" %}
+
+{% block title %}Settings - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>⚙️ Admin Settings</h1>
+                <a href="{{ url_for('admin') }}" class="btn btn-secondary">← Back to Admin</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- System Information -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">🖥️ System Information</h5>
+                </div>
+                <div class="card-body">
+                    {% if system_info.error %}
+                    <div class="alert alert-danger">{{ system_info.error }}</div>
+                    {% elif system_info.note %}
+                    <div class="alert alert-info">
+                        <strong>System monitoring unavailable</strong><br>
+                        {{ system_info.note }}
+                    </div>
+                    <p><strong>Python Version:</strong> {{ system_info.python_version.split()[0] }}</p>
+                    {% else %}
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <strong>CPU Usage:</strong><br>
+                            <div class="progress mb-2">
+                                <div class="progress-bar" style="width: {{ system_info.cpu_percent }}%;">
+                                    {{ system_info.cpu_percent }}%
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <strong>Memory Usage:</strong><br>
+                            <div class="progress mb-2">
+                                <div class="progress-bar bg-warning" style="width: {{ system_info.memory_percent }}%;">
+                                    {{ system_info.memory_percent }}%
+                                </div>
+                            </div>
+                            <small>{{ system_info.memory_used }} / {{ system_info.memory_total }}</small>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-sm-6">
+                            <strong>Disk Usage:</strong><br>
+                            <div class="progress mb-2">
+                                <div class="progress-bar bg-info" style="width: {{ system_info.disk_percent }}%;">
+                                    {{ system_info.disk_percent }}%
+                                </div>
+                            </div>
+                            <small>{{ system_info.disk_used }} / {{ system_info.disk_total }}</small>
+                        </div>
+                        <div class="col-sm-6">
+                            <strong>Python Version:</strong><br>
+                            <small>{{ system_info.python_version.split()[0] }}</small>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Cache Information -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">💾 Cache Status</h5>
+                </div>
+                <div class="card-body">
+                    {% if cache_info.error %}
+                    <div class="alert alert-danger">{{ cache_info.error }}</div>
+                    {% else %}
+                    <p><strong>Main Levels:</strong> {{ cache_info.main_levels }} cached</p>
+                    <p><strong>Legacy Levels:</strong> {{ cache_info.legacy_levels }} cached</p>
+                    <p><strong>Last Updated:</strong> {{ cache_info.last_updated }}</p>
+
+                    <div class="btn-group w-100" role="group">
+                        <form method="POST" action="{{ url_for('admin_clear_cache') }}" class="flex-fill">
+                            <button type="submit" class="btn btn-warning w-100"
+                                onclick="return confirm('Clear all cached data?')">
+                                🗑️ Clear Cache
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ url_for('admin_reload_cache') }}" class="flex-fill">
+                            <button type="submit" class="btn btn-success w-100">
+                                🔄 Reload Cache
+                            </button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Database Statistics -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">🗄️ Database Statistics</h5>
+                </div>
+                <div class="card-body">
+                    {% if db_stats.error %}
+                    <div class="alert alert-danger">{{ db_stats.error }}</div>
+                    {% else %}
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <p><strong>Total Levels:</strong> {{ db_stats.total_levels }}</p>
+                            <p><strong>Main Levels:</strong> {{ db_stats.main_levels }}</p>
+                            <p><strong>Legacy Levels:</strong> {{ db_stats.legacy_levels }}</p>
+                        </div>
+                        <div class="col-sm-6">
+                            <p><strong>Total Users:</strong> {{ db_stats.total_users }}</p>
+                            <p><strong>Total Records:</strong> {{ db_stats.total_records }}</p>
+                            <p><strong>Pending Records:</strong>
+                                <span class="badge bg-warning">{{ db_stats.pending_records }}</span>
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature Controls -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">🚀 Feature Controls</h5>
+                </div>
+                <div class="card-body">
+                    {% set future_enabled = site_settings.future_list_enabled %}
+
+                    <div class="mb-3">
+                        <h6>🔮 Future List</h6>
+                        <p class="text-muted small">Enable/disable the Future Recent Tab List feature</p>
+
+                        {% if future_enabled %}
+                        <div class="alert alert-success py-2">
+                            <small>✅ Future List is <strong>ENABLED</strong></small>
+                        </div>
+                        <div class="d-grid gap-2">
+                            <a href="/future" class="btn btn-outline-primary btn-sm">👁️ View Future List</a>
+                            <form method="POST" action="{{ url_for('admin_toggle_future_list') }}">
+                                <input type="hidden" name="action" value="disable">
+                                <button type="submit" class="btn btn-warning btn-sm w-100">🔒 Disable Future
+                                    List</button>
+                            </form>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-secondary py-2">
+                            <small>❌ Future List is <strong>DISABLED</strong></small>
+                        </div>
+                        <form method="POST" action="{{ url_for('admin_toggle_future_list') }}">
+                            <input type="hidden" name="action" value="enable">
+                            <button type="submit" class="btn btn-success w-100">🚀 Enable Future List</button>
+                        </form>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <h6>📝 Record Submissions</h6>
+                        <p class="text-muted small">Enable/disable user record submissions</p>
+
+                        {% set submissions_enabled = site_settings.submissions_enabled %}
+                        {% if submissions_enabled %}
+                        <div class="alert alert-success py-2">
+                            <small>✅ Submissions are <strong>ENABLED</strong></small>
+                        </div>
+                        <form method="POST" action="{{ url_for('admin_toggle_submissions') }}">
+                            <button type="submit" class="btn btn-warning btn-sm w-100" 
+                                    onclick="return confirm('Disable record submissions? Users will not be able to submit new records.')">
+                                🔒 Disable Submissions
+                            </button>
+                        </form>
+                        {% else %}
+                        <div class="alert alert-danger py-2">
+                            <small>❌ Submissions are <strong>DISABLED</strong></small>
+                        </div>
+                        <form method="POST" action="{{ url_for('admin_toggle_submissions') }}">
+                            <button type="submit" class="btn btn-success w-100">📝 Enable Submissions</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6>⏰ Time Machine</h6>
+                        <p class="text-muted small">Enable/disable the Time Machine feature</p>
+
+                        {% set timemachine_enabled = site_settings.timemachine_enabled %}
+                        {% if timemachine_enabled %}
+                        <div class="alert alert-success py-2">
+                            <small>✅ Time Machine is <strong>ENABLED</strong></small>
+                        </div>
+                        <form method="POST" action="{{ url_for('admin_toggle_timemachine') }}">
+                            <button type="submit" class="btn btn-warning btn-sm w-100" 
+                                    onclick="return confirm('Disable Time Machine? Users will not be able to view historical data.')">
+                                🔒 Disable Time Machine
+                            </button>
+                        </form>
+                        {% else %}
+                        <div class="alert alert-danger py-2">
+                            <small>❌ Time Machine is <strong>DISABLED</strong></small>
+                        </div>
+                        <form method="POST" action="{{ url_for('admin_toggle_timemachine') }}">
+                            <button type="submit" class="btn btn-success w-100">⏰ Enable Time Machine</button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Webhook Settings -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">📡 Webhook Settings</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('admin_update_changelog_settings') }}">
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="pingEnabled" name="ping_enabled" 
+                                       {% if changelog_settings.ping_enabled %}checked{% endif %}>
+                                <label class="form-check-label" for="pingEnabled">
+                                    <strong>Enable @Changelog Role Ping</strong>
+                                </label>
+                            </div>
+                            <p class="text-muted small">When enabled, the bot will ping the Changelog role in Discord notifications</p>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="pingThreshold" class="form-label">
+                                <strong>Ping Threshold</strong>
+                            </label>
+                            <input type="number" class="form-control" id="pingThreshold" name="ping_threshold" 
+                                   value="{{ changelog_settings.ping_threshold }}" min="1">
+                            <p class="text-muted small">Number of messages that need to be sent before pinging the role (to prevent spam)</p>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="roleId" class="form-label">
+                                <strong>Role ID</strong>
+                            </label>
+                            <input type="text" class="form-control" id="roleId" name="role_id" 
+                                   value="{{ changelog_settings.role_id }}">
+                            <p class="text-muted small">Discord role ID to ping (default: 1388326130183966720)</p>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100">
+                            💾 Save Changelog Settings
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Controls -->
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">🔧 System Controls</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="/debug_db" class="btn btn-info">
+                            🔍 Debug Database
+                        </a>
+
+                        <a href="/virtual" class="btn btn-secondary">
+                            🚀 Virtual List View
+                        </a>
+
+                        <a href="/test_speed" class="btn btn-success">
+                            ⏱️ Speed Test
+                        </a>
+
+                        <a href="{{ url_for('changelog') }}" class="btn btn-info">
+                            📝 View Changelog
+                        </a>
+
+                        <form method="POST" action="{{ url_for('admin_delete_website') }}">
+                                <button type="submit" class="btn btn-dark w-100 mt-2"
+                                    onclick="return confirm('Are you ABSOLUTELY sure you want to delete the entire website? This cannot be undone!')">
+                                    💀 Delete Website
+                                </button>
+                            </form>
+
+                            <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank"
+                                class="btn btn-outline-danger w-100 mt-2">
+                                💥 Delete Website
+                            </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">⚡ Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <a href="{{ url_for('admin') }}" class="btn btn-outline-primary w-100 mb-2">
+                                📊 Admin Dashboard
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{{ url_for('admin_levels') }}" class="btn btn-outline-success w-100 mb-2">
+                                📋 Manage Levels
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{{ url_for('admin_users') }}" class="btn btn-outline-info w-100 mb-2">
+                                👥 Manage Users
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="/" class="btn btn-outline-secondary w-100 mb-2">
+                                🏠 Back to Site
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,475 @@
+{% extends "layout.html" %}
+
+{% block title %}User Settings - RTL{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-3">
+            <!-- Settings Navigation -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">⚙️ Settings</h5>
+                </div>
+                <div class="list-group list-group-flush">
+                    <a href="#profile" class="list-group-item list-group-item-action active" data-bs-toggle="pill">
+                        👤 Profile
+                    </a>
+                    <a href="#security" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                        🔒 Security
+                    </a>
+                    <a href="#privacy" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                        🛡️ Privacy
+                    </a>
+                    <a href="#gd-verification" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                        🎮 GD Verification
+                    </a>
+                    <a href="#sessions" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                        📱 Active Sessions
+                    </a>
+                    <a href="#recovery" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                        🔧 Account Recovery
+                    </a>
+                    <a href="#danger" class="list-group-item list-group-item-action text-danger" data-bs-toggle="pill">
+                        ⚠️ Danger Zone
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-9">
+            <div class="tab-content">
+                <!-- Profile Settings -->
+                <div class="tab-pane fade show active" id="profile">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">👤 Profile Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="{{ url_for('update_user_settings') }}" enctype="multipart/form-data">
+                                <input type="hidden" name="action" value="profile">
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Username</label>
+                                            <input type="text" name="username" class="form-control" value="{{ user.username }}" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Display Name</label>
+                                            <input type="text" name="display_name" class="form-control" value="{{ user.display_name or '' }}">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Email</label>
+                                    <input type="email" name="email" class="form-control" value="{{ user.email or '' }}">
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Bio</label>
+                                    <textarea name="bio" class="form-control" rows="3" maxlength="500">{{ user.bio or '' }}</textarea>
+                                    <small class="text-muted">Tell others about yourself (max 500 characters)</small>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Country</label>
+                                            <select name="country" class="form-select">
+                                                <option value="">Select Country</option>
+                                                <option value="US" {% if user.country == 'US' %}selected{% endif %}>🇺🇸 United States</option>
+                                                <option value="GB" {% if user.country == 'GB' %}selected{% endif %}>🇬🇧 United Kingdom</option>
+                                                <option value="CA" {% if user.country == 'CA' %}selected{% endif %}>🇨🇦 Canada</option>
+                                                <option value="DE" {% if user.country == 'DE' %}selected{% endif %}>🇩🇪 Germany</option>
+                                                <option value="FR" {% if user.country == 'FR' %}selected{% endif %}>🇫🇷 France</option>
+                                                <option value="ES" {% if user.country == 'ES' %}selected{% endif %}>🇪🇸 Spain</option>
+                                                <option value="IT" {% if user.country == 'IT' %}selected{% endif %}>🇮🇹 Italy</option>
+                                                <option value="JP" {% if user.country == 'JP' %}selected{% endif %}>🇯🇵 Japan</option>
+                                                <option value="AU" {% if user.country == 'AU' %}selected{% endif %}>🇦🇺 Australia</option>
+                                                <option value="BR" {% if user.country == 'BR' %}selected{% endif %}>🇧🇷 Brazil</option>
+                                                <option value="RU" {% if user.country == 'RU' %}selected{% endif %}>RU Russia</option>
+                                                <!-- Add more countries as needed -->
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Profile Picture</label>
+                                            <input type="file" name="profile_picture" class="form-control" accept="image/*">
+                                            <small class="text-muted">Max 2MB, JPG/PNG only</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary">💾 Save Profile</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Security Settings -->
+                <div class="tab-pane fade" id="security">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">🔒 Security Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- Change Password -->
+                            <form method="POST" action="{{ url_for('update_user_settings') }}" class="mb-4">
+                                <input type="hidden" name="action" value="change_password">
+                                <h6>Change Password</h6>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">Current Password</label>
+                                            <input type="password" name="current_password" class="form-control" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">New Password</label>
+                                            <input type="password" name="new_password" class="form-control" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">Confirm Password</label>
+                                            <input type="password" name="confirm_password" class="form-control" required>
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-warning">🔑 Change Password</button>
+                            </form>
+                            
+                            <!-- Two-Factor Authentication -->
+                            <div class="border-top pt-4">
+                                <h6>Two-Factor Authentication (2FA)</h6>
+                                {% if user.two_factor_enabled %}
+                                    <div class="alert alert-success">
+                                        <strong>✅ 2FA is enabled</strong> - Your account is protected with two-factor authentication
+                                    </div>
+                                    <form method="POST" action="{{ url_for('update_user_settings') }}" style="display: inline;">
+                                        <input type="hidden" name="action" value="disable_2fa">
+                                        <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Disable 2FA? This will make your account less secure.')">
+                                            🔓 Disable 2FA
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <div class="alert alert-warning">
+                                        <strong>⚠️ 2FA is disabled</strong> - Enable two-factor authentication for better security
+                                    </div>
+                                    <form method="POST" action="{{ url_for('update_user_settings') }}">
+                                        <input type="hidden" name="action" value="enable_2fa">
+                                        <button type="submit" class="btn btn-success" onclick="return confirm('Enable 2FA? You will need an authenticator app like Google Authenticator or Authy.')">
+                                            🔐 Enable 2FA
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Backup Codes -->
+                            <div class="border-top pt-4">
+                                <h6>Backup Recovery Codes</h6>
+                                <p class="text-muted">Use these codes if you lose access to your 2FA device. Each code can only be used once.</p>
+                                <div class="row">
+                                    {% for code in user.backup_codes %}
+                                    <div class="col-md-3 mb-2">
+                                        <code class="d-block p-2 bg-light rounded text-center">{{ code }}</code>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                <form method="POST" action="{{ url_for('update_user_settings') }}" style="display: inline;">
+                                    <input type="hidden" name="action" value="regenerate_backup_codes">
+                                    <button type="submit" class="btn btn-outline-warning" onclick="return confirm('Generate new backup codes? Old codes will stop working.')">
+                                        🔄 Regenerate Codes
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Privacy Settings -->
+                <div class="tab-pane fade" id="privacy">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">🛡️ Privacy Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" action="{{ url_for('update_user_settings') }}">
+                                <input type="hidden" name="action" value="privacy">
+                                
+                                <div class="mb-4">
+                                    <h6>Profile Visibility</h6>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="profile_visibility" value="public" 
+                                               {% if user.profile_visibility != 'private' and user.profile_visibility != 'friends' %}checked{% endif %}>
+                                        <label class="form-check-label">
+                                            🌍 Public - Anyone can view your profile and records
+                                        </label>
+                                    </div>
+
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="profile_visibility" value="private" 
+                                               {% if user.profile_visibility == 'private' %}checked{% endif %}>
+                                        <label class="form-check-label">
+                                            🔒 Private - Only you can view your profile
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <h6>Additional Privacy Options</h6>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="hide_country_flag" 
+                                               {% if user.hide_country_flag %}checked{% endif %}>
+                                        <label class="form-check-label">
+                                            🏳️ Hide country flag from profile
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="hide_records" 
+                                               {% if user.hide_records %}checked{% endif %}>
+                                        <label class="form-check-label">
+                                            📊 Hide my records from public leaderboards
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="hide_online_status" 
+                                               {% if user.hide_online_status %}checked{% endif %}>
+                                        <label class="form-check-label">
+                                            🟢 Hide online status
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary">🛡️ Save Privacy Settings</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- GD Verification -->
+                <div class="tab-pane fade" id="gd-verification">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">🎮 Geometry Dash Verification</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if user.gd_verified %}
+                                <div class="alert alert-success">
+                                    <strong>✅ Verified GD Player</strong><br>
+                                    Player Name: <strong>{{ user.gd_player_name }}</strong><br>
+                                    Account ID: <strong>{{ user.gd_account_id }}</strong>
+                                </div>
+                                <form method="POST" action="{{ url_for('update_user_settings') }}">
+                                    <input type="hidden" name="action" value="unlink_gd">
+                                    <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Unlink GD account?')">
+                                        🔗 Unlink GD Account
+                                    </button>
+                                </form>
+                            {% else %}
+                                <div class="alert alert-info">
+                                    <strong>🎮 Link your Geometry Dash account</strong><br>
+                                    Verify your GD identity to prevent impersonation and get a verified badge!
+                                </div>
+                                
+                                <form method="POST" action="{{ url_for('update_user_settings') }}">
+                                    <input type="hidden" name="action" value="verify_gd">
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">GD Player Name</label>
+                                        <input type="text" name="gd_player_name" class="form-control" required>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">GD Account ID</label>
+                                        <input type="number" name="gd_account_id" class="form-control" required>
+                                        <small class="text-muted">Find this in your GD profile</small>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Verification Method</label>
+                                        <select name="verification_method" class="form-select" required>
+                                            <option value="">Choose verification method</option>
+                                            <option value="profile_description">Add code to profile description</option>
+                                            <option value="video_proof">Upload verification video</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div id="verification_instructions" class="alert alert-warning" style="display: none;">
+                                        <!-- Instructions will be shown based on selected method -->
+                                    </div>
+                                    
+                                    <button type="submit" class="btn btn-success">🎮 Start Verification</button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Active Sessions -->
+                <div class="tab-pane fade" id="sessions">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">📱 Active Sessions</h5>
+                        </div>
+                        <div class="card-body">
+                            {% for session_info in active_sessions %}
+                            <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+                                <div>
+                                    <h6 class="mb-1">
+                                        {{ session_info.device[:50] }}...
+                                        {% if session_info.current %}
+                                            <span class="badge bg-success">Current Session</span>
+                                        {% endif %}
+                                    </h6>
+                                    <small class="text-muted">
+                                        IP: {{ session_info.ip }} • 
+                                        Last active: {{ session_info.last_active.strftime('%Y-%m-%d %H:%M UTC') }}
+                                    </small>
+                                </div>
+                                {% if not session_info.current %}
+                                <form method="POST" action="{{ url_for('update_user_settings') }}" style="display: inline;">
+                                    <input type="hidden" name="action" value="revoke_session">
+                                    <input type="hidden" name="session_id" value="{{ session_info.id }}">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm">🚫 Revoke</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <!-- Login History -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">📋 Recent Login History</h5>
+                        </div>
+                        <div class="card-body">
+                            {% for login in login_history %}
+                            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+                                <div>
+                                    <strong>{{ login.timestamp.strftime('%Y-%m-%d %H:%M UTC') }}</strong><br>
+                                    <small class="text-muted">
+                                        {{ login.ip_address }} • 
+                                        {{ login.user_agent[:50] }}...
+                                        {% if login.login_method %}• {{ login.login_method }}{% endif %}
+                                    </small>
+                                </div>
+                                <span class="badge bg-success">✅ Success</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Account Recovery -->
+                <div class="tab-pane fade" id="recovery">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="mb-0">🔧 Account Recovery</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-info">
+                                <strong>📝 Recovery Options</strong><br>
+                                Set up backup methods to recover your account if you lose access to your primary email or 2FA device.
+                            </div>
+                            
+                            <form method="POST" action="{{ url_for('update_user_settings') }}">
+                                <input type="hidden" name="action" value="recovery_options">
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Backup Email</label>
+                                    <input type="email" name="backup_email" class="form-control" value="{{ user.backup_email or '' }}" placeholder="backup@example.com">
+                                    <small class="text-muted">Alternative email for account recovery</small>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Discord Username (for recovery)</label>
+                                    <input type="text" name="discord_username" class="form-control" value="{{ user.discord_username or '' }}" placeholder="username#1234">
+                                    <small class="text-muted">Discord username for manual account recovery verification</small>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary">💾 Save Recovery Options</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Danger Zone -->
+                <div class="tab-pane fade" id="danger">
+                    <div class="card border-danger">
+                        <div class="card-header bg-danger text-white">
+                            <h5 class="mb-0">⚠️ Danger Zone</h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-danger"><strong>Warning:</strong> These actions cannot be undone. Proceed with extreme caution.</p>
+                            
+                            <!-- Reset API Key -->
+                            <div class="mb-4">
+                                <h6 class="text-warning">🔑 Reset API Key</h6>
+                                <p class="text-muted">Generate a new API key. Your old key will stop working immediately.</p>
+                                <form method="POST" action="{{ url_for('update_user_settings') }}" onsubmit="return confirm('Reset API key? Your current key will stop working.')">
+                                    <input type="hidden" name="action" value="reset_api_key">
+                                    <button type="submit" class="btn btn-warning">🔄 Reset API Key</button>
+                                </form>
+                            </div>
+
+                            <hr class="border-danger">
+
+                            <!-- Delete Account -->
+                            <div>
+                                <h6 class="text-danger">💥 Delete Account</h6>
+                                <p class="text-muted">Permanently delete your account and all associated data.</p>
+                                <form method="POST" action="{{ url_for('update_user_settings') }}" onsubmit="return confirm('⚠️ DELETE ACCOUNT? This action cannot be undone! Type DELETE to confirm.')">
+                                    <input type="hidden" name="action" value="delete_account">
+                                    <div class="mb-3">
+                                        <input type="text" name="confirm_delete" class="form-control" placeholder="Type DELETE to confirm" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-danger">💥 Delete Account</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Show verification instructions based on selected method
+document.querySelector('select[name="verification_method"]').addEventListener('change', function() {
+    const instructions = document.getElementById('verification_instructions');
+    const method = this.value;
+    
+    if (method === 'profile_description') {
+        instructions.innerHTML = `
+            <strong>Profile Description Method:</strong><br>
+            1. Add this code to your GD profile description: <code>RTL-VERIFY-${Math.random().toString(36).substr(2, 8).toUpperCase()}</code><br>
+            2. Click "Start Verification" below<br>
+            3. We'll check your profile and verify within 24 hours
+        `;
+        instructions.style.display = 'block';
+    } else if (method === 'video_proof') {
+        instructions.innerHTML = `
+            <strong>Video Proof Method:</strong><br>
+            1. Record a short video showing your GD account<br>
+            2. Include your username and account ID in the video<br>
+            3. Upload to YouTube/Streamable and paste the link<br>
+            4. We'll review and verify within 48 hours
+        `;
+        instructions.style.display = 'block';
+    } else {
+        instructions.style.display = 'none';
+    }
+});
+</script>
+{% endblock %}

@@ -3,27 +3,100 @@
 {% block title %}Main List - GD Recent Tab List{% endblock %}
 
 {% block content %}
+
 <div class="row">
     <div class="col-lg-8">
         <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <h4 class="mb-0">📋 Main List</h4>
+                    </div>
+                    <div class="col-md-6">
+                        <form action="{{ url_for('search_levels') }}" method="GET" class="d-flex">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-white">🔍</span>
+                                <input type="text" name="q" class="form-control" placeholder="Search all levels..." value="{{ request.args.get('q', '') }}">
+                                <button class="btn btn-outline-light" type="submit">Search</button>
+                                <a href="{{ url_for('advanced_search') }}" class="btn btn-light" title="Advanced Search">
+                                    <i class="fas fa-filter"></i>
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
             <div class="card-body p-0">
                 {% for level in levels %}
-                <div class="d-flex align-items-center p-3 border-bottom level-card mb-4" data-level-id="{{ level._id if level is not mapping else level['_id'] }}">
+                <div class="d-flex align-items-center p-3 border-bottom level-card mb-4" data-level-id="{{ level._id if level is not mapping else level['_id'] }}" style="cursor: pointer; transition: all 0.2s ease;">
                     <div class="me-4">
                         <div class="position-relative">
-                            {% set thumbnail_url = level.thumbnail_url if level is not mapping else level.get('thumbnail_url') %}
-                            {% set video_url = level.video_url if level is not mapping else level['video_url'] %}
-                            {% if thumbnail_url %}
-                                <img src="{{ thumbnail_url }}" alt="{{ level.name if level is not mapping else level['name'] }}" class="img-fluid rounded" width="206" height="116">
-                            {% elif video_url and 'youtube.com' in video_url %}
-                                {% set video_id = video_url.split('v=')[1].split('&')[0] %}
-                                <img src="https://img.youtube.com/vi/{{ video_id }}/maxresdefault.jpg" alt="{{ level.name if level is not mapping else level['name'] }}" class="img-fluid rounded" width="206" height="116">
-                            {% elif video_url and 'youtu.be' in video_url %}
-                                {% set video_id = video_url.split('/')[-1] %}
-                                <img src="https://img.youtube.com/vi/{{ video_id }}/maxresdefault.jpg" alt="{{ level.name if level is not mapping else level['name'] }}" class="img-fluid rounded" width="206" height="116">
-                            {% else %}
-                                <div class="bg-secondary rounded d-flex align-items-center justify-content-center text-white" width="206" height="116">No Image</div>
-                            {% endif %}
+                            {% set level_name = level.name if level is not mapping else level['name'] %}
+                            {% set video_url = level.video_url if level is not mapping else level.get('video_url', '') %}
+                            {% set thumbnail_url = level.thumbnail_url if level is not mapping else level.get('thumbnail_url', '') %}
+                            
+                            <div class="level-thumbnail" style="width: 206px; height: 116px; position: relative;">
+                                {% set level_name = level.name if level is not mapping else level['name'] %}
+                                {% set video_url = level.video_url if level is not mapping else level.get('video_url', '') %}
+                                {% set thumbnail_url = level.thumbnail_url if level is not mapping else level.get('thumbnail_url', '') %}
+                                
+                                <!-- OPTIMIZED IMAGE SYSTEM FOR BASE64 -->
+                                {% if thumbnail_url and thumbnail_url.strip() %}
+                                    {% if thumbnail_url.startswith('data:image') %}
+                                        <!-- Base64 image (no error handling needed) -->
+                                        <img src="{{ thumbnail_url }}" 
+                                             alt="{{ level_name }}" 
+                                             class="img-fluid rounded"
+                                             style="width: 206px; height: 116px; object-fit: cover;"
+                                             loading="lazy">
+                                    {% else %}
+                                        <!-- External URL image with error handling -->
+                                        <img src="{{ thumbnail_url }}" 
+                                             alt="{{ level_name }}" 
+                                             class="img-fluid rounded"
+                                             style="width: 206px; height: 116px; object-fit: cover;"
+                                             loading="lazy"
+                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <!-- Fallback for broken external images -->
+                                        <div class="bg-light rounded d-flex align-items-center justify-content-center text-muted" 
+                                             style="width: 206px; height: 116px; display: none;">
+                                            <div class="text-center">
+                                                <i class="fas fa-image fa-2x mb-2"></i>
+                                                <div>Image Error</div>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                {% else %}
+                                    <!-- YouTube auto thumbnail -->
+                                    {% set youtube_id = '' %}
+                                    {% if video_url and video_url.strip() %}
+                                        {% if 'youtu.be/' in video_url %}
+                                            {% set youtube_id = video_url.split('youtu.be/')[1].split('?')[0].split('&')[0] %}
+                                        {% elif 'youtube.com/watch?v=' in video_url %}
+                                            {% set youtube_id = video_url.split('v=')[1].split('&')[0] %}
+                                        {% endif %}
+                                    {% endif %}
+                                    
+                                    {% if youtube_id %}
+                                        <!-- Simple YouTube thumbnail - no complex fallbacks -->
+                                        <img src="https://img.youtube.com/vi/{{ youtube_id }}/hqdefault.jpg" 
+                                             alt="{{ level_name }}" 
+                                             class="img-fluid rounded"
+                                             style="width: 206px; height: 116px; object-fit: cover;"
+                                             loading="lazy">
+                                    {% else %}
+                                        <!-- Clean placeholder for no video -->
+                                        <div class="bg-light rounded d-flex align-items-center justify-content-center text-muted" 
+                                             style="width: 206px; height: 116px;">
+                                            <div class="text-center">
+                                                <i class="fas fa-image fa-2x mb-2"></i>
+                                                <div>No Preview</div>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                            
                             <div class="position-absolute top-0 start-0 bg-dark text-white px-2 py-1 rounded">
                                 {{ level.position if level is not mapping else level['position'] }}
                             </div>
@@ -38,8 +111,12 @@
                         {% endif %}
                     </div>
                     <div class="text-end">
-                        {% set difficulty = level.difficulty|round|int if level is not mapping else level['difficulty']|round|int %}
-                        <div class="text-muted"><strong>{{ difficulty }}/10</strong></div>
+                        {% set difficulty = (level.difficulty|default(5.0))|round|int if level is not mapping else (level['difficulty']|default(5.0))|round|int %}
+                        {% set demon_type = level.demon_type if level is not mapping else level.get('demon_type') %}
+                        <div class="text-muted"><strong>{{ get_difficulty_text(difficulty) }}</strong></div>
+                        {% if difficulty == 10 and get_demon_type_display(difficulty, demon_type) %}
+                            <div class="text-muted small">{{ get_demon_type_display(difficulty, demon_type) }}</div>
+                        {% endif %}
                         {% set position = level.position if level is not mapping else level['position'] %}
                         {% set points = level.points if level is not mapping else level['points'] %}
                         <small class="text-muted">{{ format_points(points or ((100 - position + 1) / 10)|round(2)) }} points</small>
@@ -47,6 +124,52 @@
                 </div>
                 {% endfor %}
             </div>
+            
+            <!-- Pagination -->
+            {% if total_pages > 1 %}
+            <div class="card-footer">
+                <nav aria-label="Level pagination">
+                    <ul class="pagination justify-content-center mb-0">
+                        {% if has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ prev_page }}">← Previous</a>
+                            </li>
+                        {% endif %}
+                        
+                        {% for p in range(1, total_pages + 1) %}
+                            {% if p == page %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ p }}</span>
+                                </li>
+                            {% elif p <= 3 or p > total_pages - 3 or (p >= page - 1 and p <= page + 1) %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ p }}">{{ p }}</a>
+                                </li>
+                            {% elif p == 4 and page > 6 %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                            {% elif p == total_pages - 3 and page < total_pages - 5 %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ next_page }}">Next →</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                <div class="text-center mt-2">
+                    <small class="text-muted">
+                        Showing {{ ((page-1) * 10) + 1 }}-{{ ((page-1) * 10) + levels|length }} of {{ total_levels }} levels
+                    </small>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
     
@@ -61,29 +184,7 @@
             </div>
         </div>
         
-        <div class="card shadow-sm mb-4">
-            <div class="card-header bg-info text-white">
-                <h4 class="mb-0">Top Players (by Points)</h4>
-            </div>
-            <div class="card-body p-0">
-                <ul class="list-group list-group-flush">
-                    {% for player in top_players %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        {{ loop.index }}. {{ player.username }}
-                        <div>
-                            <span class="badge bg-primary rounded-pill me-1">
-                                {% if player is mapping %}
-                                    {{ format_points(player.points) }} points
-                                {% else %}
-                                    {{ player[2] }} records
-                                {% endif %}
-                            </span>
-                        </div>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </div>
-        </div>
+
         
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-primary text-white">
@@ -102,7 +203,7 @@
             </div>
             <div class="card-body">
                 <p><strong>List Admin:</strong> Miifin</p>
-                <p><strong>List Moderators:</strong> Kye, Monika, DetiousMage</p>
+                <p><strong>List Moderators:</strong> Kye, Monika, ApplePi, DairyFarmer</p>
                 <p><strong>List Coder:</strong> ENGINE</p>
                 <p><strong>Server Moderator:</strong> Cesium</p>
             </div>
@@ -120,5 +221,11 @@
             window.location = '/level/' + levelId;
         });
     });
+    
+    // Simple thumbnail system - no complex fallbacks
+    
+
+    
+
 </script>
 {% endblock %}

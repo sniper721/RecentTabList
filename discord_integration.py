@@ -63,7 +63,7 @@ class DiscordNotifier:
         embed = {
             "title": "📝 New Record Submission",
             "description": "A new record has been submitted for review",
-            "color": 16766020,  # Yellow color (0xfbbf24)
+            "color": 10181046,  # Purple color (0x9b59b6)
             "timestamp": datetime.utcnow().isoformat(),
             "fields": [
                 {
@@ -190,6 +190,72 @@ class DiscordNotifier:
             self.send_webhook(embed)
         except Exception as e:
             print(f"❌ Error in Discord rejection notification: {e}")
+    
+    def send_admin_action_notification(self, admin_username, action, details=""):
+        """Send notification for admin actions"""
+        # Determine color based on action type
+        color = 3447003  # Default blue
+        
+        # RED - Dangerous/Critical actions
+        if ("DELETE" in action.upper() or "BAN" in action.upper() or 
+            "LOGIN AS USER" in action.upper() or "ADMIN LOGIN AS" in action.upper() or
+            "RESET POINTS" in action.upper() or "DEMOTE" in action.upper() or
+            "REMOVE HEAD ADMIN" in action.upper() or "IP BAN" in action.upper() or
+            "RTL DANGEROUS COMMAND" in action.upper() or "DANGEROUS" in action.upper() or
+            "UNBAN" in action.upper()):
+            color = 15548997  # Red
+        # GREEN - Positive actions
+        elif ("APPROVE" in action.upper() or "ADD" in action.upper() or 
+              "PROMOTE" in action.upper() or "MAKE HEAD ADMIN" in action.upper()):
+            color = 1096065  # Green
+        # YELLOW/ORANGE - Console actions
+        elif ("CONSOLE" in action.upper() or "COMMAND" in action.upper() or 
+              "RTL COMMAND" in action.upper()):
+            color = 16766020  # Yellow/Orange
+        
+        embed = {
+            "title": "🔧 Admin Action",
+            "description": f"Admin activity detected",
+            "color": color,
+            "timestamp": datetime.utcnow().isoformat(),
+            "fields": [
+                {
+                    "name": "👤 Admin",
+                    "value": admin_username,
+                    "inline": True
+                },
+                {
+                    "name": "⚡ Action",
+                    "value": action,
+                    "inline": True
+                }
+            ],
+            "footer": {
+                "text": "RTL Admin Tracking System"
+            }
+        }
+        
+        # Add details if provided
+        if details:
+            embed["fields"].append({
+                "name": "📝 Details",
+                "value": details[:1000],  # Limit to 1000 chars
+                "inline": False
+            })
+        
+        # Add admin panel link
+        website_url = os.environ.get('WEBSITE_URL', 'http://localhost:10000')
+        embed["fields"].append({
+            "name": "⚙️ Admin Panel",
+            "value": f"[View Admin Panel]({website_url}/admin)",
+            "inline": False
+        })
+        
+        # Send webhook directly
+        try:
+            self.send_webhook(embed)
+        except Exception as e:
+            print(f"❌ Error in Discord admin action notification: {e}")
 
 # Global notifier instance
 discord_notifier = DiscordNotifier()
@@ -247,5 +313,17 @@ def notify_record_rejected(username, level_name, progress, reason=None):
         discord_notifier.send_record_rejected_notification(record_data, reason)
     except Exception as e:
         print(f"❌ Error in notify_record_rejected: {e}")
+        import traceback
+        traceback.print_exc()
+
+def notify_admin_action(admin_username, action, details=""):
+    """Convenience function to notify about admin actions"""
+    print(f"🔔 notify_admin_action called: {admin_username} - {action}")
+    
+    # Send directly instead of using threads (more reliable)
+    try:
+        discord_notifier.send_admin_action_notification(admin_username, action, details)
+    except Exception as e:
+        print(f"❌ Error in notify_admin_action: {e}")
         import traceback
         traceback.print_exc()

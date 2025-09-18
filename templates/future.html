@@ -1,0 +1,134 @@
+{% extends "layout.html" %}
+
+{% block title %}Future List - RTL{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="text-center mb-4">
+                <h1 class="display-4"> Future Recent Tab List</h1>
+                <p class="lead text-muted">A glimpse into the future of RTL</p>
+                <div class="alert alert-info">
+                    <strong>🚀 Coming Soon!</strong> These levels are planned for future updates to the main list.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if levels %}
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow-sm">
+                <div class="card-header bg-gradient" style="background: linear-gradient(45deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h4 class="mb-0">✨ Future Levels ({{ levels|length }})</h4>
+                </div>
+                <div class="card-body p-0">
+                    {% for level in levels %}
+                    <div class="d-flex align-items-center p-3 border-bottom level-card" 
+                         style="background: linear-gradient(90deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%); cursor: pointer; transition: all 0.2s ease;"
+                         onclick="window.location.href='{{ url_for('future_level_details', level_id=level._id) }}';"
+                         onmouseover="this.style.background='linear-gradient(90deg, rgba(102,126,234,0.2) 0%, rgba(118,75,162,0.2) 100%)'"
+                         onmouseout="this.style.background='linear-gradient(90deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%)'">
+                        <div class="me-4">
+                            <div class="position-relative">
+                                {% set thumbnail_url = level.thumbnail_url %}
+                                {% set video_url = level.video_url %}
+                                
+                                <!-- SIMPLE THUMBNAIL - NO DOUBLE IMAGES -->
+                                {% if thumbnail_url and thumbnail_url != '' and not thumbnail_url.startswith('https://img.youtube.com') %}
+                                    <!-- Custom thumbnail -->
+                                    <img src="/thumb/{{ thumbnail_url | urlencode }}" alt="{{ level.name }}" 
+                                         class="img-fluid rounded" width="206" height="116" 
+                                         style="object-fit: cover; filter: brightness(1.1) saturate(1.2);">
+                                {% elif video_url and ('youtube.com' in video_url or 'youtu.be' in video_url) %}
+                                    <!-- YouTube thumbnail -->
+                                    {% if 'watch?v=' in video_url %}
+                                        {% set video_id = video_url.split('watch?v=')[1].split('&')[0] %}
+                                    {% elif 'youtu.be/' in video_url %}
+                                        {% set video_id = video_url.split('youtu.be/')[1].split('?')[0] %}
+                                    {% endif %}
+                                    <img src="https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg" 
+                                         alt="{{ level.name }}" 
+                                         class="img-fluid rounded" width="206" height="116" 
+                                         style="object-fit: cover; filter: brightness(1.1) saturate(1.2);">
+                                {% else %}
+                                    <!-- No thumbnail -->
+                                    <div class="bg-gradient rounded d-flex align-items-center justify-content-center text-white" 
+                                         style="width: 206px; height: 116px; background: linear-gradient(45deg, #667eea, #764ba2); font-size: 14px;">
+                                        🎮 {{ level.name }}
+                                    </div>
+                                {% endif %}
+                                <div class="position-absolute top-0 start-0 bg-primary text-white px-2 py-1 rounded">
+                                    #{{ level.position }}
+                                </div>
+                                <div class="position-absolute top-0 end-0 bg-warning text-dark px-2 py-1 rounded">
+                                    FUTURE
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h5 class="mb-1">{{ level.name }}</h5>
+                            <p class="mb-1 text-muted">by {{ level.creator }}</p>
+                            <!-- verified by text removed - levels not verified yet -->
+                            {% if level.description %}
+                                <small class="text-info d-block mt-1">{{ level.description }}</small>
+                            {% endif %}
+                        </div>
+                        <div class="text-end">
+                            <div class="text-muted"><strong>{{ get_difficulty_text(level.difficulty or 5) }}</strong></div>
+                            <small class="text-muted">{{ level.points or 0 }} points</small>
+                            <div class="mt-1">
+                                <span class="badge bg-info">Coming Soon</span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="row">
+        <div class="col-lg-6 mx-auto">
+            <div class="card text-center">
+                <div class="card-body py-5">
+                    <div class="mb-4" style="font-size: 4rem;"></div>
+                    <h3>No Future Levels Yet</h3>
+                    <p class="text-muted">The future is still being written...</p>
+                    {% if session.get('is_admin') %}
+                        <a href="{{ url_for('admin_levels') }}" class="btn btn-primary">
+                            ➕ Add Future Levels
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row mt-4">
+        <div class="col-12 text-center">
+            <a href="{{ url_for('index') }}" class="btn btn-outline-primary">
+                ← Back to Main List
+            </a>
+            <a href="{{ url_for('legacy') }}" class="btn btn-outline-secondary">
+                📜 Legacy List
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.level-card {
+    transition: all 0.3s ease;
+}
+.level-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+.bg-gradient {
+    background: linear-gradient(45deg, #667eea 0%, #764ba2 100%) !important;
+}
+</style>
+{% endblock %}

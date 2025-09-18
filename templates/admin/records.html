@@ -1,0 +1,257 @@
+{% extends "layout.html" %}
+
+{% block title %}Manage Records - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>📋 Manage Records</h1>
+                <a href="{{ url_for('admin') }}" class="btn btn-secondary">← Back to Admin</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search and Filter Form -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">🔍 Search & Filter</h5>
+                </div>
+                <div class="card-body">
+                    <form method="GET" action="{{ url_for('admin_records') }}">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label for="status" class="form-label">Status</label>
+                                <select class="form-select" name="status" id="status">
+                                    <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Status</option>
+                                    <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending</option>
+                                    <option value="approved" {% if status_filter == 'approved' %}selected{% endif %}>Approved</option>
+                                    <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejected</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="username" class="form-label">Username</label>
+                                <input type="text" class="form-control" name="username" id="username" 
+                                       value="{{ username_filter }}" placeholder="Search by username">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="level" class="form-label">Level Name</label>
+                                <input type="text" class="form-control" name="level" id="level" 
+                                       value="{{ level_filter }}" placeholder="Search by level">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">&nbsp;</label>
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary">🔍 Search</button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Records Stats -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <strong>📈 Found {{ total_records }} record(s)</strong>
+                {% if username_filter or level_filter or status_filter != 'all' %}
+                    with current filters
+                {% endif %}
+                (Page {{ page }} of {{ total_pages }})
+            </div>
+        </div>
+    </div>
+
+    <!-- Records Table -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">All Records</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if records %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover mb-0">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>User</th>
+                                    <th>Level</th>
+                                    <th>Percentage</th>
+                                    <th>Status</th>
+                                    <th>Video</th>
+                                    <th>Submitted</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for record in records %}
+                                <tr>
+                                    <td>
+                                        <strong>#{{ record._id }}</strong>
+                                    </td>
+                                    <td>
+                                        <div>
+                                            <strong>{{ record.user.username }}</strong>
+                                            {% if record.user.nickname %}
+                                                <br><small class="text-muted">{{ record.user.nickname }}</small>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div>
+                                            <strong>{{ record.level.name }}</strong>
+                                            <br><small class="text-muted">
+                                                by {{ record.level.creator }} 
+                                                (Pos: #{{ record.level.position }})
+                                            </small>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{% if record.percentage == 100 %}success{% elif record.percentage >= 80 %}warning{% else %}info{% endif %} fs-6">
+                                            {{ record.percentage }}%
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if record.status == 'approved' %}
+                                            <span class="badge bg-success">✅ Approved</span>
+                                        {% elif record.status == 'pending' %}
+                                            <span class="badge bg-warning">⏳ Pending</span>
+                                        {% elif record.status == 'rejected' %}
+                                            <span class="badge bg-danger">❌ Rejected</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ record.status|title }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if record.video_url %}
+                                            <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-play"></i> Video
+                                            </a>
+                                        {% else %}
+                                            <span class="text-muted">No video</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small>{{ record.date_submitted.strftime('%Y-%m-%d %H:%M') }}</small>
+                                        {% if record.get('last_edited_by') %}
+                                            <br><small class="text-muted">
+                                                Edited by {{ record.last_edited_by }}
+                                            </small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <!-- Quick Actions -->
+                                            {% if record.status == 'pending' %}
+                                                <form method="POST" action="{{ url_for('admin_approve_record', record_id=record._id|string) }}" class="d-inline">
+                                                    <button type="submit" class="btn btn-sm btn-success" title="Approve">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                </form>
+                                                <form method="POST" action="{{ url_for('admin_reject_record', record_id=record._id|string) }}" class="d-inline">
+                                                    <button type="submit" class="btn btn-sm btn-danger" title="Reject">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </form>
+                                            {% endif %}
+                                            
+                                            <!-- Edit Record -->
+                                            <a href="{{ url_for('admin_edit_record', record_id=record._id|string) }}" 
+                                               class="btn btn-sm btn-primary" title="Edit Record">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            
+                                            <!-- Delete Record -->
+                                            <form method="POST" action="{{ url_for('admin_delete_record', record_id=record._id|string) }}" 
+                                                  class="d-inline"
+                                                  onsubmit="return confirm('⚠️ Delete this record?\n\nUser: {{ record.user.username }}\nLevel: {{ record.level.name }}\nPercentage: {{ record.percentage }}%\n\nThis action cannot be undone!');">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Record">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Pagination -->
+                    {% if total_pages > 1 %}
+                    <div class="card-footer">
+                        <nav aria-label="Records pagination">
+                            <ul class="pagination justify-content-center mb-0">
+                                {% if has_prev %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page - 1 }}&status={{ status_filter }}&username={{ username_filter }}&level={{ level_filter }}">
+                                            ← Previous
+                                        </a>
+                                    </li>
+                                {% endif %}
+                                
+                                <!-- Page numbers -->
+                                {% set start_page = page - 2 if page > 2 else 1 %}
+                                {% set end_page = page + 2 if page + 2 <= total_pages else total_pages %}
+                                {% for p in range(start_page, end_page + 1) %}
+                                    {% if p == page %}
+                                        <li class="page-item active">
+                                            <span class="page-link">{{ p }}</span>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item">
+                                            <a class="page-link" href="?page={{ p }}&status={{ status_filter }}&username={{ username_filter }}&level={{ level_filter }}">
+                                                {{ p }}
+                                            </a>
+                                        </li>
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if has_next %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="?page={{ page + 1 }}&status={{ status_filter }}&username={{ username_filter }}&level={{ level_filter }}">
+                                            Next →
+                                        </a>
+                                    </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                        <div class="text-center mt-2">
+                            <small class="text-muted">
+                                Showing {{ ((page-1) * 25) + 1 }}-{{ ((page-1) * 25) + records|length }} of {{ total_records }} records
+                            </small>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% else %}
+                    <div class="text-center py-5">
+                        <h5 class="text-muted">No records found</h5>
+                        <p class="text-muted">Try adjusting your search filters</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Auto-submit form when filters change
+    document.querySelectorAll('select[name="status"]').forEach(select => {
+        select.addEventListener('change', function() {
+            this.form.submit();
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}GD Recent Tab List{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    {% block extra_css %}{% endblock %}
+    <style>
+        /* Custom dropdown styling for Lists menu */
+        .dropdown-menu {
+            border: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border-radius: 8px;
+            padding: 8px 0;
+            min-width: 180px;
+        }
+        
+        .dropdown-item {
+            padding: 10px 16px;
+            transition: all 0.2s ease;
+            border-radius: 6px;
+            margin: 2px 8px;
+            font-weight: 500;
+            color: #212529 !important;
+        }
+        
+        .dropdown-item:hover {
+            background: linear-gradient(45deg, #667eea, #764ba2) !important;
+            color: white !important;
+            transform: translateX(4px);
+        }
+        
+        .dropdown-item.active {
+            background: linear-gradient(45deg, #28a745, #20c997) !important;
+            color: white !important;
+        }
+        
+        /* Ensure dropdown has white background */
+        .dropdown-menu {
+            background-color: white !important;
+        }
+        
+        .dropdown-divider {
+            margin: 8px 16px;
+            border-color: #e9ecef;
+        }
+        
+        /* Navbar dropdown toggle styling */
+        .nav-link.dropdown-toggle::after {
+            margin-left: 6px;
+        }
+        
+        .navbar-nav .dropdown-menu {
+            margin-top: 8px;
+        }
+        
+        /* Smooth dropdown animation */
+        .dropdown-menu {
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: all 0.2s ease;
+        }
+        
+        .dropdown-menu.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        /* Prevent navigation text wrapping */
+        .navbar-nav .nav-link {
+            white-space: nowrap;
+            font-size: 0.9rem;
+            padding: 0.5rem 0.75rem !important;
+        }
+        
+        .navbar-nav .nav-item {
+            margin: 0 2px;
+        }
+        
+        /* Make navbar more compact */
+        .navbar {
+            padding: 0.25rem 0;
+        }
+        
+        .navbar-brand {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 991.98px) {
+            .navbar-nav .nav-link {
+                padding: 0.5rem 1rem !important;
+                font-size: 1rem;
+            }
+        }
+        
+        /* Better spacing for navigation items */
+        @media (min-width: 992px) {
+            .navbar-nav .nav-item {
+                margin: 0 1px;
+            }
+            
+            .navbar-nav .nav-link {
+                font-size: 0.85rem;
+                padding: 0.5rem 0.6rem !important;
+            }
+        }
+    </style>
+</head>
+<body data-bs-theme="{{ current_theme }}">
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                GD Recent Tab List
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle {% if request.path in [url_for('index'), url_for('legacy')] %}active{% endif %}" 
+                           href="#" id="listsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            📋 Lists
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="listsDropdown">
+                            <li>
+                                <a class="dropdown-item {% if request.path == url_for('index') %}active{% endif %}" href="{{ url_for('index') }}">
+                                    Main List
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item {% if request.path == url_for('legacy') %}active{% endif %}" href="{{ url_for('legacy') }}">
+                                    Legacy List
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="/future">
+                                    Future List
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == url_for('timemachine') %}active{% endif %}" href="{{ url_for('timemachine') }}">🕒 Time Machine</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('submit_record') }}">📝 Submit</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="toolsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            🔧 Tools
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="toolsDropdown">
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('recent_tab_roulette') }}">
+                                    🎯 Roulette
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('advanced_search') }}">
+                                    🔍 Advanced Search
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == url_for('news_blog') %}active{% endif %}" href="{{ url_for('news_blog') }}">📰 News</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('changelog') }}">📋 Changelog</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('guidelines') }}">📖 Guide</a>
+                    </li>
+
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="statsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            📊 Stats
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="statsDropdown">
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('stats_overview') }}">
+                                    📈 Overview
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('stats_players') }}">
+                                    🏆 Players
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('stats_levels') }}">
+                                    🎮 Levels
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('stats_records') }}">
+                                    📋 Records
+                                </a>
+                            </li>
+
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('stats_activity') }}">
+                                    🕒 Activity
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    {% if session.get('is_admin') %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin') }}">Admin Panel</a>
+                    </li>
+                    {% endif %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="themeDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-palette"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="themeDropdown">
+                            <li><h6 class="dropdown-header">🎨 Appearance</h6></li>
+                            <li><a class="dropdown-item theme-option" href="#" data-theme="light">☀️ Light</a></li>
+                            <li><a class="dropdown-item theme-option" href="#" data-theme="dark">🌙 Dark</a></li>
+                            <li><a class="dropdown-item theme-option" href="#" data-theme="auto">🔄 Auto</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item theme-option" href="#" data-theme="blue">💙 Ocean Blue</a></li>
+                            <li><a class="dropdown-item theme-option" href="#" data-theme="purple">💜 Purple Night</a></li>
+                            <li><a class="dropdown-item theme-option" href="#" data-theme="green">💚 Forest Green</a></li>
+                            <li><a class="dropdown-item theme-option" href="#" data-theme="red">❤️ Cherry Red</a></li>
+                            <li><a class="dropdown-item theme-option" href="#" data-theme="orange">🧡 Sunset Orange</a></li>
+                        </ul>
+                    </li>
+                    {% if 'user_id' in session %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Account
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+                            <li><a class="dropdown-item" href="{{ url_for('profile') }}">👤 Profile</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('user_settings') }}">⚙️ Settings</a></li>
+                            {% if session.get('is_admin') %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin') }}">🔧 Admin Panel</a></li>
+                            {% endif %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('logout') }}">🚪 Logout</a></li>
+                        </ul>
+                    </li>
+                    {% else %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == url_for('login') %}active{% endif %}" href="{{ url_for('login') }}">Login</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == url_for('register') %}active{% endif %}" href="{{ url_for('register') }}">Register</a>
+                    </li>
+                    {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- Mobile Navigation Menu (only visible on mobile) -->
+    <div class="d-block d-lg-none bg-light border-bottom">
+        <div class="container">
+            <div class="row g-2 py-3">
+                <div class="col-6">
+                    <a href="{{ url_for('index') }}" class="btn btn-outline-primary w-100 btn-sm">
+                        🏠 Main List
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('legacy') }}" class="btn btn-outline-secondary w-100 btn-sm">
+                        📜 Legacy List
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="/future" class="btn btn-outline-info w-100 btn-sm">
+                        🔮 Future List
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('stats_players') }}" class="btn btn-outline-success w-100 btn-sm">
+                        🏆 Leaderboard
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('submit_record') }}" class="btn btn-outline-warning w-100 btn-sm">
+                        📝 Submit
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('recent_tab_roulette') }}" class="btn btn-outline-info w-100 btn-sm">
+                        🎯 Roulette
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('news_blog') }}" class="btn btn-outline-primary w-100 btn-sm">
+                        📰 News
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('timemachine') }}" class="btn btn-outline-info w-100 btn-sm">
+                        🕒 Time Machine
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('changelog') }}" class="btn btn-outline-info w-100 btn-sm">
+                        📋 Changelog
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('guidelines') }}" class="btn btn-outline-dark w-100 btn-sm">
+                        📖 Guide
+                    </a>
+                </div>
+                {% if session.get('user_id') %}
+                <div class="col-6">
+                    <a href="{{ url_for('profile') }}" class="btn btn-outline-primary w-100 btn-sm">
+                        👤 Profile
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('user_settings') }}" class="btn btn-outline-secondary w-100 btn-sm">
+                        ⚙️ Settings
+                    </a>
+                </div>
+                {% if session.get('is_admin') %}
+                <div class="col-12">
+                    <a href="{{ url_for('admin') }}" class="btn btn-danger w-100 btn-sm">
+                        🔧 Admin Panel
+                    </a>
+                </div>
+                {% endif %}
+                {% else %}
+                <div class="col-6">
+                    <a href="{{ url_for('login') }}" class="btn btn-success w-100 btn-sm">
+                        🔑 Login
+                    </a>
+                </div>
+                <div class="col-6">
+                    <a href="{{ url_for('register') }}" class="btn btn-primary w-100 btn-sm">
+                        📝 Register
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Site Announcements -->
+        {% set active_announcements = get_active_announcements() %}
+        {% if active_announcements %}
+            {% for announcement in active_announcements %}
+            <div class="alert alert-{{ announcement.type }} alert-dismissible fade show" role="alert">
+                <div class="d-flex align-items-start">
+                    <div class="me-2">
+                        {% if announcement.type == 'info' %}📢
+                        {% elif announcement.type == 'success' %}🎉
+                        {% elif announcement.type == 'warning' %}⚠️
+                        {% elif announcement.type == 'danger' %}🚨
+                        {% endif %}
+                    </div>
+                    <div class="flex-grow-1">
+                        <h6 class="alert-heading mb-1">{{ announcement.title }}</h6>
+                        <p class="mb-0">{{ announcement.message }}</p>
+                        <small class="text-muted">
+                            Posted by {{ announcement.created_by }} • 
+                            Expires {{ announcement.expires_at.strftime('%Y-%m-%d %H:%M UTC') }}
+                        </small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        {% endif %}
+        
+        <!-- Active Polls -->
+        {% set active_polls = get_active_polls() %}
+        {% if active_polls %}
+            {% for poll in active_polls %}
+            <div class="card mb-3 border-{{ poll.type }}" id="poll-{{ poll._id }}">
+                <div class="card-header bg-{{ poll.type }} text-white">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <div class="me-2">
+                                {% if poll.type == 'info' %}📊
+                                {% elif poll.type == 'success' %}✅
+                                {% elif poll.type == 'warning' %}⚠️
+                                {% elif poll.type == 'danger' %}🚨
+                                {% endif %}
+                            </div>
+                            <h6 class="mb-0">{{ poll.question }}</h6>
+                            {% if poll.allow_multiple %}
+                                <span class="badge bg-light text-dark ms-2">Multiple Choice</span>
+                            {% endif %}
+                        </div>
+                        {% if 'user_id' in session %}
+                        <button type="button" class="btn-close btn-close-white" 
+                                onclick="closePoll('{{ poll._id }}')"
+                                title="Close poll"></button>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if poll.user_has_voted %}
+                        <!-- Show results if user has voted -->
+                        <div class="mb-2 text-success">✓ You have voted in this poll</div>
+                        <div class="mb-3">
+                            <small class="text-muted">Total votes: {{ poll.total_votes }}</small>
+                            {% for option in poll.options %}
+                            <div class="mb-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>{{ option.text }}</span>
+                                    <span class="text-muted">{{ option.votes }} votes</span>
+                                </div>
+                                {% set vote_percentage = (option.votes / poll.total_votes * 100) if poll.total_votes > 0 else 0 %}
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-{{ poll.type }}" role="progressbar" 
+                                         style="width: {{ vote_percentage }}%"></div>
+                                </div>
+                                <small class="text-muted">{{ "%.1f" | format(vote_percentage) }}%</small>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% elif 'user_id' in session %}
+                        <!-- Show voting form if user is logged in and hasn't voted -->
+                        <form method="POST" action="{{ url_for('vote_poll') }}">
+                            <input type="hidden" name="poll_id" value="{{ poll._id }}">
+                            {% for option in poll.options %}
+                            <div class="form-check mb-2">
+                                {% if poll.allow_multiple %}
+                                <input class="form-check-input" type="checkbox" name="poll_option" value="{{ loop.index0 }}" id="poll_{{ poll._id }}_option_{{ loop.index0 }}">
+                                {% else %}
+                                <input class="form-check-input" type="radio" name="poll_option" value="{{ loop.index0 }}" id="poll_{{ poll._id }}_option_{{ loop.index0 }}">
+                                {% endif %}
+                                <label class="form-check-label" for="poll_{{ poll._id }}_option_{{ loop.index0 }}">
+                                    {{ option.text }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                            <button type="submit" class="btn btn-{{ poll.type }} btn-sm mt-2">Vote</button>
+                        </form>
+                    {% else %}
+                        <!-- Show login prompt if user is not logged in -->
+                        <div class="text-muted mb-2">Please <a href="{{ url_for('login') }}">log in</a> to vote in this poll.</div>
+                        {% for option in poll.options %}
+                        <div class="mb-1">• {{ option.text }}</div>
+                        {% endfor %}
+                    {% endif %}
+                    
+                    <small class="text-muted d-block mt-2">
+                        Posted by {{ poll.created_by }} • 
+                        Expires {{ poll.expires_at.strftime('%Y-%m-%d %H:%M UTC') }}
+                    </small>
+                </div>
+            </div>
+            {% endfor %}
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Back to Top Button -->
+    <button id="backToTop" class="btn btn-primary position-fixed" style="bottom: 20px; right: 20px; z-index: 1000; border-radius: 50%; width: 50px; height: 50px; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <footer class="footer mt-5 py-3">
+        <div class="container text-center">
+            <span class="text-muted">© 2025 GD Recent Tab List - Not affiliated with RobTop Games</span>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/country-search.js') }}"></script>
+    
+    <!-- Poll Close Functionality -->
+    <script>
+        // Function to close polls
+        function closePoll(pollId) {
+            fetch('/close_poll', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'poll_id=' + encodeURIComponent(pollId)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Hide the poll with a smooth fade out
+                    const pollElement = document.getElementById('poll-' + pollId);
+                    if (pollElement) {
+                        pollElement.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                        pollElement.style.opacity = '0';
+                        pollElement.style.transform = 'translateX(100%)';
+                        setTimeout(() => {
+                            pollElement.style.display = 'none';
+                        }, 300);
+                    }
+                } else {
+                    console.error('Failed to close poll:', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error closing poll:', error);
+            });
+        }
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

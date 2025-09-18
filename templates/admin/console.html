@@ -1,0 +1,319 @@
+{% extends "layout.html" %}
+
+{% block title %}Admin Console{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>👑 Admin Console</h1>
+                <a href="{{ url_for('admin') }}" class="btn btn-secondary">← Back to Admin Panel</a>
+            </div>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <!-- System Stats -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <h5 class="card-title">Users</h5>
+                    <h3>{{ stats.total_users }}</h3>
+                    <p class="mb-0">Total registered users</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h5 class="card-title">Levels</h5>
+                    <h3>{{ stats.total_levels }}</h3>
+                    <p class="mb-0">Total levels in database</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <h5 class="card-title">Records</h5>
+                    <h3>{{ stats.total_records }}</h3>
+                    <p class="mb-0">Total submitted records</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-danger">
+                <div class="card-body">
+                    <h5 class="card-title">Admins</h5>
+                    <h3>{{ stats.admin_users }}</h3>
+                    <p class="mb-0">{{ stats.head_admin_users }} head admins</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interactive Console -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">🐍 Interactive Python Console</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-light" onclick="clearConsole()">Clear</button>
+                        <button class="btn btn-sm btn-outline-light" onclick="showHelp()">Help</button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="console-output" class="console-output"></div>
+                    <div class="console-input-container">
+                        <span class="console-prompt">>>> </span>
+                        <input type="text" id="console-input" class="console-input" placeholder="Enter Python code or RTL commands..." autocomplete="off">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Admin Actions -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">👑 Quick Admin Actions</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Make User Head Admin</h6>
+                    <form method="POST" action="{{ url_for('admin_make_head_admin') }}" class="mb-3">
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="user_id" placeholder="User ID" required>
+                            <button type="submit" class="btn btn-primary">Make Head Admin</button>
+                        </div>
+                        <small class="text-muted">Grant head admin privileges to a user</small>
+                    </form>
+                    
+                    <h6>Remove Head Admin Status</h6>
+                    <form method="POST" action="{{ url_for('admin_remove_head_admin') }}" class="mb-3">
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="user_id" placeholder="User ID" required>
+                            <button type="submit" class="btn btn-warning">Remove Head Admin</button>
+                        </div>
+                        <small class="text-muted">Remove head admin privileges</small>
+                    </form>
+
+                    <h6>Demote Admin to User</h6>
+                    <form method="POST" action="{{ url_for('admin_demote_admin') }}">
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="user_id" placeholder="User ID" required>
+                            <button type="submit" class="btn btn-danger">Demote Admin</button>
+                        </div>
+                        <small class="text-muted">Remove admin privileges</small>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">📝 Console Commands</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Popular RTL Commands:</strong></p>
+                    <ul class="small">
+                        <li><code>rtl.stats()</code> - Database statistics</li>
+                        <li><code>rtl.top_players()</code> - Top players</li>
+                        <li><code>rtl.pending_records()</code> - Pending records</li>
+                        <li><code>rtl.user('username')</code> - User details</li>
+                        <li><code>rtl.level('name')</code> - Level details</li>
+                        <li><code>rtl.system_info()</code> - System info</li>
+                        <li><code>rtl.recent_activity()</code> - Recent activity</li>
+                    </ul>
+                    <p><strong>Dangerous Commands:</strong></p>
+                    <ul class="small">
+                        <li><code>rtl.login_as('user')</code> - Login as user</li>
+                        <li><code>rtl.admin_logs()</code> - View admin logs</li>
+                    </ul>
+                    <p><strong>Python & System:</strong></p>
+                    <ul class="small">
+                        <li><code>help</code> - Show all commands</li>
+                        <li><code>clear</code> - Clear console</li>
+                        <li>Any Python expression</li>
+                        <li><code>mongo_db</code> - Database access</li>
+                    </ul>
+                </div>
+            </div>
+
+
+        </div>
+    </div>
+
+<style>
+.console-output {
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 14px;
+    padding: 15px;
+    height: 400px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.console-input-container {
+    background-color: #1e1e1e;
+    padding: 10px 15px;
+    display: flex;
+    align-items: center;
+    border-top: 1px solid #333;
+}
+
+.console-prompt {
+    color: #4ec9b0;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-weight: bold;
+    margin-right: 8px;
+}
+
+.console-input {
+    background: transparent;
+    border: none;
+    color: #d4d4d4;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 14px;
+    flex: 1;
+    outline: none;
+}
+
+.console-input::placeholder {
+    color: #666;
+}
+
+.console-line {
+    margin-bottom: 5px;
+}
+
+.console-command {
+    color: #4ec9b0;
+}
+
+.console-result {
+    color: #d4d4d4;
+    margin-left: 20px;
+}
+
+.console-error {
+    color: #f44747;
+    margin-left: 20px;
+}
+</style>
+
+<script>
+let commandHistory = [];
+let historyIndex = -1;
+
+document.addEventListener('DOMContentLoaded', function() {
+    const consoleInput = document.getElementById('console-input');
+    const consoleOutput = document.getElementById('console-output');
+    
+    // Welcome message
+    addToConsole('RTL Admin Console v1.0', 'result');
+    addToConsole('Type "help" for available commands', 'result');
+    addToConsole('', 'result');
+    
+    consoleInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            const command = consoleInput.value.trim();
+            if (command) {
+                executeCommand(command);
+                commandHistory.unshift(command);
+                if (commandHistory.length > 50) {
+                    commandHistory.pop();
+                }
+                historyIndex = -1;
+            }
+            consoleInput.value = '';
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (historyIndex < commandHistory.length - 1) {
+                historyIndex++;
+                consoleInput.value = commandHistory[historyIndex];
+            }
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (historyIndex > 0) {
+                historyIndex--;
+                consoleInput.value = commandHistory[historyIndex];
+            } else if (historyIndex === 0) {
+                historyIndex = -1;
+                consoleInput.value = '';
+            }
+        }
+    });
+    
+    // Focus on input
+    consoleInput.focus();
+});
+
+function executeCommand(command) {
+    // Add command to output
+    addToConsole('>>> ' + command, 'command');
+    
+    // Send to server
+    fetch('/admin/console/execute', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({command: command})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            if (data.result === '__CLEAR__') {
+                clearConsole();
+            } else {
+                addToConsole(data.result, 'result');
+            }
+        } else {
+            addToConsole('Error: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        addToConsole('Network Error: ' + error.message, 'error');
+    });
+}
+
+function addToConsole(text, type) {
+    const consoleOutput = document.getElementById('console-output');
+    const line = document.createElement('div');
+    line.className = 'console-line console-' + type;
+    line.textContent = text;
+    consoleOutput.appendChild(line);
+    consoleOutput.scrollTop = consoleOutput.scrollHeight;
+}
+
+function clearConsole() {
+    const consoleOutput = document.getElementById('console-output');
+    consoleOutput.innerHTML = '';
+    addToConsole('Console cleared', 'result');
+}
+
+function showHelp() {
+    executeCommand('help');
+}
+</script>
+</div>
+{% endblock %}

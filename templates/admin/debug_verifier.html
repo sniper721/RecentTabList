@@ -1,0 +1,126 @@
+{% extends "layout.html" %}
+
+{% block title %}Debug Verifier - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>🔍 Debug Verifier: "{{ verifier_name }}"</h1>
+                <a href="{{ url_for('admin') }}" class="btn btn-secondary">← Back to Admin</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">Search Results</h5>
+        </div>
+        <div class="card-body">
+            <h6>Exact Match Search ("{{ verifier_name }}")</h6>
+            <p>Found {{ exact_levels|length }} levels</p>
+            {% if exact_levels %}
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Level Name</th>
+                            <th>Position</th>
+                            <th>List Type</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for level in exact_levels %}
+                        <tr>
+                            <td>{{ level.name }}</td>
+                            <td>{{ level.position }}</td>
+                            <td>{{ "Legacy" if level.is_legacy else "Main" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">No exact matches found</p>
+            {% endif %}
+
+            <h6 class="mt-4">Case-Insensitive Match Search</h6>
+            <p>Found {{ case_insensitive_levels|length }} levels</p>
+            {% if case_insensitive_levels %}
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Level Name</th>
+                            <th>Verifier Name</th>
+                            <th>Position</th>
+                            <th>List Type</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for level in case_insensitive_levels %}
+                        <tr>
+                            <td>{{ level.name }}</td>
+                            <td><code>{{ level.verifier }}</code></td>
+                            <td>{{ level.position }}</td>
+                            <td>{{ "Legacy" if level.is_legacy else "Main" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">No case-insensitive matches found</p>
+            {% endif %}
+
+            <h6 class="mt-4">Partial Match Search</h6>
+            <p>Found {{ partial_levels|length }} levels</p>
+            {% if partial_levels %}
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Level Name</th>
+                            <th>Verifier Name</th>
+                            <th>Position</th>
+                            <th>List Type</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for level in partial_levels %}
+                        <tr>
+                            <td>{{ level.name }}</td>
+                            <td><code>{{ level.verifier }}</code></td>
+                            <td>{{ level.position }}</td>
+                            <td>{{ "Legacy" if level.is_legacy else "Main" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">No partial matches found</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">Similar Verifier Names</h5>
+        </div>
+        <div class="card-body">
+            {% if similar_verifiers %}
+            <p>These verifier names contain "{{ verifier_name }}":</p>
+            <ul>
+                {% for verifier in similar_verifiers %}
+                <li><code>{{ verifier }}</code> - <a href="{{ url_for('admin_debug_verifier', verifier_name=verifier) }}">Debug this verifier</a></li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p>No similar verifier names found</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

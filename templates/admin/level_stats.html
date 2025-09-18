@@ -1,0 +1,237 @@
+{% extends "layout.html" %}
+
+{% block title %}Level Statistics - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="display-4">📊 Level Statistics Dashboard</h1>
+            <p class="lead text-muted">Comprehensive overview of your RTL data</p>
+        </div>
+    </div>
+    
+    <!-- Main Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h2 class="display-4">{{ stats.main_levels }}</h2>
+                    <p class="mb-0">🏆 Main Levels</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h2 class="display-4">{{ stats.legacy_levels }}</h2>
+                    <p class="mb-0">🕰️ Legacy Levels</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h2 class="display-4">{{ stats.future_levels }}</h2>
+                    <p class="mb-0">🚀 Future Levels</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body text-center">
+                    <h2 class="display-4">{{ stats.pending_records }}</h2>
+                    <p class="mb-0">⏳ Pending Records</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Secondary Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h4>{{ stats.total_records }}</h4>
+                    <small class="text-muted">Total Records</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h4>{{ stats.approved_records }}</h4>
+                    <small class="text-muted">Approved Records</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h4>{{ stats.total_users }}</h4>
+                    <small class="text-muted">Total Users</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h4>{{ stats.active_users }}</h4>
+                    <small class="text-muted">Active Users</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h4>{{ stats.changelog_entries }}</h4>
+                    <small class="text-muted">Changelog Entries</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h4>{{ stats.active_announcements }}</h4>
+                    <small class="text-muted">Active Announcements</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Top Creators -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">🎨 Top Creators</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        {% for creator in top_creators %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ creator._id }}
+                            <span class="badge bg-primary rounded-pill">{{ creator.count }} levels</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Top Verifiers -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">✅ Top Verifiers</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        {% for verifier in top_verifiers %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ verifier._id }}
+                            <span class="badge bg-success rounded-pill">{{ verifier.count }} levels</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Difficulty Distribution -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">📊 Difficulty Distribution</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        {% for diff in difficulty_dist %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ get_difficulty_text(diff._id or 5) }} Difficulty
+                            <span class="badge bg-warning text-dark rounded-pill">{{ diff.count }} levels</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Activity -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">📝 Recent Changelog Activity</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent_changelog %}
+                        {% for entry in recent_changelog %}
+                        <div class="border-bottom p-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="badge bg-{{ 'success' if entry.action == 'placed' else 'warning' if entry.action == 'moved' else 'info' if entry.action == 'legacy' else 'danger' }} me-2">
+                                        {{ entry.action.upper() }}
+                                    </span>
+                                    <strong>{{ entry.level_name }}</strong>
+                                    {% if entry.action == 'placed' %}
+                                        placed at #{{ entry.position }} on {{ entry.list_type }} list
+                                    {% elif entry.action == 'moved' %}
+                                        moved from #{{ entry.old_position }} to #{{ entry.new_position }}
+                                    {% elif entry.action == 'legacy' %}
+                                        moved to legacy list
+                                    {% elif entry.action == 'removed' %}
+                                        removed from {{ entry.list_type }} list
+                                    {% endif %}
+                                </div>
+                                <small class="text-muted">
+                                    {{ entry.timestamp.strftime('%Y-%m-%d %H:%M') if entry.timestamp else 'Unknown time' }}
+                                </small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <p class="text-muted">No recent activity</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">⚡ Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a href="{{ url_for('admin_levels') }}" class="btn btn-primary">
+                            🏆 Manage Main Levels
+                        </a>
+                        <a href="{{ url_for('admin_future_levels') }}" class="btn btn-success">
+                            🚀 Manage Future Levels
+                        </a>
+                        <a href="{{ url_for('admin_announcements') }}" class="btn btn-warning">
+                            📢 Manage Announcements
+                        </a>
+                        <a href="{{ url_for('changelog') }}" class="btn btn-info">
+                            📝 View Changelog
+                        </a>
+                        <form method="POST" action="{{ url_for('admin_clear_changelog') }}" style="display: inline;">
+                            <input type="hidden" name="action" value="clear_old">
+                            <button type="submit" class="btn btn-outline-danger" onclick="return confirm('Clear old changelog entries (30+ days)?')">
+                                🗑️ Clear Old Changelog
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

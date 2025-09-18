@@ -1,0 +1,124 @@
+{% extends "layout.html" %}
+
+{% block title %}Search Results - {{ query }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-success text-white">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <h4 class="mb-0">🔍 Search Results</h4>
+                        <small>{{ total_results }} result{{ 's' if total_results != 1 else '' }} for "{{ query }}"</small>
+                    </div>
+                    <div class="col-md-6">
+                        <form action="{{ url_for('search_levels') }}" method="GET" class="d-flex">
+                            <div class="input-group input-group-sm">
+                                <span class="input-group-text bg-white">🔍</span>
+                                <input type="text" name="q" class="form-control" placeholder="Search all levels..." value="{{ query }}">
+                                <button class="btn btn-outline-light" type="submit">Search</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                {% if levels %}
+                    {% for level in levels %}
+                    <div class="d-flex align-items-center p-3 border-bottom level-card mb-4" data-level-id="{{ level._id }}" style="cursor: pointer; transition: all 0.2s ease;">
+                        <div class="me-4">
+                            <div class="position-relative">
+                                {% set video_url = level.get('video_url', '') %}
+                                {% if video_url and 'youtube.com' in video_url %}
+                                    {% set video_id = video_url.split('v=')[1].split('&')[0] %}
+                                    <img src="https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg" alt="{{ level.name }}" class="img-fluid rounded" width="206" height="116" loading="lazy" style="object-fit: cover;">
+                                {% elif video_url and 'youtu.be' in video_url %}
+                                    {% set video_id = video_url.split('/')[-1].split('?')[0] %}
+                                    <img src="https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg" alt="{{ level.name }}" class="img-fluid rounded" width="206" height="116" loading="lazy" style="object-fit: cover;">
+                                {% elif video_url and 'vimeo.com' in video_url %}
+                                    {% set video_id = video_url.split('/')[-1] %}
+                                    <img src="https://vumbnail.com/{{ video_id }}.jpg" alt="{{ level.name }}" class="img-fluid rounded" width="206" height="116" loading="lazy" style="object-fit: cover;">
+                                {% else %}
+                                    <div class="bg-secondary rounded d-flex align-items-center justify-content-center text-white" style="width: 206px; height: 116px; font-size: 12px;">🎮 No Video</div>
+                                {% endif %}
+                                <div class="position-absolute top-0 start-0 bg-dark text-white px-2 py-1 rounded">
+                                    #{{ level.position }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h5 class="mb-1">{{ level.name }}</h5>
+                            <p class="mb-1 text-muted">by {{ level.creator }}</p>
+                            <small class="text-muted d-block">verified by {{ level.verifier }}</small>
+                            {% if level.level_id %}
+                                <small class="text-muted d-block">ID: {{ level.level_id }}</small>
+                            {% endif %}
+                        </div>
+                        <div class="text-end">
+                            {% set difficulty = (level.difficulty|default(5.0))|round|int %}
+                            <div class="text-muted"><strong>{{ get_difficulty_text(difficulty) }}</strong></div>
+                            <small class="text-muted">{{ format_points(level.points or 0) }} points</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                        <h5>No levels found</h5>
+                        <p class="text-muted">Try searching for a different term or check your spelling.</p>
+                        <a href="{{ url_for('index') }}" class="btn btn-primary">← Back to Main List</a>
+                    </div>
+                {% endif %}
+            </div>
+            
+            {% if levels %}
+            <div class="card-footer text-center">
+                <a href="{{ url_for('index') }}" class="btn btn-outline-primary">← Back to Main List</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">Search Tips</h4>
+            </div>
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    <li class="mb-2">🎮 <strong>Level names:</strong> "Bloodbath", "Sonic Wave"</li>
+                    <li class="mb-2">👤 <strong>Creators:</strong> "Riot", "Cyclic"</li>
+                    <li class="mb-2">✅ <strong>Verifiers:</strong> "Sunix", "Technical"</li>
+                    <li class="mb-2">🔍 <strong>Partial matches:</strong> "Blood" finds "Bloodbath"</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Quick Links</h4>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('index') }}" class="btn btn-outline-primary">📋 Main List</a>
+                    <a href="{{ url_for('legacy') }}" class="btn btn-outline-secondary">📜 Legacy List</a>
+                    <a href="{{ url_for('submit_record') }}" class="btn btn-outline-success">📝 Submit Record</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Add click event to level cards
+    document.querySelectorAll('.level-card').forEach(card => {
+        card.addEventListener('click', function() {
+            const levelId = this.getAttribute('data-level-id');
+            window.location = '/level/' + levelId;
+        });
+    });
+</script>
+{% endblock %}

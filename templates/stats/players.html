@@ -1,0 +1,83 @@
+{% extends "layout.html" %}
+
+{% block title %}Players - Statistics{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>🏆 Player Statistics</h1>
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('stats_overview') }}" class="btn btn-outline-secondary">📈 Overview</a>
+                    <a href="{{ url_for('stats_levels') }}" class="btn btn-outline-success">🎮 Levels</a>
+                    <a href="{{ url_for('stats_records') }}" class="btn btn-outline-info">📋 Records</a>
+                    <a href="{{ url_for('stats_activity') }}" class="btn btn-outline-warning">🕒 Activity</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Top Players by Points -->
+        <div class="col-12 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-gradient text-white" style="background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);">
+                    <h5 class="mb-0">🏆 Top Players by Points</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if stats.top_players %}
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Rank</th>
+                                        <th>Player</th>
+                                        <th>Points</th>
+                                        <th>Joined</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for player in stats.top_players %}
+                                    <tr>
+                                        <td>
+                                            <span class="badge {% if loop.index == 1 %}bg-warning{% elif loop.index == 2 %}bg-secondary{% elif loop.index == 3 %}bg-dark{% else %}bg-light text-dark{% endif %}">
+                                                #{{ loop.index }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('public_profile', username=player.username) }}" class="text-decoration-none">
+                                                {{ player.nickname or player.username }}
+                                            </a>
+                                        </td>
+                                        <td><strong>{{ format_points(player.points) }}</strong></td>
+                                        <td>
+                                            <small class="text-muted">
+                                                {{ player.date_joined.strftime('%b %Y') if player.date_joined else 'Unknown' }}
+                                            </small>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <div class="text-muted">No players with points yet</div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+
+    </div>
+
+
+
+    <div class="text-center mt-4">
+        <a href="{{ url_for('stats_overview') }}" class="btn btn-primary">← Back to Overview</a>
+        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">🏠 Main List</a>
+    </div>
+</div>
+{% endblock %}

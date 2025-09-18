@@ -1,0 +1,377 @@
+{% extends "layout.html" %}
+
+{% block title %}Settings - {{ user.username }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h1>⚙️ Account Settings</h1>
+                <a href="{{ url_for('profile') }}" class="btn btn-secondary">← Back to Profile</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 1: Profile Information and Profile Picture -->
+    <div class="row">
+        <div class="col-lg-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">👤 Profile Information</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('update_user_settings') }}">
+                        <input type="hidden" name="action" value="profile">
+                        
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username</label>
+                            <input type="text" class="form-control form-control-sm" id="username" name="username" 
+                                   value="{{ user.username }}" required minlength="3">
+                            <div id="username-feedback" class="form-text">This is your unique identifier</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="nickname" class="form-label">Display Name</label>
+                            <input type="text" class="form-control form-control-sm" id="nickname" name="nickname" 
+                                   value="{{ user.nickname or '' }}" placeholder="Optional display name">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control form-control-sm" id="email" name="email" 
+                                   value="{{ user.email }}" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="country" class="form-label">Country</label>
+                            <select class="form-select form-select-sm" id="country" name="country">
+                                <option value="">Select country</option>
+                                <option value="US" {% if user.country == 'US' %}selected{% endif %}>🇺🇸 United States</option>
+                                <option value="GB" {% if user.country == 'GB' %}selected{% endif %}>🇬🇧 United Kingdom</option>
+                                <option value="CA" {% if user.country == 'CA' %}selected{% endif %}>🇨🇦 Canada</option>
+                                <option value="DE" {% if user.country == 'DE' %}selected{% endif %}>🇩🇪 Germany</option>
+                                <option value="FR" {% if user.country == 'FR' %}selected{% endif %}>🇫🇷 France</option>
+                                <option value="ES" {% if user.country == 'ES' %}selected{% endif %}>🇪🇸 Spain</option>
+                                <option value="IT" {% if user.country == 'IT' %}selected{% endif %}>🇮🇹 Italy</option>
+                                <option value="NL" {% if user.country == 'NL' %}selected{% endif %}>🇳🇱 Netherlands</option>
+                                <option value="SE" {% if user.country == 'SE' %}selected{% endif %}>🇸🇪 Sweden</option>
+                                <option value="NO" {% if user.country == 'NO' %}selected{% endif %}>🇳🇴 Norway</option>
+                                <option value="AU" {% if user.country == 'AU' %}selected{% endif %}>🇦🇺 Australia</option>
+                                <option value="JP" {% if user.country == 'JP' %}selected{% endif %}>🇯🇵 Japan</option>
+                                <option value="KR" {% if user.country == 'KR' %}selected{% endif %}>🇰🇷 South Korea</option>
+                                <option value="CN" {% if user.country == 'CN' %}selected{% endif %}>🇨🇳 China</option>
+                                <option value="BR" {% if user.country == 'BR' %}selected{% endif %}>🇧🇷 Brazil</option>
+                                <option value="MX" {% if user.country == 'MX' %}selected{% endif %}>🇲🇽 Mexico</option>
+                                <option value="RU" {% if user.country == 'RU' %}selected{% endif %}>🇷🇺 Russia</option>
+                                <option value="IN" {% if user.country == 'IN' %}selected{% endif %}>🇮🇳 India</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="bio" class="form-label">Bio</label>
+                            <textarea class="form-control form-control-sm" id="bio" name="bio" rows="2" 
+                                      placeholder="Tell us about yourself...">{{ user.bio or '' }}</textarea>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-sm w-100">💾 Update Profile</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">🖼️ Profile Picture</h5>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-3">
+                        {% if user.avatar_url %}
+                            <img src="{{ user.avatar_url }}" alt="Current Avatar" 
+                                 class="rounded-circle" width="100" height="100" style="object-fit: cover;">
+                        {% else %}
+                            <div class="bg-secondary rounded-circle d-inline-flex align-items-center justify-content-center text-white" 
+                                 style="width: 100px; height: 100px; font-size: 36px;">
+                                {{ user.username[0].upper() }}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <form method="POST" action="{{ url_for('update_user_settings') }}" enctype="multipart/form-data">
+                        <input type="hidden" name="action" value="avatar">
+                        
+                        <div class="mb-3">
+                            <label for="avatar" class="form-label">Upload Picture</label>
+                            <input type="file" class="form-control form-control-sm" id="avatar" name="avatar" accept="image/*">
+                            <div class="form-text">Max 5MB</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="avatar_url" class="form-label">Or URL</label>
+                            <input type="url" class="form-control form-control-sm" id="avatar_url" name="avatar_url" 
+                                   value="{{ user.avatar_url or '' }}" placeholder="https://example.com/image.jpg">
+                        </div>
+                        
+                        <button type="submit" class="btn btn-success btn-sm w-100">📷 Update</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 2: Preferences and Social Media -->
+    <div class="row">
+        <div class="col-lg-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">🎨 Preferences</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('update_user_settings') }}">
+                        <input type="hidden" name="action" value="preferences">
+                        
+                        <div class="mb-3">
+                            <label for="theme" class="form-label">Theme</label>
+                            <select class="form-select form-select-sm" id="theme" name="theme">
+                                <option value="light" {% if not user.theme or user.theme == 'light' %}selected{% endif %}>☀️ Light</option>
+                                <option value="dark" {% if user.theme == 'dark' %}selected{% endif %}>🌙 Dark</option>
+                                <option value="auto" {% if user.theme == 'auto' %}selected{% endif %}>🔄 Auto</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="timezone" class="form-label">Timezone</label>
+                            <select class="form-select form-select-sm" id="timezone" name="timezone">
+                                <option value="UTC" {% if not user.timezone or user.timezone == 'UTC' %}selected{% endif %}>UTC</option>
+                                <option value="US/Eastern" {% if user.timezone == 'US/Eastern' %}selected{% endif %}>Eastern</option>
+                                <option value="US/Central" {% if user.timezone == 'US/Central' %}selected{% endif %}>Central</option>
+                                <option value="US/Pacific" {% if user.timezone == 'US/Pacific' %}selected{% endif %}>Pacific</option>
+                                <option value="Europe/London" {% if user.timezone == 'Europe/London' %}selected{% endif %}>London</option>
+                                <option value="Europe/Berlin" {% if user.timezone == 'Europe/Berlin' %}selected{% endif %}>Berlin</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="email_notifications" 
+                                       name="email_notifications" {% if user.email_notifications %}checked{% endif %}>
+                                <label class="form-check-label" for="email_notifications">
+                                    📧 Email notifications
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="public_profile" 
+                                       name="public_profile" {% if user.public_profile != False %}checked{% endif %}>
+                                <label class="form-check-label" for="public_profile">
+                                    🌐 Public profile
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-info btn-sm w-100">💾 Save</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">🔗 Social Media</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('update_user_settings') }}">
+                        <input type="hidden" name="action" value="social_media">
+                        
+                        <div class="mb-2">
+                            <label for="youtube_url" class="form-label">
+                                <i class="fab fa-youtube text-danger"></i> YouTube
+                            </label>
+                            <input type="url" class="form-control form-control-sm" id="youtube_url" name="youtube_url" 
+                                   value="{{ user.youtube_url or '' }}" placeholder="https://youtube.com/@channel">
+                        </div>
+                        
+                        <div class="mb-2">
+                            <label for="twitch_url" class="form-label">
+                                <i class="fab fa-twitch text-purple"></i> Twitch
+                            </label>
+                            <input type="url" class="form-control form-control-sm" id="twitch_url" name="twitch_url" 
+                                   value="{{ user.twitch_url or '' }}" placeholder="https://twitch.tv/channel">
+                        </div>
+                        
+                        <div class="mb-2">
+                            <label for="discord_tag" class="form-label">
+                                <i class="fab fa-discord text-primary"></i> Discord
+                            </label>
+                            <input type="text" class="form-control form-control-sm" id="discord_tag" name="discord_tag" 
+                                   value="{{ user.discord_tag or '' }}" placeholder="username#1234">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="twitter_url" class="form-label">
+                                <i class="fab fa-twitter text-info"></i> Twitter/X
+                            </label>
+                            <input type="url" class="form-control form-control-sm" id="twitter_url" name="twitter_url" 
+                                   value="{{ user.twitter_url or '' }}" placeholder="https://twitter.com/username">
+                        </div>
+                        
+                        <button type="submit" class="btn btn-warning btn-sm w-100">🔗 Update</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 3: Change Password and Account Info -->
+    <div class="row">
+        <div class="col-lg-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">🔒 Change Password</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('update_user_settings') }}">
+                        <input type="hidden" name="action" value="password">
+                        
+                        <div class="mb-3">
+                            <label for="current_password" class="form-label">Current Password</label>
+                            <input type="password" class="form-control form-control-sm" id="current_password" 
+                                   name="current_password" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="new_password" class="form-label">New Password</label>
+                            <input type="password" class="form-control form-control-sm" id="new_password" 
+                                   name="new_password" required minlength="6">
+                            <div class="form-text">At least 6 characters</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="confirm_password" class="form-label">Confirm Password</label>
+                            <input type="password" class="form-control form-control-sm" id="confirm_password" 
+                                   name="confirm_password" required minlength="6">
+                        </div>
+                        
+                        <button type="submit" class="btn btn-danger btn-sm w-100">🔑 Change</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">📊 Account Info</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <div class="text-center p-2 bg-light rounded">
+                                <h5 class="text-primary mb-1">{{ format_points(user.points or 0) }}</h5>
+                                <small class="text-muted">Points</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center p-2 bg-light rounded">
+                                <h5 class="text-success mb-1">{{ user.date_joined.strftime('%Y') if user.date_joined else '?' }}</h5>
+                                <small class="text-muted">Joined</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <p class="mb-2"><strong>Status:</strong> 
+                        {% if user.is_admin %}
+                            <span class="badge bg-success">Admin</span>
+                        {% else %}
+                            <span class="badge bg-primary">Member</span>
+                        {% endif %}
+                    </p>
+                    
+                    {% if user.google_id %}
+                        <p class="mb-3"><strong>Linked:</strong> <span class="badge bg-info">Google</span></p>
+                    {% endif %}
+                    
+                    <div class="d-grid gap-1">
+                        <a href="{{ url_for('profile') }}" class="btn btn-outline-primary btn-sm">
+                            👤 My Profile
+                        </a>
+                        <a href="/user/{{ user.username }}" class="btn btn-outline-success btn-sm" target="_blank">
+                            🔗 Public Link
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Danger Zone -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">⚠️ Danger Zone</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <h6>Reset API Key</h6>
+                            <p class="text-muted">Generate a new API key. This will invalidate your current key.</p>
+                        </div>
+                        <div class="col-md-4">
+                            <button type="button" class="btn btn-warning btn-sm w-100" data-bs-toggle="modal" data-bs-target="#resetApiModal">
+                                🔑 Reset API Key
+                            </button>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h6>Delete Account</h6>
+                            <p class="text-muted">Permanently delete your account. This cannot be undone.</p>
+                        </div>
+                        <div class="col-md-4">
+                            <button type="button" class="btn btn-danger btn-sm w-100" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                                🗑️ Delete Account
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modals would go here but keeping it simple for now -->
+
+<script>
+// Form validation and interactions
+document.addEventListener('DOMContentLoaded', function() {
+    // Password confirmation validation
+    const newPassword = document.getElementById('new_password');
+    const confirmPassword = document.getElementById('confirm_password');
+    
+    if (newPassword && confirmPassword) {
+        function validatePasswords() {
+            if (newPassword.value && confirmPassword.value) {
+                if (newPassword.value === confirmPassword.value) {
+                    confirmPassword.setCustomValidity('');
+                    confirmPassword.classList.remove('is-invalid');
+                    confirmPassword.classList.add('is-valid');
+                } else {
+                    confirmPassword.setCustomValidity('Passwords do not match');
+                    confirmPassword.classList.remove('is-valid');
+                    confirmPassword.classList.add('is-invalid');
+                }
+            }
+        }
+        
+        newPassword.addEventListener('input', validatePasswords);
+        confirmPassword.addEventListener('input', validatePasswords);
+    }
+});
+</script>
+{% endblock %}

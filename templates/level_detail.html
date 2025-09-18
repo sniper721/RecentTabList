@@ -212,10 +212,44 @@
                 <h4 class="mb-0">Position History</h4>
             </div>
             <div class="card-body">
-                <p class="text-center">
+                <p class="text-center mb-3">
                     <strong>Current Position:</strong> #{{ position }}
                 </p>
-                <p class="text-muted text-center small">Position history tracking will be implemented in a future update.</p>
+                
+                {% if position_history %}
+                    <div class="timeline">
+                        {% for change in position_history %}
+                        <div class="timeline-item mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="timeline-icon me-3">
+                                    {% if change.change_type == 'move_up' %}
+                                        <span class="badge bg-success">↑</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">↓</span>
+                                    {% endif %}
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>
+                                                #{{ change.old_position }} → #{{ change.new_position }}
+                                            </strong>
+                                            <small class="text-muted d-block">
+                                                by {{ change.changed_by }}
+                                            </small>
+                                        </div>
+                                        <small class="text-muted">
+                                            {{ change.change_date.strftime('%Y-%m-%d %H:%M') }}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted text-center small">No position changes recorded yet.</p>
+                {% endif %}
             </div>
         </div>
         {% endif %}

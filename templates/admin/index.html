@@ -1,125 +1,211 @@
 {% extends "layout.html" %}
 
-{% block title %}Admin Dashboard - GD Recent Tab List{% endblock %}
+{% block title %}Admin Panel{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card shadow-sm">
-            <div class="card-header bg-dark text-white">
-                <h2 class="mb-0">Admin Dashboard</h2>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>🔐 Admin Panel</h1>
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">← Back to Site</a>
             </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-4">
-                        <div class="card mb-3">
-                            <div class="card-body text-center">
-                                <h1 class="display-4">{{ pending_records|length }}</h1>
-                                <p class="lead">Pending Records</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-8">
-                        <div class="d-flex gap-2 mb-3">
-                            <a href="{{ url_for('admin_levels') }}" class="btn btn-primary">
-                                <i class="fas fa-list"></i> Manage Levels
-                            </a>
-                            <a href="{{ url_for('admin_users') }}" class="btn btn-secondary">
-                                <i class="fas fa-users"></i> Manage Users
-                            </a>
-                            <a href="#" class="btn btn-info">
-                                <i class="fas fa-cog"></i> Settings
-                            </a>
-                        </div>
-                    </div>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <!-- Stats Overview -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <h5 class="card-title">Users</h5>
+                    <h3>{{ stats.total_users }}</h3>
+                    <p class="mb-0">{{ stats.new_users_24h }} new in 24h</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h5 class="card-title">Levels</h5>
+                    <h3>{{ stats.total_levels }}</h3>
+                    <p class="mb-0">{{ stats.new_levels_24h }} new in 24h</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <h5 class="card-title">Records</h5>
+                    <h3>{{ stats.total_records }}</h3>
+                    <p class="mb-0">{{ stats.new_records_24h }} new in 24h</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-danger">
+                <div class="card-body">
+                    <h5 class="card-title">Pending</h5>
+                    <h3>{{ stats.pending_records }}</h3>
+                    <p class="mb-0">Records to review</p>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<div class="row">
-    <div class="col-12">
-        <div class="card shadow-sm">
-            <div class="card-header bg-warning text-dark">
-                <h3 class="mb-0">Pending Records</h3>
+    <!-- Main Content -->
+    <div class="row">
+        <!-- Left Column -->
+        <div class="col-md-6">
+            <!-- Level Management -->
+            <div class="card mb-4">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">📋 Level Management</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('admin_levels') }}" class="btn btn-success">
+                            📋 Manage Main List
+                        </a>
+                        <a href="{{ url_for('admin_levels') }}?filter=legacy" class="btn btn-info">
+                            📚 Manage Legacy List
+                        </a>
+                        <a href="{{ url_for('admin_future_levels') }}" class="btn btn-primary">
+                            🔮 Manage Future List
+                        </a>
+                        <a href="{{ url_for('admin_levels') }}" class="btn btn-warning">
+                            ➕ Add New Level
+                        </a>
+                    </div>
+                </div>
             </div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-striped mb-0">
-                        <thead class="table-dark">
-                            <tr>
-                                <th>User</th>
-                                <th>Level</th>
-                                <th>Progress</th>
-                                <th>Submitted</th>
-                                <th>Video</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for record in pending_records %}
-                            <tr>
-                                <td>{{ record.user.username }}</td>
-                                <td>
-                                    <a href="{{ url_for('level_detail', level_id=record.level._id) }}">
-                                        {{ record.level.name }}
-                                    </a>
-                                </td>
-                                <td>
-                                    {% if record.progress == 100 %}
-                                    <span class="badge bg-success">100%</span>
-                                    {% else %}
-                                    <span class="badge bg-warning">{{ record.progress }}%</span>
-                                    {% endif %}
-                                </td>
-                                <td>{{ record.date_submitted.strftime('%Y-%m-%d') }}</td>
-                                <td>
-                                    {% if record.video_url %}
-                                        {% set video_info = get_video_embed_info(record.video_url) %}
-                                        {% if video_info %}
-                                            {% if video_info.platform == 'youtube' %}
-                                                <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-danger" title="YouTube">
-                                                    <i class="fab fa-youtube"></i> Watch
-                                                </a>
-                                            {% elif video_info.platform == 'streamable' %}
-                                                <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-primary" title="Streamable">
-                                                    <i class="fas fa-play"></i> Watch
-                                                </a>
-                                            {% elif video_info.platform == 'tiktok' %}
-                                                <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-dark" title="TikTok">
-                                                    <i class="fab fa-tiktok"></i> Watch
-                                                </a>
-                                            {% endif %}
-                                        {% else %}
-                                            <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-secondary" title="Video">
-                                                <i class="fas fa-external-link-alt"></i> Watch
-                                            </a>
-                                        {% endif %}
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <div class="btn-group" role="group">
-                                        <form method="POST" action="{{ url_for('admin_approve_record', record_id=record._id) }}" class="d-inline">
-                                            <button type="submit" class="btn btn-sm btn-success">
-                                                <i class="fas fa-check"></i> Approve
-                                            </button>
-                                        </form>
-                                        <form method="POST" action="{{ url_for('admin_reject_record', record_id=record._id) }}" class="d-inline ms-1">
-                                            <button type="submit" class="btn btn-sm btn-danger">
-                                                <i class="fas fa-times"></i> Reject
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="6" class="text-center py-3">No pending records to review.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+
+            <!-- User Management -->
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">👥 User Management</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('admin_users') }}" class="btn btn-primary">
+                            👥 Manage Users
+                        </a>
+                        <a href="{{ url_for('admin_records') }}" class="btn btn-success">
+                            📝 Manage Records
+                        </a>
+                        <a href="{{ url_for('admin_records') }}?status=pending" class="btn btn-info">
+                            ✅ Approve Records ({{ stats.pending_records }})
+                        </a>
+                        <a href="{{ url_for('admin_records') }}?status=rejected" class="btn btn-warning">
+                            ❌ Rejected Records
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Management -->
+            <div class="card mb-4">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">📝 Content Management</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('admin_news') }}" class="btn btn-primary">
+                            📰 Manage News
+                        </a>
+                        <a href="{{ url_for('admin_polls') }}" class="btn btn-success">
+                            📊 Manage Polls
+                        </a>
+                        <a href="{{ url_for('admin_announcements') }}" class="btn btn-info">
+                            📢 Manage Announcements
+                        </a>
+                        <a href="{{ url_for('admin_create_news') }}" class="btn btn-warning">
+                            ✍️ Create News Article
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="col-md-6">
+            <!-- System Controls -->
+            <div class="card mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">⚙️ System Controls</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('admin_settings') }}" class="btn btn-primary">
+                            ⚙️ General Settings
+                        </a>
+                        <a href="{{ url_for('admin_webhook_settings') }}" class="btn btn-success">
+                            📡 Webhook Settings
+                        </a>
+                        <a href="{{ url_for('admin_level_stats') }}" class="btn btn-info">
+                            📈 Level Statistics
+                        </a>
+                        <a href="{{ url_for('changelog') }}" class="btn btn-warning">
+                            📝 View Changelog
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin Tools -->
+            <div class="card mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">🛠️ Admin Tools</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="/admin/tools" class="btn btn-danger">
+                            🚫 IP Ban & User Tools
+                        </a>
+                        <a href="{{ url_for('admin_award_verifier_points_dedicated') }}" class="btn btn-success">
+                            🏆 Award Verifier Points
+                        </a>
+                        <a href="/debug_db" class="btn btn-outline-primary">
+                            🔍 Debug Database
+                        </a>
+                        <a href="/virtual" class="btn btn-outline-success">
+                            🚀 Virtual View
+                        </a>
+                        <a href="/test_speed" class="btn btn-outline-info">
+                            ⏱️ Speed Test
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">⚡ Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="/debug_levels" class="btn btn-outline-warning">
+                            🐛 Debug Levels
+                        </a>
+                        <a href="/debug_images" class="btn btn-outline-danger">
+                            🖼️ Debug Images
+                        </a>
+                        <a href="/debug_thumbnails" class="btn btn-outline-dark">
+                            🖼️ Thumbnails
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>

@@ -1,0 +1,350 @@
+{% extends "layout.html" %}
+
+{% block title %}Statistics - RTL{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="text-center mb-4">
+                <h1 class="display-4">📊 RTL Statistics</h1>
+                <p class="lead text-muted">Comprehensive statistics and insights</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overview Cards -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-primary text-white h-100">
+                <div class="card-body text-center">
+                    <div class="display-6 mb-2">{{ stats.levels.total }}</div>
+                    <h5>Total Levels</h5>
+                    <small>Demonlist stats ⁨{{ stats.levels.main }}⁩ Main, ⁨{{ stats.levels.legacy }}⁩ Extended, ⁨0⁩ Legacy</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-success text-white h-100">
+                <div class="card-body text-center">
+                    <div class="display-6 mb-2">{{ stats.users.total }}</div>
+                    <h5>Total Users</h5>
+                    <small>{{ stats.users.active }} Active ({{ stats.users.active_rate }}%)</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-info text-white h-100">
+                <div class="card-body text-center">
+                    <div class="display-6 mb-2">{{ stats.records.total }}</div>
+                    <h5>Total Records</h5>
+                    <small>{{ stats.records.approved }} Approved ({{ stats.records.approval_rate }}%)</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-warning text-dark h-100">
+                <div class="card-body text-center">
+                    <div class="display-6 mb-2">{{ stats.records.completed }}</div>
+                    <h5>Completions</h5>
+                    <small>{{ stats.records.completion_rate }}% Completion Rate</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Top Players -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-gradient text-white" style="background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);">
+                    <h5 class="mb-0">🏆 Top Players</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if stats.top_players %}
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Rank</th>
+                                        <th>Player</th>
+                                        <th>Points</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for player in stats.top_players %}
+                                    <tr>
+                                        <td>
+                                            <span class="badge {% if loop.index == 1 %}bg-warning{% elif loop.index == 2 %}bg-secondary{% elif loop.index == 3 %}bg-dark{% else %}bg-light text-dark{% endif %}">
+                                                #{{ loop.index }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('public_profile', username=player.username) }}" class="text-decoration-none">
+                                                {{ player.nickname or player.username }}
+                                            </a>
+                                        </td>
+                                        <td><strong>{{ player.points }}</strong></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <div class="text-muted">No players with points yet</div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Most Active Levels -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-gradient text-white" style="background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);">
+                    <h5 class="mb-0">🔥 Most Active Levels</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if stats.most_active_levels %}
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Level</th>
+                                        <th>Records</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in stats.most_active_levels %}
+                                    <tr>
+                                        <td>
+                                            <a href="{{ url_for('level_detail', level_id=item.level._id) }}" class="text-decoration-none">
+                                                <strong>{{ item.level.name }}</strong>
+                                            </a>
+                                            <br>
+                                            <small class="text-muted">by {{ item.level.creator }}</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-primary">{{ item.record_count }}</span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <div class="text-muted">No records yet</div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Record Status Breakdown -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="mb-0">📈 Record Status</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>Approved</span>
+                            <span class="text-success"><strong>{{ stats.records.approved }}</strong></span>
+                        </div>
+                        <div class="progress mb-2">
+                            <div class="progress-bar bg-success" style="width: {{ (stats.records.approved / stats.records.total * 100) if stats.records.total > 0 else 0 }}%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>Pending</span>
+                            <span class="text-warning"><strong>{{ stats.records.pending }}</strong></span>
+                        </div>
+                        <div class="progress mb-2">
+                            <div class="progress-bar bg-warning" style="width: {{ (stats.records.pending / stats.records.total * 100) if stats.records.total > 0 else 0 }}%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>Rejected</span>
+                            <span class="text-danger"><strong>{{ stats.records.rejected }}</strong></span>
+                        </div>
+                        <div class="progress mb-2">
+                            <div class="progress-bar bg-danger" style="width: {{ (stats.records.rejected / stats.records.total * 100) if stats.records.total > 0 else 0 }}%"></div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    <div class="text-center">
+                        <small class="text-muted">Approval Rate: {{ stats.records.approval_rate }}%</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Difficulty Distribution -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">⭐ Difficulty Distribution</h5>
+                </div>
+                <div class="card-body">
+                    {% if stats.difficulty_distribution %}
+                        {% for diff in stats.difficulty_distribution %}
+                        <div class="mb-2">
+                            <div class="d-flex justify-content-between">
+                                <span>{{ diff._id or 'Unknown' }}/10</span>
+                                <span><strong>{{ diff.count }}</strong></span>
+                            </div>
+                            <div class="progress" style="height: 8px;">
+                                {% set max_count = stats.difficulty_distribution|map(attribute='count')|max %}
+                                <div class="progress-bar bg-info" style="width: {{ (diff.count / max_count * 100) if max_count > 0 else 0 }}%"></div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <div class="text-muted">No difficulty data</div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">⚡ Quick Stats</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6 mb-3">
+                            <div class="h4 text-primary">{{ stats.users.admins }}</div>
+                            <small class="text-muted">Admins</small>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <div class="h4 text-success">{{ stats.records.completed }}</div>
+                            <small class="text-muted">100% Records</small>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <div class="h4 text-warning">{{ stats.records.partial }}</div>
+                            <small class="text-muted">Partial Records</small>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <div class="h4 text-info">{{ stats.levels.main + stats.levels.legacy }}</div>
+                            <small class="text-muted">All Levels</small>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="text-center">
+                        <small class="text-muted">
+                            Last updated: {{ moment().format('MMM DD, YYYY HH:mm') if moment else 'Now' }}
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-gradient text-white" style="background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);">
+                    <h5 class="mb-0">🕒 Recent Activity</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if stats.recent_activity %}
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Player</th>
+                                        <th>Level</th>
+                                        <th>Progress</th>
+                                        <th>Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for activity in stats.recent_activity %}
+                                    <tr>
+                                        <td>
+                                            <a href="{{ url_for('public_profile', username=activity.user.username) }}" class="text-decoration-none">
+                                                {{ activity.user.nickname or activity.user.username }}
+                                            </a>
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('level_detail', level_id=activity.level._id) }}" class="text-decoration-none">
+                                                {{ activity.level.name }}
+                                            </a>
+                                        </td>
+                                        <td>
+                                            <span class="badge {% if activity.progress == 100 %}bg-success{% else %}bg-warning{% endif %}">
+                                                {{ activity.progress }}%
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">
+                                                {{ activity.date_submitted.strftime('%b %d, %Y') if activity.date_submitted else 'Unknown' }}
+                                            </small>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <div class="text-muted">No recent activity</div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center mt-4">
+        <a href="{{ url_for('index') }}" class="btn btn-primary">
+            ← Back to Main List
+        </a>
+        {% if session.get('is_admin') %}
+        <a href="{{ url_for('admin_settings') }}" class="btn btn-outline-secondary">
+            🔧 Admin Settings
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.bg-gradient {
+    background: linear-gradient(45deg, #667eea 0%, #764ba2 100%) !important;
+}
+
+.card {
+    transition: transform 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.progress {
+    height: 6px;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+</style>
+{% endblock %}

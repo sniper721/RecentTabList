@@ -1,0 +1,212 @@
+{% extends "layout.html" %}
+
+{% block title %}🎲 Level Randomizer - RTL{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            <div class="text-center mb-5">
+                <h1 class="display-4">🎲 Smart Level Randomizer</h1>
+                <p class="lead text-muted">Can't decide what to play? Let our smart randomizer pick the perfect level for you!</p>
+            </div>
+            
+            <!-- Filters -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🎯 Customize Your Random Pick</h5>
+                </div>
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Difficulty</label>
+                            <select name="difficulty" class="form-select">
+                                <option value="any" {% if filters.difficulty == 'any' %}selected{% endif %}>Any Difficulty</option>
+                                <option value="easy" {% if filters.difficulty == 'easy' %}selected{% endif %}>Easy (1-4)</option>
+                                <option value="medium" {% if filters.difficulty == 'medium' %}selected{% endif %}>Medium (4-7)</option>
+                                <option value="hard" {% if filters.difficulty == 'hard' %}selected{% endif %}>Hard (7-10)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <label class="form-label">List Type</label>
+                            <select name="list_type" class="form-select">
+                                <option value="any" {% if filters.list_type == 'any' %}selected{% endif %}>Any List</option>
+                                <option value="main" {% if filters.list_type == 'main' %}selected{% endif %}>🏆 Main List</option>
+                                <option value="legacy" {% if filters.list_type == 'legacy' %}selected{% endif %}>🕰️ Legacy List</option>
+                            </select>
+                        </div>
+                        
+                        {% if session.user_id %}
+                        <div class="col-md-3">
+                            <label class="form-label">Completion Status</label>
+                            <select name="completed" class="form-select">
+                                <option value="any" {% if filters.completed == 'any' %}selected{% endif %}>Any Status</option>
+                                <option value="completed" {% if filters.completed == 'completed' %}selected{% endif %}>✅ Completed</option>
+                                <option value="not_completed" {% if filters.completed == 'not_completed' %}selected{% endif %}>❌ Not Completed</option>
+                            </select>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="col-md-3 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary w-100">🎲 Get Random Level</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            {% if random_level %}
+            <!-- Random Level Result -->
+            <div class="card shadow-lg">
+                <div class="card-header bg-gradient-primary text-white text-center">
+                    <h4 class="mb-0">🎯 Your Random Level Pick!</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h2 class="mb-3">{{ random_level.name }}</h2>
+                            <div class="row mb-3">
+                                <div class="col-sm-6">
+                                    <p><strong>👤 Creator:</strong> {{ random_level.creator }}</p>
+                                    <p><strong>✅ Verifier:</strong> {{ random_level.verifier }}</p>
+                                </div>
+                                <div class="col-sm-6">
+                                    <p><strong>📊 Difficulty:</strong> {{ random_level.difficulty }}/10</p>
+                                    <p><strong>📍 Position:</strong> #{{ random_level.position }} 
+                                        {% if random_level.is_legacy %}(Legacy){% else %}(Main){% endif %}</p>
+                                </div>
+                            </div>
+                            
+                            {% if random_level.description %}
+                            <div class="mb-3">
+                                <strong>📝 Description:</strong>
+                                <p class="text-muted">{{ random_level.description }}</p>
+                            </div>
+                            {% endif %}
+                            
+                            {% if random_level.video_url %}
+                            <div class="mb-3">
+                                <a href="{{ random_level.video_url }}" target="_blank" class="btn btn-outline-primary">
+                                    🎥 Watch Video
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h5>📈 Level Statistics</h5>
+                                    <div class="mb-2">
+                                        <strong>{{ level_stats.total_attempts }}</strong>
+                                        <br><small class="text-muted">Total Attempts</small>
+                                    </div>
+                                    <div class="mb-2">
+                                        <strong>{{ level_stats.completions }}</strong>
+                                        <br><small class="text-muted">Completions</small>
+                                    </div>
+                                    <div class="mb-2">
+                                        <strong>{{ level_stats.completion_rate|round(1) }}%</strong>
+                                        <br><small class="text-muted">Success Rate</small>
+                                    </div>
+                                    <div class="progress mt-3">
+                                        <div class="progress-bar bg-success" 
+                                             style="width: {{ level_stats.average_progress }}%">
+                                            {{ level_stats.average_progress|round(1) }}%
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">Average Progress</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {% if fun_facts %}
+                    <div class="mt-4">
+                        <h6>🎉 Fun Facts:</h6>
+                        {% for fact in fun_facts %}
+                        <div class="alert alert-info py-2">{{ fact }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="card-footer text-center">
+                    <a href="{{ url_for('level_randomizer') }}" class="btn btn-primary btn-lg">
+                        🎲 Pick Another Level
+                    </a>
+                    {% if random_level.level_id %}
+                    <button class="btn btn-success btn-lg" onclick="copyLevelID('{{ random_level.level_id }}')">
+                        📋 Copy Level ID
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            
+            {% else %}
+            <!-- No Level Found -->
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <h3 class="text-muted">🎲 Ready to discover your next challenge?</h3>
+                    <p class="text-muted">Use the filters above and click "Get Random Level" to find your perfect match!</p>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- How It Works -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">🧠 How Smart Randomization Works</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>🎯 Weighted Selection</h6>
+                            <p class="small text-muted">Higher-ranked levels have a higher chance of being selected from the main list</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>🔍 Smart Filtering</h6>
+                            <p class="small text-muted">Filters by difficulty, completion status, and list type for personalized picks</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function copyLevelID(levelId) {
+    navigator.clipboard.writeText(levelId).then(function() {
+        // Show success message
+        const btn = event.target;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '✅ Copied!';
+        btn.classList.remove('btn-success');
+        btn.classList.add('btn-outline-success');
+        
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.classList.remove('btn-outline-success');
+            btn.classList.add('btn-success');
+        }, 2000);
+    });
+}
+
+// Add some fun animations
+document.addEventListener('DOMContentLoaded', function() {
+    const card = document.querySelector('.shadow-lg');
+    if (card) {
+        card.style.transform = 'scale(0.95)';
+        card.style.opacity = '0';
+        
+        setTimeout(() => {
+            card.style.transition = 'all 0.5s ease';
+            card.style.transform = 'scale(1)';
+            card.style.opacity = '1';
+        }, 100);
+    }
+});
+</script>
+{% endblock %}

@@ -4,5 +4,9 @@ Werkzeug==2.3.7
 Authlib==1.2.1
 requests==2.31.0
 python-dotenv==1.0.0
-pymongo==4.13
+pymongo==4.14
 Flask-PyMongo==2.3.0
+psutil==5.9.8
+Pillow==10.4.0
+qrcode==7.4.2
+python-dateutil==2.8.2

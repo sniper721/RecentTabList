@@ -12,27 +12,105 @@
             <div class="card-body">
                 <div class="text-center mb-4">
                     <div class="profile-avatar mb-3">
-                        <i class="fas fa-user-circle fa-6x text-primary"></i>
+                        {% if user.profile_picture or user.avatar_url %}
+                            <img src="{{ user.profile_picture or user.avatar_url }}" alt="Avatar" class="rounded-circle" width="120" height="120" style="object-fit: cover;"
+                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
+                            <div class="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center text-white" style="width: 120px; height: 120px; font-size: 48px; display: none;">
+                                {{ user.username[0].upper() }}
+                            </div>
+                        {% else %}
+                            <div class="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center text-white" style="width: 120px; height: 120px; font-size: 48px;">
+                                {{ user.username[0].upper() }}
+                            </div>
+                        {% endif %}
                     </div>
-                    <h4>{{ user.username }}</h4>
+                    <h4>
+                        {{ user.nickname or user.username }}
+                        {% if user.nickname %}
+                            <small class="text-muted">({{ user.username }})</small>
+                        {% endif %}
+                    </h4>
+                    
+                    <!-- Country Display -->
+                    {% if user.country %}
+                        {% set country_flags = {
+                            'US': '🇺🇸', 'CA': '🇨🇦', 'GB': '🇬🇧', 'DE': '🇩🇪', 'FR': '🇫🇷', 'ES': '🇪🇸', 'IT': '🇮🇹', 'NL': '🇳🇱', 'PL': '🇵🇱',
+                            'RU': '🇷🇺', 'CN': '🇨🇳', 'JP': '🇯🇵', 'KR': '🇰🇷', 'IN': '🇮🇳', 'AU': '🇦🇺', 'BR': '🇧🇷', 'MX': '🇲🇽', 'AR': '🇦🇷'
+                        } %}
+                        {% set country_names = {
+                            'US': 'United States', 'CA': 'Canada', 'GB': 'United Kingdom', 'DE': 'Germany', 'FR': 'France', 'ES': 'Spain', 'IT': 'Italy', 'NL': 'Netherlands', 'PL': 'Poland',
+                            'RU': 'Russia', 'CN': 'China', 'JP': 'Japan', 'KR': 'South Korea', 'IN': 'India', 'AU': 'Australia', 'BR': 'Brazil', 'MX': 'Mexico', 'AR': 'Argentina'
+                        } %}
+                        <p class="text-muted">
+                            {{ country_flags.get(user.country, '🌍') }} {{ country_names.get(user.country, user.country) }}
+                        </p>
+                    {% endif %}
+                    
                     <p class="text-muted">Member since {{ user.date_joined.strftime('%Y-%m-%d') }}</p>
+                    
+                    {% if user.bio %}
+                        <p class="text-muted fst-italic">"{{ user.bio }}"</p>
+                    {% endif %}
                 </div>
                 
+                <!-- Social Media Links -->
+                {% if user.youtube_url or user.twitch_url or user.tiktok_url or user.vimeo_url or user.discord_tag or user.twitter_url %}
                 <div class="mb-3">
-                    <h5>Stats</h5>
+                    <h6>🔗 Social Media</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% if user.youtube_url %}
+                            <a href="{{ user.youtube_url }}" target="_blank" class="btn btn-outline-danger btn-sm">
+                                <i class="fab fa-youtube"></i> YouTube
+                            </a>
+                        {% endif %}
+                        {% if user.twitch_url %}
+                            <a href="{{ user.twitch_url }}" target="_blank" class="btn btn-outline-primary btn-sm" style="border-color: #9146ff; color: #9146ff;">
+                                <i class="fab fa-twitch"></i> Twitch
+                            </a>
+                        {% endif %}
+                        {% if user.tiktok_url %}
+                            <a href="{{ user.tiktok_url }}" target="_blank" class="btn btn-outline-dark btn-sm">
+                                <i class="fab fa-tiktok"></i> TikTok
+                            </a>
+                        {% endif %}
+                        {% if user.vimeo_url %}
+                            <a href="{{ user.vimeo_url }}" target="_blank" class="btn btn-outline-info btn-sm">
+                                <i class="fab fa-vimeo"></i> Vimeo
+                            </a>
+                        {% endif %}
+                        {% if user.twitter_url %}
+                            <a href="{{ user.twitter_url }}" target="_blank" class="btn btn-outline-info btn-sm">
+                                <i class="fab fa-twitter"></i> Twitter
+                            </a>
+                        {% endif %}
+                        {% if user.discord_tag %}
+                            <span class="btn btn-outline-primary btn-sm">
+                                <i class="fab fa-discord"></i> {{ user.discord_tag }}
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <div class="mb-3">
+                    <h5>📊 Stats</h5>
                     <ul class="list-group">
                         <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Total Records
+                            <span><i class="fas fa-trophy text-warning"></i> Total Points</span>
+                            <span class="badge bg-warning text-dark rounded-pill">{{ format_points(user.points or 0) }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><i class="fas fa-list text-primary"></i> Total Records</span>
                             <span class="badge bg-primary rounded-pill">{{ records|length }}</span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Completed Levels
+                            <span><i class="fas fa-check-circle text-success"></i> Completed Levels</span>
                             <span class="badge bg-success rounded-pill">
                                 {{ records|selectattr('progress', 'equalto', 100)|list|length }}
                             </span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center">
-                            Pending Records
+                            <span><i class="fas fa-clock text-warning"></i> Pending Records</span>
                             <span class="badge bg-warning rounded-pill">
                                 {{ records|selectattr('status', 'equalto', 'pending')|list|length }}
                             </span>
@@ -42,7 +120,26 @@
                 
                 <div class="d-grid gap-2">
                     <a href="{{ url_for('submit_record') }}" class="btn btn-primary">Submit New Record</a>
+                    <a href="{{ url_for('connect_youtube') }}" class="btn btn-outline-danger">
+                        🎥 Connect YouTube Channel
+                    </a>
                 </div>
+                
+                <!-- YouTube Channel Info -->
+                {% if user.youtube_channel or user.youtube_username %}
+                <div class="mt-3">
+                    <h6>🎥 YouTube Channel</h6>
+                    <div class="alert alert-success">
+                        {% if user.youtube_channel %}
+                        <p class="mb-1"><strong>Channel:</strong> <a href="{{ user.youtube_channel }}" target="_blank">{{ user.youtube_channel }}</a></p>
+                        {% endif %}
+                        {% if user.youtube_username %}
+                        <p class="mb-0"><strong>Username:</strong> {{ user.youtube_username }}</p>
+                        {% endif %}
+                        <small class="text-muted">✅ Connected for verifier points</small>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
