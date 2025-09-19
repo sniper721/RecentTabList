@@ -114,10 +114,10 @@
     {% if current_theme.startswith('custom_') and 'user_id' in session %}
     <!-- Custom Theme CSS -->
     <style id="customThemeCSS">
-        {% set user = get_user_by_id(session['user_id']) %}
-        {% if user and user.custom_themes %}
+        {% set current_user = get_user_by_id(session['user_id']) %}
+        {% if current_user and current_user.custom_themes %}
             {% set theme_id = current_theme.replace('custom_', '') %}
-            {% for theme in user.custom_themes %}
+            {% for theme in current_user.custom_themes %}
                 {% if theme.id == theme_id %}
         :root {
             --bs-primary: {{ theme.primary_color }};
@@ -290,9 +290,9 @@
                             <li><a class="dropdown-item theme-option" href="#" data-theme="orange">🧡 Sunset Orange</a></li>
                             <li><hr class="dropdown-divider"></li>
                             {% if 'user_id' in session %}
-                                {% set user = get_user_by_id(session['user_id']) %}
-                                {% if user and user.custom_themes %}
-                                    {% for theme in user.custom_themes %}
+                                {% set current_user = get_user_by_id(session['user_id']) %}
+                                {% if current_user and current_user.custom_themes %}
+                                    {% for theme in current_user.custom_themes %}
                                     <li><a class="dropdown-item theme-option" href="#" data-theme="custom_{{ theme.id }}">🎨 {{ theme.name }}</a></li>
                                     {% endfor %}
                                 {% endif %}

@@ -9837,19 +9837,20 @@ def generate_qr_code(username):
 @app.route('/user/<username>')
 def public_profile(username):
     """Public user profile page"""
-    user = mongo_db.users.find_one({"username": username})
-    if not user:
+    # Clear any potential session conflicts
+    profile_user = mongo_db.users.find_one({"username": username})
+    if not profile_user:
         flash('User not found', 'danger')
         return redirect(url_for('index'))
     
     # Check if profile is public
-    if not user.get('public_profile', True) and user['_id'] != session.get('user_id'):
+    if not profile_user.get('public_profile', True) and profile_user['_id'] != session.get('user_id'):
         flash('This profile is private', 'warning')
         return redirect(url_for('index'))
     
-    # Get user's approved records with level info
+    # Get user's approved records with level info - ensure we're getting the right user's records
     user_records = list(mongo_db.records.aggregate([
-        {"$match": {"user_id": user['_id'], "status": "approved"}},
+        {"$match": {"user_id": profile_user['_id'], "status": "approved"}},
         {"$lookup": {
             "from": "levels",
             "localField": "level_id",
@@ -9867,14 +9868,17 @@ def public_profile(username):
     # Create a set of completed level IDs for quick lookup
     completed_levels = {record['level_id']: record for record in user_records if record['progress'] == 100}
     
-    # Hardest level beaten functionality removed per user request
-    
     # Calculate stats
     total_main_levels = len([level for level in all_levels if not level.get('is_legacy')])
     completed_main_levels = len(completed_levels)
     
+    # Debug logging to help identify the issue
+    print(f"DEBUG: Viewing profile for user: {profile_user['username']} (ID: {profile_user['_id']})")
+    print(f"DEBUG: Found {len(user_records)} records for this user")
+    print(f"DEBUG: Current session user: {session.get('user_id', 'Not logged in')}")
+    
     return render_template('public_profile.html', 
-                         user=user, 
+                         user=profile_user,  # Use profile_user instead of user to avoid confusion
                          records=user_records,
                          all_levels=all_levels,
                          completed_levels=completed_levels,
