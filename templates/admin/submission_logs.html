@@ -1,0 +1,101 @@
+{% extends "layout.html" %}
+
+{% block title %}Submission Logs - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h3 class="mb-0">📝 Submission Logs</h3>
+                    <a href="{{ url_for('admin') }}" class="btn btn-outline-light">← Back to Admin</a>
+                </div>
+                <div class="card-body">
+                    {% if logs %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>User</th>
+                                    <th>Level</th>
+                                    <th>Progress</th>
+                                    <th>Comments</th>
+                                    <th>Type</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in logs %}
+                                <tr>
+                                    <td>
+                                        <small class="text-muted">
+                                            {{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') if log.timestamp else 'Unknown' }}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        <strong>{{ log.username or 'Unknown' }}</strong>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ log.level_name or 'Unknown Level' }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-success">{{ log.progress or 0 }}%</span>
+                                    </td>
+                                    <td>
+                                        {% if log.comments and log.comments.strip() %}
+                                        <div class="text-truncate" style="max-width: 300px;" title="{{ log.comments }}">
+                                            {{ log.comments }}
+                                        </div>
+                                        {% else %}
+                                        <em class="text-muted">No comments</em>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ log.type or 'submission' }}</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <h5>No submission logs found</h5>
+                        <p>Submission logs will appear here when users submit records with comments.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.table td {
+    vertical-align: middle;
+}
+
+.text-truncate {
+    cursor: help;
+}
+
+.badge {
+    font-size: 0.85em;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Add tooltips for truncated comments
+document.addEventListener('DOMContentLoaded', function() {
+    const truncatedElements = document.querySelectorAll('.text-truncate');
+    truncatedElements.forEach(element => {
+        if (element.scrollWidth > element.clientWidth) {
+            element.style.cursor = 'help';
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -4,10 +4,14 @@
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-lg-8">
+    <div class="col-lg-10">
         <div class="card shadow">
-            <div class="card-header bg-primary text-white">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                 <h3 class="mb-0">Submit Record</h3>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-outline-light" id="singleModeBtn" onclick="switchMode('single')">Single Record</button>
+                    <button type="button" class="btn btn-outline-light" id="multipleModeBtn" onclick="switchMode('multiple')">Multiple Records</button>
+                </div>
             </div>
             <div class="card-body">
                 {% if 'user_id' not in session %}
@@ -16,7 +20,11 @@
                     <p>Don't have an account? <a href="{{ url_for('register') }}">Register</a> now.</p>
                 </div>
                 {% else %}
-                <form method="POST" action="{{ url_for('submit_record') }}">
+                
+                <!-- Single Record Form -->
+                <form method="POST" action="{{ url_for('submit_record') }}" id="singleForm">
+                    <input type="hidden" name="multiple_submission" value="false">
+                    
                     <div class="mb-3">
                         <label for="level_id" class="form-label">Level</label>
                         <select class="form-select" id="level_id" name="level_id" required>
@@ -43,8 +51,8 @@
                     
                     <div class="mb-3">
                         <label for="comments" class="form-label">Comments (Optional)</label>
-                        <textarea class="form-control" id="comments" name="comments" rows="3"></textarea>
-                        <div class="form-text">Any additional information you want to share with the moderators.</div>
+                        <textarea class="form-control" id="comments" name="comments" rows="3" placeholder="Any additional information for moderators..."></textarea>
+                        <div class="form-text">Your comments will be logged and visible to moderators.</div>
                     </div>
                     
                     <div class="mb-3 form-check">
@@ -56,6 +64,37 @@
                         <button type="submit" class="btn btn-primary">Submit Record</button>
                     </div>
                 </form>
+                
+                <!-- Multiple Records Form -->
+                <form method="POST" action="{{ url_for('submit_record') }}" id="multipleForm" style="display: none;">
+                    <input type="hidden" name="multiple_submission" value="true">
+                    <input type="hidden" name="record_count" id="recordCount" value="1">
+                    
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5>Submit Multiple Records</h5>
+                            <div>
+                                <button type="button" class="btn btn-sm btn-success" onclick="addRecord()">+ Add Record</button>
+                                <button type="button" class="btn btn-sm btn-danger" onclick="removeRecord()">- Remove Record</button>
+                            </div>
+                        </div>
+                        <div class="form-text">Submit up to 10 records at once. Fill in all required fields for each record.</div>
+                    </div>
+                    
+                    <div id="recordsContainer">
+                        <!-- Records will be added here dynamically -->
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="confirmMultiple" required>
+                        <label class="form-check-label" for="confirmMultiple">I confirm all these records are my own gameplay and no cheats were used</label>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">Submit All Records</button>
+                    </div>
+                </form>
+                
                 {% endif %}
             </div>
         </div>
@@ -93,7 +132,101 @@
 
 {% block extra_js %}
 <script>
-    // Validate progress based on selected level
+let recordCount = 1;
+const maxRecords = 10;
+
+// Level options HTML for reuse
+const levelOptionsHTML = `
+    <option value="" selected disabled>Select a level</option>
+    {% for level in levels %}
+        {% if not level.get('is_legacy', False) %}
+        <option value="{{ level._id }}">{{ level.position }}. {{ level.name }} by {{ level.verifier }}</option>
+        {% endif %}
+    {% endfor %}
+`;
+
+function switchMode(mode) {
+    const singleForm = document.getElementById('singleForm');
+    const multipleForm = document.getElementById('multipleForm');
+    const singleBtn = document.getElementById('singleModeBtn');
+    const multipleBtn = document.getElementById('multipleModeBtn');
+    
+    if (mode === 'single') {
+        singleForm.style.display = 'block';
+        multipleForm.style.display = 'none';
+        singleBtn.classList.add('active');
+        multipleBtn.classList.remove('active');
+    } else {
+        singleForm.style.display = 'none';
+        multipleForm.style.display = 'block';
+        singleBtn.classList.remove('active');
+        multipleBtn.classList.add('active');
+        
+        // Initialize with one record if container is empty
+        if (document.getElementById('recordsContainer').children.length === 0) {
+            addRecord();
+        }
+    }
+}
+
+function addRecord() {
+    if (recordCount >= maxRecords) {
+        alert(`Maximum ${maxRecords} records allowed`);
+        return;
+    }
+    
+    const container = document.getElementById('recordsContainer');
+    const recordDiv = document.createElement('div');
+    recordDiv.className = 'record-entry border rounded p-3 mb-3';
+    recordDiv.innerHTML = `
+        <h6 class="text-primary">Record ${recordCount + 1}</h6>
+        <div class="row">
+            <div class="col-md-6">
+                <label class="form-label">Level</label>
+                <select class="form-select" name="level_id_${recordCount}" required>
+                    ${levelOptionsHTML}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Progress (%)</label>
+                <input type="number" class="form-control" name="progress_${recordCount}" min="50" max="100" required>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Video URL</label>
+                <input type="url" class="form-control" name="video_url_${recordCount}" placeholder="https://..." required>
+            </div>
+        </div>
+        <div class="mt-2">
+            <label class="form-label">Comments (Optional)</label>
+            <textarea class="form-control" name="comments_${recordCount}" rows="2" placeholder="Comments for this record..."></textarea>
+        </div>
+    `;
+    
+    container.appendChild(recordDiv);
+    recordCount++;
+    document.getElementById('recordCount').value = recordCount;
+}
+
+function removeRecord() {
+    const container = document.getElementById('recordsContainer');
+    if (container.children.length > 1) {
+        container.removeChild(container.lastChild);
+        recordCount--;
+        document.getElementById('recordCount').value = recordCount;
+        
+        // Update record numbers
+        const records = container.querySelectorAll('.record-entry h6');
+        records.forEach((header, index) => {
+            header.textContent = `Record ${index + 1}`;
+        });
+    }
+}
+
+// Initialize single mode
+document.addEventListener('DOMContentLoaded', function() {
+    switchMode('single');
+    
+    // Validate progress based on selected level for single form
     document.getElementById('level_id').addEventListener('change', function() {
         const levelOption = this.options[this.selectedIndex];
         const isLegacy = levelOption.parentElement.label === 'Legacy List';
@@ -107,5 +240,6 @@
             progressInput.title = "Minimum progress for main list levels is 50%";
         }
     });
+});
 </script>
 {% endblock %}

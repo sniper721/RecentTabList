@@ -77,10 +77,40 @@
                 </div>
                 <div class="card-body p-0">
                     {% if records %}
+                    <!-- Bulk Actions -->
+                    <div class="p-3 border-bottom bg-light">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="selectAll">
+                                    <label class="form-check-label" for="selectAll">
+                                        <strong>Select All Records</strong>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="btn-group" role="group">
+                                    <button type="button" class="btn btn-success" id="bulkApprove" disabled>
+                                        <i class="fas fa-check"></i> Bulk Approve
+                                    </button>
+                                    <button type="button" class="btn btn-danger" id="bulkReject" disabled>
+                                        <i class="fas fa-times"></i> Bulk Reject
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger" id="bulkDelete" disabled>
+                                        <i class="fas fa-trash"></i> Bulk Delete
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="table-responsive">
                         <table class="table table-striped table-hover mb-0">
                             <thead class="table-dark">
                                 <tr>
+                                    <th width="40">
+                                        <input type="checkbox" id="selectAllTable" class="form-check-input">
+                                    </th>
                                     <th>ID</th>
                                     <th>User</th>
                                     <th>Level</th>
@@ -94,6 +124,10 @@
                             <tbody>
                                 {% for record in records %}
                                 <tr>
+                                    <td>
+                                        <input type="checkbox" class="form-check-input record-checkbox" 
+                                               value="{{ record._id }}" data-status="{{ record.status }}">
+                                    </td>
                                     <td>
                                         <strong>#{{ record._id }}</strong>
                                     </td>
@@ -253,5 +287,126 @@
             this.form.submit();
         });
     });
+
+    // Bulk operations functionality
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const selectAllTableCheckbox = document.getElementById('selectAllTable');
+    const recordCheckboxes = document.querySelectorAll('.record-checkbox');
+    const bulkApproveBtn = document.getElementById('bulkApprove');
+    const bulkRejectBtn = document.getElementById('bulkReject');
+    const bulkDeleteBtn = document.getElementById('bulkDelete');
+
+    // Sync select all checkboxes
+    function syncSelectAll() {
+        const checkedBoxes = document.querySelectorAll('.record-checkbox:checked');
+        const allChecked = checkedBoxes.length === recordCheckboxes.length && recordCheckboxes.length > 0;
+        
+        selectAllCheckbox.checked = allChecked;
+        selectAllTableCheckbox.checked = allChecked;
+        
+        // Enable/disable bulk action buttons
+        const hasSelection = checkedBoxes.length > 0;
+        bulkApproveBtn.disabled = !hasSelection;
+        bulkRejectBtn.disabled = !hasSelection;
+        bulkDeleteBtn.disabled = !hasSelection;
+    }
+
+    // Select all functionality
+    function toggleSelectAll(checked) {
+        recordCheckboxes.forEach(checkbox => {
+            checkbox.checked = checked;
+        });
+        syncSelectAll();
+    }
+
+    selectAllCheckbox.addEventListener('change', function() {
+        toggleSelectAll(this.checked);
+    });
+
+    selectAllTableCheckbox.addEventListener('change', function() {
+        toggleSelectAll(this.checked);
+        selectAllCheckbox.checked = this.checked;
+    });
+
+    // Individual checkbox change
+    recordCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', syncSelectAll);
+    });
+
+    // Bulk approve
+    bulkApproveBtn.addEventListener('click', function() {
+        const selectedRecords = Array.from(document.querySelectorAll('.record-checkbox:checked')).map(cb => cb.value);
+        
+        if (selectedRecords.length === 0) {
+            alert('Please select records to approve');
+            return;
+        }
+
+        if (confirm(`Are you sure you want to approve ${selectedRecords.length} record(s)?`)) {
+            performBulkAction('approve', selectedRecords);
+        }
+    });
+
+    // Bulk reject
+    bulkRejectBtn.addEventListener('click', function() {
+        const selectedRecords = Array.from(document.querySelectorAll('.record-checkbox:checked')).map(cb => cb.value);
+        
+        if (selectedRecords.length === 0) {
+            alert('Please select records to reject');
+            return;
+        }
+
+        const reason = prompt('Enter rejection reason (optional):');
+        if (reason !== null) { // User didn't cancel
+            if (confirm(`Are you sure you want to reject ${selectedRecords.length} record(s)?`)) {
+                performBulkAction('reject', selectedRecords, reason);
+            }
+        }
+    });
+
+    // Bulk delete
+    bulkDeleteBtn.addEventListener('click', function() {
+        const selectedRecords = Array.from(document.querySelectorAll('.record-checkbox:checked')).map(cb => cb.value);
+        
+        if (selectedRecords.length === 0) {
+            alert('Please select records to delete');
+            return;
+        }
+
+        if (confirm(`⚠️ Are you sure you want to DELETE ${selectedRecords.length} record(s)?\n\nThis action cannot be undone!`)) {
+            performBulkAction('delete', selectedRecords);
+        }
+    });
+
+    // Perform bulk action
+    function performBulkAction(action, recordIds, reason = '') {
+        const formData = new FormData();
+        formData.append('action', action);
+        formData.append('record_ids', JSON.stringify(recordIds));
+        if (reason) {
+            formData.append('reason', reason);
+        }
+
+        fetch('/admin/bulk_record_action', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`Successfully ${action}ed ${data.count} record(s)`);
+                location.reload();
+            } else {
+                alert('Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while performing the bulk action');
+        });
+    }
+
+    // Initialize
+    syncSelectAll();
 </script>
 {% endblock %}

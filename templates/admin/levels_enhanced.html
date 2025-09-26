@@ -297,17 +297,34 @@ function moveToLegacy(levelId) {
 
 function deleteLevel(levelId) {
     if (confirm('Are you sure you want to DELETE this level? This will also delete all associated records!')) {
-        fetch(`/admin/delete_level/${levelId}`, {
-            method: 'POST'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Error deleting level: ' + data.error);
+        // Ask for removal reason
+        const reason = prompt('Enter removal reason (optional):\n\nThis will be shown in the changelog. Leave empty for no reason.');
+        
+        // User can cancel by clicking Cancel or pressing Escape
+        if (reason !== null) {
+            const formData = new FormData();
+            formData.append('level_id', levelId);
+            if (reason && reason.trim()) {
+                formData.append('removal_reason', reason.trim());
             }
-        });
+            
+            fetch('/admin/delete_level', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    return response.text().then(text => {
+                        throw new Error(text);
+                    });
+                }
+            })
+            .catch(error => {
+                alert('Error deleting level: ' + error.message);
+            });
+        }
     }
 }
 
