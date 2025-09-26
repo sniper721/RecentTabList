@@ -1,0 +1,304 @@
+{% extends "layout.html" %}
+
+{% block title %}Admin Dashboard - RTL{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>🛠️ Admin Dashboard</h1>
+                <div>
+                    <a href="{{ url_for('admin') }}" class="btn btn-outline-secondary">
+                        📋 Classic Admin Panel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="card bg-warning text-dark">
+                <div class="card-body text-center">
+                    <h3>{{ stats.pending_records }}</h3>
+                    <small>Pending Records</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h3>{{ stats.total_users }}</h3>
+                    <small>Total Users</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h3>{{ stats.total_levels }}</h3>
+                    <small>Main Levels</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-secondary text-white">
+                <div class="card-body text-center">
+                    <h3>{{ stats.legacy_levels }}</h3>
+                    <small>Legacy Levels</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h3>{{ stats.total_records }}</h3>
+                    <small>Approved Records</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Categories -->
+    <div class="row">
+        <!-- Records Management -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">📝 Records Management</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Manage user submissions and records</p>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('admin') }}" class="btn btn-warning">
+                            📋 Review Pending Records
+                        </a>
+                        <a href="{{ url_for('admin_records') }}" class="btn btn-outline-warning">
+                            🔍 All Records
+                        </a>
+                        <a href="{{ url_for('admin_bulk_records') }}" class="btn btn-outline-warning">
+                            📦 Bulk Actions
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Level Management -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">🎮 Level Management</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Manage levels, positions, and points</p>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('admin_levels_enhanced') }}" class="btn btn-success">
+                            📊 Enhanced Levels
+                        </a>
+                        <a href="{{ url_for('admin_levels') }}" class="btn btn-outline-success">
+                            📋 Classic Levels
+                        </a>
+                        <a href="{{ url_for('admin_rebuild_image_system') }}" class="btn btn-outline-success">
+                            🖼️ Rebuild Images
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Management -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">👥 User Management</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Manage users, permissions, and bans</p>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('admin_users') }}" class="btn btn-primary">
+                            👤 All Users
+                        </a>
+                        <a href="{{ url_for('admin_tools') }}" class="btn btn-outline-primary">
+                            🔨 User Tools
+                        </a>
+                        <a href="{{ url_for('admin_profanity') }}" class="btn btn-outline-primary">
+                            🚫 Profanity Filter
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Management -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">📰 Content Management</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Manage news, announcements, and content</p>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('admin_news') }}" class="btn btn-info">
+                            📰 News Articles
+                        </a>
+                        <a href="{{ url_for('admin_create_news') }}" class="btn btn-outline-info">
+                            ➕ Create News
+                        </a>
+                        <a href="#" class="btn btn-outline-info" onclick="alert('Coming soon!')">
+                            📢 Announcements
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Settings -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">⚙️ System Settings</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Configure system settings and features</p>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('admin_settings') }}" class="btn btn-secondary">
+                            ⚙️ General Settings
+                        </a>
+                        <a href="{{ url_for('admin_webhook_settings') }}" class="btn btn-outline-secondary">
+                            🔗 Webhook Settings
+                        </a>
+                        <a href="{{ url_for('admin_console') }}" class="btn btn-outline-secondary">
+                            💻 Admin Console
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Advanced Tools -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">🔧 Advanced Tools</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Advanced administrative tools</p>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('admin_console') }}" class="btn btn-danger">
+                            💻 Console Access
+                        </a>
+                        <button class="btn btn-outline-danger" onclick="recalculateAllPoints()">
+                            🔄 Recalculate Points
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="clearCache()">
+                            🗑️ Clear Cache
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">⚡ Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-primary w-100" onclick="findUser()">
+                                🔍 Find User
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-success w-100" onclick="addLevel()">
+                                ➕ Add Level
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-warning w-100" onclick="bulkApprove()">
+                                ✅ Bulk Approve
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-info w-100" onclick="systemStatus()">
+                                📊 System Status
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function recalculateAllPoints() {
+    if (confirm('This will recalculate all level points and user points. This may take a while. Continue?')) {
+        fetch('/admin/recalculate_all_points', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('✅ Points recalculated successfully!');
+                location.reload();
+            } else {
+                alert('❌ Error: ' + data.error);
+            }
+        })
+        .catch(error => {
+            alert('❌ Error: ' + error);
+        });
+    }
+}
+
+function clearCache() {
+    if (confirm('Clear all cached data?')) {
+        fetch('/admin/settings/clear_cache', {
+            method: 'POST'
+        })
+        .then(() => {
+            alert('✅ Cache cleared!');
+            location.reload();
+        })
+        .catch(error => {
+            alert('❌ Error: ' + error);
+        });
+    }
+}
+
+function findUser() {
+    const username = prompt('Enter username to find:');
+    if (username) {
+        window.location.href = `/admin/users?search=${encodeURIComponent(username)}`;
+    }
+}
+
+function addLevel() {
+    window.location.href = '/admin/levels_enhanced';
+}
+
+function bulkApprove() {
+    window.location.href = '/admin';
+}
+
+function systemStatus() {
+    alert('System Status:\n\n' +
+          '✅ Database: Connected\n' +
+          '✅ Cache: Active\n' +
+          '✅ Discord: ' + ({{ 'Connected' if DISCORD_AVAILABLE else 'Disconnected' }}) + '\n' +
+          '📊 Pending Records: {{ stats.pending_records }}\n' +
+          '👥 Total Users: {{ stats.total_users }}');
+}
+</script>
+{% endblock %}

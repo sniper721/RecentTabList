@@ -39,6 +39,9 @@ from bson.objectid import ObjectId
 from bson.errors import InvalidId
 import functools
 
+# Import profanity filter
+from profanity_filter import check_username_profanity, check_level_name_profanity, check_comment_profanity, profanity_filter
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -2512,6 +2515,12 @@ def admin_add_level():
         verifier = request.form.get('verifier', '').strip()
         position = int(request.form.get('position', 1))
         difficulty = int(request.form.get('difficulty', 10))
+        
+        # Check level name for profanity
+        is_name_clean, profanity_reason = check_level_name_profanity(name)
+        if not is_name_clean:
+            flash(f'Level name not allowed: {profanity_reason}', 'danger')
+            return redirect(url_for('admin_levels_enhanced'))
         # Note: Demon type requirement removed - now using text-based difficulties
         # demon_type = request.form.get('demon_type', '').strip() if difficulty == 10 else None
         demon_type = None  # Demon subcategories removed
@@ -4720,6 +4729,10 @@ def index():
                 {"_id": 1, "name": "Loading failed - try /debug_db", "creator": "System", "verifier": "System", "position": 1, "points": 0, "level_id": "error", "difficulty": 5}
             ]
     
+    # 🎭 APRIL FOOLS MODE: Randomize positions if active
+    if is_april_fools_active():
+        main_list = randomize_level_positions(main_list.copy())
+    
     # Pagination
     total_levels = len(main_list)
     start_idx = (page - 1) * per_page
@@ -4741,7 +4754,8 @@ def index():
                          prev_page=prev_page,
                          next_page=next_page,
                          total_pages=total_pages,
-                         total_levels=total_levels)
+                         total_levels=total_levels,
+                         april_fools_active=is_april_fools_active())
 
 # Routes
 
@@ -4768,7 +4782,11 @@ def legacy():
             print(f"Legacy auto-load failed: {e}")
             legacy_list = []
     
-    return render_template('legacy.html', levels=legacy_list)
+    # 🎭 APRIL FOOLS MODE: Randomize legacy positions if active
+    if is_april_fools_active():
+        legacy_list = randomize_level_positions(legacy_list.copy())
+    
+    return render_template('legacy.html', levels=legacy_list, april_fools_active=is_april_fools_active())
 
 @app.route('/timemachine')
 def timemachine():
@@ -4874,6 +4892,12 @@ def register():
         username = request.form.get('username')
         email = request.form.get('email')
         password = request.form.get('password')
+        
+        # Check username for profanity
+        is_username_clean, profanity_reason = check_username_profanity(username)
+        if not is_username_clean:
+            flash(f'Username not allowed: {profanity_reason}', 'danger')
+            return render_template('register.html')
         
         # Check if username or email already exists
         if mongo_db.users.find_one({"username": username}, max_time_ms=60000):
@@ -5377,6 +5401,107 @@ def submit_record():
     return render_template('submit_record.html', levels=levels)
 
 # Admin routes
+@app.route('/admin/dashboard')
+def admin_dashboard():
+    """New categorized admin dashboard"""
+    if 'user_id' not in session:
+        flash('Please log in to access admin panel', 'warning')
+        return redirect(url_for('login'))
+    
+    if not session.get('is_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('index'))
+    
+    # Get basic stats for dashboard
+    stats = {
+        'pending_records': mongo_db.records.count_documents({"status": "pending"}),
+        'total_users': mongo_db.users.count_documents({}),
+        'total_levels': mongo_db.levels.count_documents({"is_legacy": False}),
+        'legacy_levels': mongo_db.levels.count_documents({"is_legacy": True}),
+        'total_records': mongo_db.records.count_documents({"status": "approved"})
+    }
+    
+    return render_template('admin/dashboard.html', stats=stats)
+
+@app.route('/admin/profanity')
+def admin_profanity():
+    """Profanity filter management"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('index'))
+    
+    word_lists = profanity_filter.get_word_lists()
+    return render_template('admin/profanity.html', word_lists=word_lists)
+
+@app.route('/admin/profanity/add', methods=['POST'])
+def admin_add_profanity_word():
+    """Add word to profanity filter"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return {'error': 'Access denied'}, 403
+    
+    word = request.form.get('word', '').strip().lower()
+    severity = request.form.get('severity', 'strong')
+    
+    if not word:
+        flash('Please enter a word', 'danger')
+        return redirect(url_for('admin_profanity'))
+    
+    try:
+        profanity_filter.add_word(word, severity)
+        flash(f'Added "{word}" to {severity} profanity list', 'success')
+    except Exception as e:
+        flash(f'Error adding word: {e}', 'danger')
+    
+    return redirect(url_for('admin_profanity'))
+
+@app.route('/admin/profanity/remove', methods=['POST'])
+def admin_remove_profanity_word():
+    """Remove word from profanity filter"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return {'error': 'Access denied'}, 403
+    
+    word = request.form.get('word', '').strip().lower()
+    
+    if not word:
+        flash('Please enter a word', 'danger')
+        return redirect(url_for('admin_profanity'))
+    
+    try:
+        profanity_filter.remove_word(word)
+        flash(f'Removed "{word}" from profanity filter', 'success')
+    except Exception as e:
+        flash(f'Error removing word: {e}', 'danger')
+    
+    return redirect(url_for('admin_profanity'))
+
+@app.route('/admin/profanity/test', methods=['POST'])
+def admin_test_profanity():
+    """Test profanity filter"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return {'error': 'Access denied'}, 403
+    
+    test_text = request.form.get('test_text', '').strip()
+    test_type = request.form.get('test_type', 'username')
+    
+    if not test_text:
+        return {'error': 'Please enter text to test'}, 400
+    
+    try:
+        if test_type == 'username':
+            is_clean, reason = check_username_profanity(test_text)
+        elif test_type == 'level':
+            is_clean, reason = check_level_name_profanity(test_text)
+        else:
+            is_clean, reason = check_comment_profanity(test_text)
+        
+        return {
+            'is_clean': is_clean,
+            'reason': reason,
+            'suggestion': profanity_filter.suggest_alternative(test_text) if not is_clean else test_text
+        }
+    except Exception as e:
+        return {'error': str(e)}, 500
+
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
     if 'user_id' not in session:
@@ -5741,6 +5866,11 @@ RTL System Commands:
   rtl.login_as('user') - Login as any user (REQUIRES SUPER PIN!)
   rtl.whoami() - Show current session info
   rtl.admin_logs() - Show recent admin actions
+  
+RTL Secret Commands:
+  rtl.april_fools() - Toggle April Fools mode (randomizes level positions!)
+  rtl.chaos_mode() - Alias for april_fools()
+  rtl.chaos_status() - Check current April Fools mode status
 
   
 Python Commands:
@@ -6100,7 +6230,11 @@ Note: Install psutil for detailed system metrics"""
             except Exception as e:
                 return f"Error retrieving admin logs: {str(e)}"
         
-
+        elif command == 'april_fools()' or command == 'chaos_mode()':
+            return toggle_april_fools_mode()
+        
+        elif command == 'chaos_status()' or command == 'april_status()':
+            return get_april_fools_status()
         
         else:
             return f"Unknown RTL command: {command}\nType 'help' for available commands"
@@ -6169,6 +6303,201 @@ def execute_python_code(code):
     finally:
         # Restore stdout
         sys.stdout = old_stdout
+
+def toggle_april_fools_mode():
+    """Toggle April Fools mode - randomizes level positions on every page load"""
+    global levels_cache
+    
+    try:
+        # Check current state
+        settings = mongo_db.site_settings.find_one({"_id": "april_fools"})
+        
+        if settings and settings.get('enabled', False):
+            # Disable April Fools mode
+            mongo_db.site_settings.update_one(
+                {"_id": "april_fools"},
+                {"$set": {"enabled": False, "disabled_at": datetime.now(timezone.utc)}},
+                upsert=True
+            )
+            
+            # Restore original positions
+            restore_original_positions()
+            
+            # Clear cache to ensure fresh data on next load
+            levels_cache.clear()
+            
+            return """🎭 April Fools Mode DISABLED! 🎭
+
+Level positions have been restored to normal.
+The chaos has ended... for now. 😈
+
+Use rtl.april_fools() again to re-enable the madness!"""
+        
+        else:
+            # Enable April Fools mode
+            # First, save original positions
+            save_original_positions()
+            
+            # Clear cache to ensure fresh data
+            levels_cache.clear()
+            
+            mongo_db.site_settings.update_one(
+                {"_id": "april_fools"},
+                {"$set": {
+                    "enabled": True, 
+                    "enabled_at": datetime.now(timezone.utc),
+                    "description": "Randomizes level positions on every page refresh"
+                }},
+                upsert=True
+            )
+            
+            return """🎭 APRIL FOOLS MODE ACTIVATED! 🎭
+
+🌪️ CHAOS UNLEASHED! 🌪️
+
+Every time someone refreshes the main list page,
+the levels will appear in COMPLETELY RANDOM positions!
+
+⚠️ Don't worry - the real positions are safely stored.
+⚠️ This only affects the display, not the actual database.
+
+Effects:
+- Main list shows random positions every refresh
+- Legacy list also randomized
+- Points calculations remain correct
+- Records still work normally
+
+Use rtl.april_fools() again to disable and restore order.
+
+Let the confusion begin! 😈🎉"""
+    
+    except Exception as e:
+        return f"Error toggling April Fools mode: {str(e)}"
+
+def save_original_positions():
+    """Save original level positions before chaos mode"""
+    try:
+        # Get all levels with their current positions
+        levels = list(mongo_db.levels.find({}, {"_id": 1, "position": 1, "is_legacy": 1}))
+        
+        # Save original positions
+        for level in levels:
+            mongo_db.levels.update_one(
+                {"_id": level["_id"]},
+                {"$set": {"original_position": level["position"]}}
+            )
+        
+        print(f"✅ Saved original positions for {len(levels)} levels")
+        
+    except Exception as e:
+        print(f"❌ Error saving original positions: {e}")
+
+def restore_original_positions():
+    """Restore original level positions after chaos mode"""
+    try:
+        # Get all levels with original positions
+        levels = list(mongo_db.levels.find(
+            {"original_position": {"$exists": True}}, 
+            {"_id": 1, "original_position": 1}
+        ))
+        
+        # Restore original positions
+        for level in levels:
+            mongo_db.levels.update_one(
+                {"_id": level["_id"]},
+                {
+                    "$set": {"position": level["original_position"]},
+                    "$unset": {"original_position": ""}
+                }
+            )
+        
+        print(f"✅ Restored original positions for {len(levels)} levels")
+        
+    except Exception as e:
+        print(f"❌ Error restoring original positions: {e}")
+
+def is_april_fools_active():
+    """Check if April Fools mode is currently active"""
+    try:
+        settings = mongo_db.site_settings.find_one({"_id": "april_fools"})
+        return settings and settings.get('enabled', False)
+    except:
+        return False
+
+def get_april_fools_status():
+    """Get detailed April Fools mode status"""
+    try:
+        settings = mongo_db.site_settings.find_one({"_id": "april_fools"})
+        
+        if not settings:
+            return """🎭 April Fools Mode Status: NEVER ACTIVATED
+
+The chaos has never been unleashed!
+Use rtl.april_fools() to start the madness! 😈"""
+        
+        is_active = settings.get('enabled', False)
+        
+        if is_active:
+            enabled_at = settings.get('enabled_at', 'Unknown')
+            return f"""🎭 April Fools Mode Status: 🔴 ACTIVE 🔴
+
+🌪️ CHAOS IS CURRENTLY UNLEASHED! 🌪️
+
+Activated: {enabled_at}
+Effect: Level positions randomize on every page refresh
+Affected Pages: Main list (/), Legacy list (/legacy)
+
+⚠️ Original positions are safely stored
+⚠️ Use rtl.april_fools() to restore order
+
+The madness continues... 😈🎉"""
+        else:
+            enabled_at = settings.get('enabled_at', 'Unknown')
+            disabled_at = settings.get('disabled_at', 'Unknown')
+            return f"""🎭 April Fools Mode Status: 🟢 DISABLED 🟢
+
+The chaos has been contained! ✅
+
+Last Activated: {enabled_at}
+Last Disabled: {disabled_at}
+
+Everything is back to normal order.
+Use rtl.april_fools() to unleash chaos again! 😈"""
+    
+    except Exception as e:
+        return f"Error checking April Fools status: {str(e)}"
+
+def randomize_level_positions(levels):
+    """Randomize level positions for April Fools mode"""
+    import random
+    import copy
+    
+    if not levels:
+        return levels
+    
+    # Make a deep copy to avoid modifying the original data
+    levels_copy = copy.deepcopy(levels)
+    
+    # Separate main and legacy levels
+    main_levels = [level for level in levels_copy if not level.get('is_legacy', False)]
+    legacy_levels = [level for level in levels_copy if level.get('is_legacy', False)]
+    
+    # Just shuffle the order, don't change position numbers
+    if main_levels:
+        random.shuffle(main_levels)
+        # Reassign positions based on new order
+        for i, level in enumerate(main_levels):
+            level['position'] = i + 1
+    
+    if legacy_levels:
+        random.shuffle(legacy_levels)
+        # Reassign positions based on new order
+        for i, level in enumerate(legacy_levels):
+            level['position'] = i + 1
+    
+    # Combine and return
+    all_levels = main_levels + legacy_levels
+    return all_levels
 
 @app.route('/admin/console/pin', methods=['GET', 'POST'])
 def admin_console_pin():
@@ -6709,8 +7038,16 @@ def admin_edit_level():
         level_type = request.form.get('level_type', level.get('level_type', 'Level'))
         points = calculate_level_points(position, is_legacy, level_type)
     
+    # Check level name for profanity
+    new_name = request.form.get('name', '').strip()
+    if new_name != level.get('name', ''):  # Only check if name is being changed
+        is_name_clean, profanity_reason = check_level_name_profanity(new_name)
+        if not is_name_clean:
+            flash(f'Level name not allowed: {profanity_reason}', 'danger')
+            return redirect(url_for('admin_levels'))
+    
     update_data = {
-        "name": request.form.get('name'),
+        "name": new_name,
         "creator": request.form.get('creator'),
         "verifier": request.form.get('verifier'),
         "level_id": game_level_id if game_level_id and game_level_id.strip() else None,

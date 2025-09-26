@@ -4,6 +4,28 @@
 
 {% block content %}
 
+<!-- 🎭 April Fools Easter Egg -->
+{% if april_fools_active %}
+<div class="alert alert-warning alert-dismissible fade show" role="alert" style="background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57); background-size: 400% 400%; animation: gradient 3s ease infinite;">
+    <div class="d-flex align-items-center">
+        <span style="font-size: 1.2em; margin-right: 10px;">🎭</span>
+        <div>
+            <strong>Something seems... different today? 🤔</strong><br>
+            <small>The levels appear to be having an identity crisis! Refresh the page and watch the magic happen! ✨</small>
+        </div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+
+<style>
+@keyframes gradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+</style>
+{% endif %}
+
 <div class="row">
     <div class="col-lg-8">
         <div class="card shadow-sm">

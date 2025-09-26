@@ -1,0 +1,266 @@
+{% extends "layout.html" %}
+
+{% block title %}Profanity Filter - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>🚫 Profanity Filter Management</h1>
+                <div>
+                    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-secondary">
+                        ← Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Test Profanity Filter -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">🧪 Test Profanity Filter</h5>
+                </div>
+                <div class="card-body">
+                    <form id="testForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="testText" class="form-label">Text to Test</label>
+                                    <input type="text" class="form-control" id="testText" placeholder="Enter text to test...">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="testType" class="form-label">Test Type</label>
+                                    <select class="form-select" id="testType">
+                                        <option value="username">Username</option>
+                                        <option value="level">Level Name</option>
+                                        <option value="comment">Comment</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label class="form-label">&nbsp;</label>
+                                    <button type="submit" class="btn btn-primary w-100">Test</button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="testResult" class="mt-3" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Remove Words -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">➕ Add Word</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('admin_add_profanity_word') }}">
+                        <div class="mb-3">
+                            <label for="addWord" class="form-label">Word to Add</label>
+                            <input type="text" class="form-control" id="addWord" name="word" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="severity" class="form-label">Severity Level</label>
+                            <select class="form-select" id="severity" name="severity">
+                                <option value="mild">Mild (warnings)</option>
+                                <option value="strong" selected>Strong (blocked)</option>
+                                <option value="hate">Hate Speech (always blocked)</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">Add Word</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">➖ Remove Word</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('admin_remove_profanity_word') }}">
+                        <div class="mb-3">
+                            <label for="removeWord" class="form-label">Word to Remove</label>
+                            <input type="text" class="form-control" id="removeWord" name="word" required>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Enter the exact word to remove from all lists</small>
+                        </div>
+                        <button type="submit" class="btn btn-danger w-100">Remove Word</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Word Lists -->
+    <div class="row">
+        <!-- Hate Speech Words -->
+        <div class="col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">🔴 Hate Speech ({{ word_lists.hate|length }} words)</h5>
+                    <small>Always blocked in all contexts</small>
+                </div>
+                <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                    {% if word_lists.hate %}
+                        <div class="row">
+                            {% for word in word_lists.hate %}
+                            <div class="col-6 mb-2">
+                                <span class="badge bg-danger">{{ word }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No hate speech words configured</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Strong Profanity -->
+        <div class="col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">🟡 Strong Profanity ({{ word_lists.strong|length }} words)</h5>
+                    <small>Blocked in usernames and level names</small>
+                </div>
+                <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                    {% if word_lists.strong %}
+                        <div class="row">
+                            {% for word in word_lists.strong %}
+                            <div class="col-6 mb-2">
+                                <span class="badge bg-warning text-dark">{{ word }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No strong profanity words configured</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Mild Words -->
+        <div class="col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">🔵 Mild Words ({{ word_lists.mild|length }} words)</h5>
+                    <small>Warnings only, context-dependent</small>
+                </div>
+                <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                    {% if word_lists.mild %}
+                        <div class="row">
+                            {% for word in word_lists.mild %}
+                            <div class="col-6 mb-2">
+                                <span class="badge bg-info">{{ word }}</span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No mild words configured</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Information -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">ℹ️ Filter Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>How the Filter Works:</h6>
+                            <ul>
+                                <li><strong>Normalization:</strong> Removes spaces, dots, dashes and applies leetspeak substitutions</li>
+                                <li><strong>Severity Levels:</strong> Different blocking rules for different contexts</li>
+                                <li><strong>Context Aware:</strong> Stricter for usernames/levels, more lenient for comments</li>
+                                <li><strong>Substitution Detection:</strong> Catches common character replacements (@ for a, 3 for e, etc.)</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Filter Rules:</h6>
+                            <ul>
+                                <li><strong>Usernames:</strong> Blocks mild, strong, and hate speech</li>
+                                <li><strong>Level Names:</strong> Blocks mild, strong, and hate speech</li>
+                                <li><strong>Comments:</strong> Blocks strong and hate speech only</li>
+                                <li><strong>Hate Speech:</strong> Always blocked in all contexts</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="alert alert-warning mt-3">
+                        <strong>⚠️ Important:</strong> The profanity filter is located in <code>profanity_filter.py</code>. 
+                        You can edit the word lists directly in that file or use this admin interface.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('testForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const testText = document.getElementById('testText').value;
+    const testType = document.getElementById('testType').value;
+    const resultDiv = document.getElementById('testResult');
+    
+    if (!testText.trim()) {
+        alert('Please enter text to test');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('test_text', testText);
+    formData.append('test_type', testType);
+    
+    fetch('/admin/profanity/test', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            resultDiv.innerHTML = `<div class="alert alert-danger">❌ Error: ${data.error}</div>`;
+        } else {
+            const status = data.is_clean ? '✅ ALLOWED' : '❌ BLOCKED';
+            const alertClass = data.is_clean ? 'alert-success' : 'alert-danger';
+            
+            let html = `<div class="alert ${alertClass}">
+                <strong>${status}:</strong> "${testText}"<br>
+                <small>${data.reason}</small>`;
+            
+            if (!data.is_clean && data.suggestion !== testText) {
+                html += `<br><strong>Suggested alternative:</strong> "${data.suggestion}"`;
+            }
+            
+            html += '</div>';
+            resultDiv.innerHTML = html;
+        }
+        
+        resultDiv.style.display = 'block';
+    })
+    .catch(error => {
+        resultDiv.innerHTML = `<div class="alert alert-danger">❌ Error: ${error}</div>`;
+        resultDiv.style.display = 'block';
+    });
+});
+</script>
+{% endblock %}
