@@ -110,7 +110,7 @@
             <div class="mb-4">
                 <h6>🏅 Award Verifier Points</h6>
                 <p>Manually award points to users who have verified levels.</p>
-                <form method="POST" action="{{ url_for('admin_award_verifier_points') }}">
+                <form method="POST" action="{{ url_for('admin_award_verifier_points_dedicated') }}">
                     <div class="mb-3">
                         <label for="verifierName" class="form-label">Verifier Name</label>
                         <input type="text" class="form-control" id="verifierName" name="verifier_name" placeholder="Enter verifier name (e.g., RobTop)" required>

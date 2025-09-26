@@ -774,6 +774,169 @@ def log_level_change(action, level_name, admin_username, **kwargs):
         mongo_db.level_changelog.insert_one(changelog_entry)
         print(f"📝 Logged level change: {action} - {level_name}")
         
+        # Send enhanced Discord notification
+        send_enhanced_changelog_notification(action, level_name, admin_username, **kwargs)
+        
+    except Exception as e:
+        print(f"Error logging level change: {e}")
+
+def send_enhanced_changelog_notification(action, level_name, admin_username, **kwargs):
+    """Send enhanced changelog notifications with proper formatting"""
+    try:
+        message = ""
+        
+        if action == "placed":
+            position = kwargs.get('position', '?')
+            above_level = kwargs.get('above_level', '')
+            below_level = kwargs.get('below_level', '')
+            
+            if position == 1:
+                # Special case for #1 placement
+                dethroned_level = kwargs.get('dethroned_level', '')
+                pushed_to_legacy = kwargs.get('pushed_to_legacy', '')
+                
+                message = f"**{level_name}** has been placed at **#1**"
+                if dethroned_level:
+                    message += f" dethroning **{dethroned_level}**"
+                message += "."
+                
+                if pushed_to_legacy:
+                    message += f" This pushes **{pushed_to_legacy}** to the legacy list."
+            else:
+                # Regular placement
+                message = f"**{level_name}** has been placed at **#{position}**"
+                if below_level and above_level:
+                    message += f" below **{above_level}** and above **{below_level}**"
+                elif below_level:
+                    message += f" above **{below_level}**"
+                elif above_level:
+                    message += f" below **{above_level}**"
+                message += "."
+                
+                # Check if this placement pushed something to legacy
+                pushed_to_legacy = kwargs.get('pushed_to_legacy', '')
+                if pushed_to_legacy:
+                    message += f" This pushes **{pushed_to_legacy}** to the legacy list."
+        
+        elif action == "moved":
+            old_position = kwargs.get('old_position', '?')
+            new_position = kwargs.get('new_position', '?')
+            above_level = kwargs.get('above_level', '')
+            below_level = kwargs.get('below_level', '')
+            
+            message = f"**{level_name}** has been moved from **#{old_position}** to **#{new_position}**"
+            if below_level and above_level:
+                message += f" below **{above_level}** and above **{below_level}**"
+            elif below_level:
+                message += f" above **{below_level}**"
+            elif above_level:
+                message += f" below **{above_level}**"
+            message += "."
+            
+            # Check if this move pushed something to legacy
+            pushed_to_legacy = kwargs.get('pushed_to_legacy', '')
+            if pushed_to_legacy:
+                message += f" This pushes **{pushed_to_legacy}** to the legacy list."
+        
+        elif action == "removed":
+            old_position = kwargs.get('old_position', '?')
+            reason = kwargs.get('reason', '')
+            
+            message = f"**{level_name}** has been removed"
+            if old_position and old_position != '?':
+                message += f" from **#{old_position}**"
+            
+            if reason:
+                message += f". Reason: {reason}"
+            else:
+                message += "."
+        
+        elif action == "legacy":
+            old_position = kwargs.get('old_position', '?')
+            legacy_position = kwargs.get('legacy_position', '?')
+            
+            message = f"**{level_name}** has been moved to the legacy list"
+            if legacy_position and legacy_position != '?':
+                message += f" at position **#{legacy_position + 100}**"  # Legacy starts from #101
+            message += "."
+        
+        # Send the notification
+        if message and CHANGELOG_DISCORD_AVAILABLE:
+            notify_changelog(message, admin_username)
+            print(f"✅ Enhanced changelog notification sent: {message}")
+        
+    except Exception as e:
+        print(f"Error sending enhanced changelog notification: {e}")
+
+def auto_manage_legacy_list():
+    """Automatically manage legacy list - move level at position 101 to legacy"""
+    try:
+        # Find level at position 101 (should be moved to legacy)
+        level_at_101 = mongo_db.levels.find_one({
+            "position": 101,
+            "is_legacy": {"$ne": True}
+        })
+        
+        if level_at_101:
+            # Get the next legacy position (starting from 101, but in legacy list it's position 1, 2, 3...)
+            max_legacy_position = mongo_db.levels.find_one(
+                {"is_legacy": True},
+                sort=[("position", -1)]
+            )
+            
+            new_legacy_position = 1
+            if max_legacy_position:
+                new_legacy_position = max_legacy_position.get('position', 0) + 1
+            
+            # Move to legacy
+            mongo_db.levels.update_one(
+                {"_id": level_at_101["_id"]},
+                {"$set": {
+                    "is_legacy": True,
+                    "position": new_legacy_position,
+                    "points": 0  # Legacy levels have 0 points
+                }}
+            )
+            
+            # Log the automatic legacy move
+            log_level_change(
+                action="legacy",
+                level_name=level_at_101["name"],
+                admin_username="System",
+                old_position=101,
+                legacy_position=new_legacy_position
+            )
+            
+            print(f"🔄 Automatically moved {level_at_101['name']} to legacy list at position {new_legacy_position}")
+            return level_at_101["name"]
+        
+        return None
+        
+    except Exception as e:
+        print(f"Error in auto legacy management: {e}")
+        return None
+
+def get_level_neighbors(position, is_legacy=False):
+    """Get the levels above and below a given position"""
+    try:
+        above_level = mongo_db.levels.find_one({
+            "position": position - 1,
+            "is_legacy": is_legacy
+        }, {"name": 1})
+        
+        below_level = mongo_db.levels.find_one({
+            "position": position + 1,
+            "is_legacy": is_legacy
+        }, {"name": 1})
+        
+        return (
+            above_level["name"] if above_level else None,
+            below_level["name"] if below_level else None
+        )
+    except Exception as e:
+        print(f"Error getting level neighbors: {e}")
+        return None, None
+        
         # Send Discord notification for changelog
         if CHANGELOG_DISCORD_AVAILABLE:
             send_changelog_notification(action, level_name, admin_username, **kwargs)
@@ -2434,6 +2597,20 @@ def admin_move_level(level_id):
         else:
             return {'error': 'Invalid move'}, 400
         
+        # Get levels that will be above and below after the move
+        above_level, below_level = get_level_neighbors(new_position, False)
+        
+        # Check if this move will push something to legacy
+        pushed_to_legacy = None
+        if new_position <= 100 and current_position > 100:
+            # Moving up into top 100, check what's at position 100
+            level_at_100 = mongo_db.levels.find_one({
+                "position": 100,
+                "is_legacy": {"$ne": True}
+            })
+            if level_at_100:
+                pushed_to_legacy = level_at_100["name"]
+        
         # Calculate old and new points
         old_points = level.get('points', 0)
         new_points = calculate_level_points(new_position, False)
@@ -2447,8 +2624,34 @@ def admin_move_level(level_id):
         # Update user points for this level
         users_updated = recalculate_user_points_after_level_move(ObjectId(level_id), old_points, new_points)
         
-        # Log the action
+        # Handle automatic legacy management if needed
+        if new_position <= 100:
+            auto_manage_legacy_list()
+        
+        # Clear cache
+        levels_cache['main_list'] = None
+        levels_cache['legacy_list'] = None
+        
+        # Log enhanced changelog
         admin_username = session.get('username', 'Unknown Admin')
+        changelog_kwargs = {
+            'old_position': current_position,
+            'new_position': new_position,
+            'above_level': above_level,
+            'below_level': below_level
+        }
+        
+        if pushed_to_legacy:
+            changelog_kwargs['pushed_to_legacy'] = pushed_to_legacy
+        
+        log_level_change(
+            action="moved",
+            level_name=level['name'],
+            admin_username=admin_username,
+            **changelog_kwargs
+        )
+        
+        # Log admin action
         log_admin_action(admin_username, f"MOVED LEVEL: {level['name']}", f"Position {current_position} → {new_position}, Updated {users_updated} users")
         
         return {'success': True, 'users_updated': users_updated}
@@ -2502,7 +2705,7 @@ def admin_recalculate_all_points():
 
 @app.route('/admin/add_level', methods=['POST'])
 def admin_add_level():
-    """Add a new level with demon difficulty support"""
+    """Add a new level with enhanced changelog support"""
     if 'user_id' not in session or not session.get('is_admin'):
         flash('Access denied - Admin only', 'danger')
         return redirect(url_for('admin_levels_enhanced'))
@@ -2514,16 +2717,44 @@ def admin_add_level():
         creator = request.form.get('creator', '').strip()
         verifier = request.form.get('verifier', '').strip()
         position = int(request.form.get('position', 1))
-        difficulty = int(request.form.get('difficulty', 10))
+        difficulty = float(request.form.get('difficulty', 10))
+        video_url = request.form.get('video_url', '').strip()
+        level_id = request.form.get('level_id', '').strip()
+        min_percentage = int(request.form.get('min_percentage', 100))
         
         # Check level name for profanity
         is_name_clean, profanity_reason = check_level_name_profanity(name)
         if not is_name_clean:
             flash(f'Level name not allowed: {profanity_reason}', 'danger')
             return redirect(url_for('admin_levels_enhanced'))
-        # Note: Demon type requirement removed - now using text-based difficulties
-        # demon_type = request.form.get('demon_type', '').strip() if difficulty == 10 else None
-        demon_type = None  # Demon subcategories removed
+        
+        # Get admin username
+        admin_username = session.get('username', 'Unknown Admin')
+        
+        # Check if this placement will push something to legacy
+        pushed_to_legacy = None
+        if position <= 100:
+            # Check what's currently at position 100 (will be pushed to 101, then to legacy)
+            level_at_100 = mongo_db.levels.find_one({
+                "position": 100,
+                "is_legacy": {"$ne": True}
+            })
+            
+            if level_at_100:
+                pushed_to_legacy = level_at_100["name"]
+        
+        # Get levels that will be above and below the new level
+        above_level, below_level = get_level_neighbors(position, False)
+        
+        # Special handling for #1 placement
+        dethroned_level = None
+        if position == 1:
+            current_first = mongo_db.levels.find_one({
+                "position": 1,
+                "is_legacy": {"$ne": True}
+            })
+            if current_first:
+                dethroned_level = current_first["name"]
         
         # Shift existing levels down
         mongo_db.levels.update_many(
@@ -2542,10 +2773,10 @@ def admin_add_level():
             "verifier": verifier,
             "position": position,
             "difficulty": difficulty,
-            "demon_type": demon_type,
+            "demon_type": None,  # Demon subcategories removed
             "points": points,
             "video_url": video_url,
-            "level_id": int(level_id) if level_id else None,
+            "level_id": int(level_id) if level_id and level_id.strip() else None,
             "min_percentage": min_percentage,
             "is_legacy": False,
             "date_added": datetime.now(timezone.utc)
@@ -2553,8 +2784,34 @@ def admin_add_level():
         
         mongo_db.levels.insert_one(new_level)
         
-        # Log the action
-        admin_username = session.get('username', 'Unknown Admin')
+        # Handle automatic legacy management
+        auto_manage_legacy_list()
+        
+        # Clear cache
+        levels_cache['main_list'] = None
+        levels_cache['legacy_list'] = None
+        
+        # Log enhanced changelog
+        changelog_kwargs = {
+            'position': position,
+            'above_level': above_level,
+            'below_level': below_level
+        }
+        
+        if position == 1 and dethroned_level:
+            changelog_kwargs['dethroned_level'] = dethroned_level
+        
+        if pushed_to_legacy:
+            changelog_kwargs['pushed_to_legacy'] = pushed_to_legacy
+        
+        log_level_change(
+            action="placed",
+            level_name=name,
+            admin_username=admin_username,
+            **changelog_kwargs
+        )
+        
+        # Log admin action
         log_admin_action(admin_username, f"ADDED LEVEL: {name}", f"Position {position}, {difficulty}/10 difficulty")
         
         flash(f'Level "{name}" added successfully at position {position}', 'success')
@@ -5304,103 +5561,498 @@ def submit_record():
         # Default to enabled if there's an error
     
     if request.method == 'POST':
-        # Validate form data
-        level_id_str = request.form.get('level_id', '').strip()
-        progress_str = request.form.get('progress', '').strip()
-        video_url = request.form.get('video_url', '').strip()
-        comments = request.form.get('comments', '').strip()
+        # Check if this is a multiple submission
+        multiple_submission = request.form.get('multiple_submission') == 'true'
         
-        # Check for empty fields - use cached levels for faster response
-        if not level_id_str:
-            flash('Please select a level', 'danger')
-            levels = get_cached_levels(is_legacy=False)
-            return render_template('submit_record.html', levels=levels)
-            
-        if not progress_str:
-            flash('Please enter your progress percentage', 'danger')
-            levels = get_cached_levels(is_legacy=False)
-            return render_template('submit_record.html', levels=levels)
-            
-        if not video_url:
-            flash('Please provide a video URL', 'danger')
-            levels = get_cached_levels(is_legacy=False)
-            return render_template('submit_record.html', levels=levels)
-        
-        # Convert to integers
-        try:
-            level_id = int(level_id_str)
-            progress = int(progress_str)
-        except ValueError:
-            flash('Invalid level ID or progress value', 'danger')
-            levels = get_cached_levels(is_legacy=False)
-            return render_template('submit_record.html', levels=levels)
-        
-        # Validate progress range
-        if progress < 1 or progress > 100:
-            flash('Progress must be between 1 and 100', 'danger')
-            levels = get_cached_levels(is_legacy=False)
-            return render_template('submit_record.html', levels=levels)
-        
-        # Check if level exists - fast query with projection
-        level = mongo_db.levels.find_one({"_id": level_id}, {"name": 1, "min_percentage": 1}, max_time_ms=3000)
-        if not level:
-            flash('Selected level does not exist', 'danger')
-            levels = get_cached_levels(is_legacy=False)
-            return render_template('submit_record.html', levels=levels)
-        
-        # Check minimum progress requirement
-        min_progress = level.get('min_percentage', 100)
-        if progress < min_progress:
-            flash(f'This level requires at least {min_progress}% progress', 'danger')
-            levels = get_cached_levels(is_legacy=False)
-            return render_template('submit_record.html', levels=levels)
-        
-        # Generate new ObjectId for record
-        next_id = ObjectId()
-        
-        new_record = {
-            "_id": next_id,
-            "user_id": session['user_id'],
-            "level_id": level_id,
-            "progress": progress,
-            "video_url": video_url,
-            "comments": comments,
-            "status": "pending",
-            "date_submitted": datetime.now(timezone.utc)
-        }
-        
-        mongo_db.records.insert_one(new_record)
-        
-        # Send Discord notification
-        try:
-            user = mongo_db.users.find_one({"_id": session['user_id']})
-            username = user['username'] if user else 'Unknown'
-            print(f"🔔 Sending Discord notification for {username} - {level['name']} - {progress}%")
-            
-            # Try the imported function first
-            if DISCORD_AVAILABLE:
-                notify_record_submitted(username, level['name'], progress, video_url)
-            else:
-                # Fallback: send Discord notification directly
-                send_discord_notification_direct(username, level['name'], progress, video_url)
-            
-            print(f"✅ Discord notification sent successfully")
-        except Exception as e:
-            print(f"❌ Discord notification error: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        flash('Record submitted successfully! It will be reviewed by moderators.', 'success')
-        return redirect(url_for('profile'))
+        if multiple_submission:
+            return handle_multiple_record_submission()
+        else:
+            return handle_single_record_submission()
     
     # Use cached levels - if no cache, redirect to load
     levels = get_cached_levels(is_legacy=False)
     if not levels:
         flash('Please load levels first', 'info')
         return redirect(url_for('instant_load'))
+
     return render_template('submit_record.html', levels=levels)
 
+def handle_single_record_submission():
+    """Handle single record submission"""
+    # Validate form data
+    level_id_str = request.form.get('level_id', '').strip()
+    progress_str = request.form.get('progress', '').strip()
+    video_url = request.form.get('video_url', '').strip()
+    comments = request.form.get('comments', '').strip()
+    
+    # Check for empty fields - use cached levels for faster response
+    if not level_id_str:
+        flash('Please select a level', 'danger')
+        levels = get_cached_levels(is_legacy=False)
+        return render_template('submit_record.html', levels=levels)
+        
+    if not progress_str:
+        flash('Please enter your progress percentage', 'danger')
+        levels = get_cached_levels(is_legacy=False)
+        return render_template('submit_record.html', levels=levels)
+        
+    if not video_url:
+        flash('Please provide a video URL', 'danger')
+        levels = get_cached_levels(is_legacy=False)
+        return render_template('submit_record.html', levels=levels)
+    
+    # Convert to integers
+    try:
+        level_id = int(level_id_str)
+        progress = int(progress_str)
+    except ValueError:
+        flash('Invalid level ID or progress value', 'danger')
+        levels = get_cached_levels(is_legacy=False)
+        return render_template('submit_record.html', levels=levels)
+    
+    # Validate progress range
+    if progress < 1 or progress > 100:
+        flash('Progress must be between 1 and 100', 'danger')
+        levels = get_cached_levels(is_legacy=False)
+        return render_template('submit_record.html', levels=levels)
+    
+    # Check if level exists - fast query with projection
+    level = mongo_db.levels.find_one({"_id": level_id}, {"name": 1, "min_percentage": 1}, max_time_ms=3000)
+    if not level:
+        flash('Selected level does not exist', 'danger')
+        levels = get_cached_levels(is_legacy=False)
+        return render_template('submit_record.html', levels=levels)
+    
+    # Check minimum progress requirement
+    min_progress = level.get('min_percentage', 100)
+    if progress < min_progress:
+        flash(f'This level requires at least {min_progress}% progress', 'danger')
+        levels = get_cached_levels(is_legacy=False)
+        return render_template('submit_record.html', levels=levels)
+    
+    # Generate new ObjectId for record
+    next_id = ObjectId()
+    
+    new_record = {
+        "_id": next_id,
+        "user_id": session['user_id'],
+        "level_id": level_id,
+        "progress": progress,
+        "video_url": video_url,
+        "comments": comments,
+        "status": "pending",
+        "date_submitted": datetime.now(timezone.utc)
+    }
+    
+    mongo_db.records.insert_one(new_record)
+    
+    # Log submission with comments
+    log_submission_with_comments(session['user_id'], level['name'], progress, comments)
+    
+    # Send Discord notification
+    try:
+        user = mongo_db.users.find_one({"_id": session['user_id']})
+        username = user['username'] if user else 'Unknown'
+        print(f"🔔 Sending Discord notification for {username} - {level['name']} - {progress}%")
+        
+        # Try the imported function first
+        if DISCORD_AVAILABLE:
+            notify_record_submitted(username, level['name'], progress, video_url, comments)
+        else:
+            # Fallback: send Discord notification directly
+            send_discord_notification_direct(username, level['name'], progress, video_url, comments)
+        
+        print(f"✅ Discord notification sent successfully")
+    except Exception as e:
+        print(f"❌ Discord notification error: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    flash('Record submitted successfully! It will be reviewed by moderators.', 'success')
+    return redirect(url_for('profile'))
+
+def handle_multiple_record_submission():
+    """Handle multiple record submissions at once"""
+    try:
+        # Get the number of records being submitted
+        record_count = int(request.form.get('record_count', 1))
+        
+        if record_count < 1 or record_count > 10:  # Limit to 10 records max
+            flash('You can submit between 1 and 10 records at once', 'danger')
+            levels = get_cached_levels(is_legacy=False)
+            return render_template('submit_record.html', levels=levels)
+        
+        submitted_records = []
+        errors = []
+        
+        for i in range(record_count):
+            level_id_str = request.form.get(f'level_id_{i}', '').strip()
+            progress_str = request.form.get(f'progress_{i}', '').strip()
+            video_url = request.form.get(f'video_url_{i}', '').strip()
+            comments = request.form.get(f'comments_{i}', '').strip()
+            
+            # Skip empty entries
+            if not level_id_str or not progress_str or not video_url:
+                continue
+            
+            try:
+                level_id = int(level_id_str)
+                progress = int(progress_str)
+                
+                # Validate progress range
+                if progress < 1 or progress > 100:
+                    errors.append(f'Record {i+1}: Progress must be between 1 and 100')
+                    continue
+                
+                # Check if level exists
+                level = mongo_db.levels.find_one({"_id": level_id}, {"name": 1, "min_percentage": 1}, max_time_ms=3000)
+                if not level:
+                    errors.append(f'Record {i+1}: Level not found')
+                    continue
+                
+                # Check minimum progress requirement
+                min_progress = level.get('min_percentage', 100)
+                if progress < min_progress:
+                    errors.append(f'Record {i+1}: {level["name"]} requires at least {min_progress}% progress')
+                    continue
+                
+                # Create record
+                next_id = ObjectId()
+                new_record = {
+                    "_id": next_id,
+                    "user_id": session['user_id'],
+                    "level_id": level_id,
+                    "progress": progress,
+                    "video_url": video_url,
+                    "comments": comments,
+                    "status": "pending",
+                    "date_submitted": datetime.now(timezone.utc)
+                }
+                
+                mongo_db.records.insert_one(new_record)
+                submitted_records.append({
+                    'level_name': level['name'],
+                    'progress': progress,
+                    'comments': comments
+                })
+                
+                # Log submission with comments
+                log_submission_with_comments(session['user_id'], level['name'], progress, comments)
+                
+            except ValueError:
+                errors.append(f'Record {i+1}: Invalid level ID or progress value')
+                continue
+            except Exception as e:
+                errors.append(f'Record {i+1}: {str(e)}')
+                continue
+        
+        # Send Discord notifications for all submitted records
+        if submitted_records:
+            try:
+                user = mongo_db.users.find_one({"_id": session['user_id']})
+                username = user['username'] if user else 'Unknown'
+                
+                for record in submitted_records:
+                    if DISCORD_AVAILABLE:
+                        notify_record_submitted(username, record['level_name'], record['progress'], '', record['comments'])
+                
+                print(f"✅ Discord notifications sent for {len(submitted_records)} records")
+            except Exception as e:
+                print(f"❌ Discord notification error: {e}")
+        
+        # Show results
+        if submitted_records:
+            flash(f'Successfully submitted {len(submitted_records)} records! They will be reviewed by moderators.', 'success')
+        
+        if errors:
+            for error in errors:
+                flash(error, 'warning')
+        
+        if not submitted_records and not errors:
+            flash('No valid records were submitted', 'warning')
+        
+        return redirect(url_for('profile'))
+        
+    except Exception as e:
+        flash(f'Error processing multiple submissions: {str(e)}', 'danger')
+        levels = get_cached_levels(is_legacy=False)
+        return render_template('submit_record.html', levels=levels)
+
+def log_submission_with_comments(user_id, level_name, progress, comments):
+    """Log record submission with comments to submission logs"""
+    try:
+        user = mongo_db.users.find_one({"_id": user_id})
+        username = user['username'] if user else 'Unknown'
+        
+        log_entry = {
+            "_id": ObjectId(),
+            "user_id": user_id,
+            "username": username,
+            "level_name": level_name,
+            "progress": progress,
+            "comments": comments,
+            "timestamp": datetime.now(timezone.utc),
+            "type": "submission"
+        }
+        
+        mongo_db.submission_logs.insert_one(log_entry)
+        print(f"📝 Logged submission: {username} - {level_name} - {progress}% - Comments: {comments}")
+        
+    except Exception as e:
+        print(f"Error logging submission: {e}")
+
+def send_discord_notification_direct(username, level_name, progress, video_url, comments=None):
+    """Fallback Discord notification when integration is not available"""
+    try:
+        import requests
+        webhook_url = os.environ.get('DISCORD_WEBHOOK_URL')
+        
+        if not webhook_url:
+            print("❌ No Discord webhook URL configured for fallback")
+            return
+        
+        embed = {
+            "title": "📝 New Record Submission",
+            "description": "A new record has been submitted for review",
+            "color": 10181046,  # Purple color
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "fields": [
+                {"name": "👤 Player", "value": username, "inline": True},
+                {"name": "🎮 Level", "value": level_name, "inline": True},
+                {"name": "📊 Progress", "value": f"{progress}%", "inline": True}
+            ]
+        }
+        
+        if video_url:
+            embed["fields"].append({
+                "name": "🎥 Video",
+                "value": f"[Watch Video]({video_url})",
+                "inline": False
+            })
+        
+        if comments and comments.strip():
+            embed["fields"].append({
+                "name": "💬 Comments",
+                "value": comments[:500] + ("..." if len(comments) > 500 else ""),
+                "inline": False
+            })
+        
+        payload = {"embeds": [embed]}
+        
+        response = requests.post(webhook_url, json=payload, timeout=10)
+        if response.status_code == 204:
+            print("✅ Fallback Discord notification sent successfully")
+        else:
+            print(f"❌ Fallback Discord notification failed: {response.status_code}")
+            
+    except Exception as e:
+        print(f"❌ Error in fallback Discord notification: {e}")
+
 # Admin routes
+
+@app.route('/admin/bulk_record_action', methods=['POST'])
+def admin_bulk_record_action():
+    """Handle bulk record actions (approve, reject, delete)"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return {'error': 'Access denied'}, 403
+    
+    try:
+        action = request.form.get('action')
+        record_ids_json = request.form.get('record_ids')
+        reason = request.form.get('reason', '').strip()
+        
+        if not action or not record_ids_json:
+            return {'error': 'Missing action or record IDs'}, 400
+        
+        import json
+        record_ids = json.loads(record_ids_json)
+        
+        if not record_ids:
+            return {'error': 'No records selected'}, 400
+        
+        admin_username = session.get('username', 'Unknown Admin')
+        success_count = 0
+        
+        for record_id_str in record_ids:
+            try:
+                record_id = ObjectId(record_id_str)
+                
+                if action == 'approve':
+                    # Get record info
+                    record = mongo_db.records.find_one({"_id": record_id})
+                    if record and record.get('status') == 'pending':
+                        # Approve the record
+                        mongo_db.records.update_one(
+                            {"_id": record_id},
+                            {"$set": {
+                                "status": "approved",
+                                "approved_by": admin_username,
+                                "approved_at": datetime.now(timezone.utc)
+                            }}
+                        )
+                        
+                        # Update user points
+                        update_user_points(record['user_id'])
+                        success_count += 1
+                        
+                elif action == 'reject':
+                    # Get record info
+                    record = mongo_db.records.find_one({"_id": record_id})
+                    if record and record.get('status') == 'pending':
+                        # Reject the record
+                        update_data = {
+                            "status": "rejected",
+                            "rejected_by": admin_username,
+                            "rejected_at": datetime.now(timezone.utc)
+                        }
+                        if reason:
+                            update_data["rejection_reason"] = reason
+                        
+                        mongo_db.records.update_one(
+                            {"_id": record_id},
+                            {"$set": update_data}
+                        )
+                        success_count += 1
+                        
+                elif action == 'delete':
+                    # Delete the record
+                    result = mongo_db.records.delete_one({"_id": record_id})
+                    if result.deleted_count > 0:
+                        success_count += 1
+                        
+            except Exception as e:
+                print(f"Error processing record {record_id_str}: {e}")
+                continue
+        
+        # Log admin action
+        log_admin_action(
+            admin_username,
+            f"BULK {action.upper()} RECORDS",
+            f"Processed {success_count}/{len(record_ids)} records" + (f" - Reason: {reason}" if reason else "")
+        )
+        
+        return {'success': True, 'count': success_count}
+        
+    except Exception as e:
+        print(f"Error in bulk record action: {e}")
+        return {'error': str(e)}, 500
+
+@app.route('/admin/submission_logs')
+def admin_submission_logs():
+    """View submission logs with comments"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Get recent submission logs
+        logs = list(mongo_db.submission_logs.find().sort("timestamp", -1).limit(100))
+        
+        return render_template('admin/submission_logs.html', logs=logs)
+        
+    except Exception as e:
+        flash(f'Error loading submission logs: {str(e)}', 'danger')
+        return redirect(url_for('admin'))
+
+@app.route('/admin/delete_level/<level_id>', methods=['POST'])
+def admin_delete_level_enhanced(level_id):
+    """Enhanced level deletion with reason support"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return {'error': 'Access denied'}, 403
+    
+    try:
+        removal_reason = request.form.get('removal_reason', '').strip()
+        
+        # Get level info before deletion
+        level = mongo_db.levels.find_one({"_id": ObjectId(level_id)})
+        if not level:
+            return {'error': 'Level not found'}, 404
+        
+        level_position = level['position']
+        is_legacy = level.get('is_legacy', False)
+        admin_username = session.get('username', 'Unknown')
+        
+        # Delete associated records
+        mongo_db.records.delete_many({"level_id": ObjectId(level_id)})
+        
+        # Save history before deleting
+        history_entry = {
+            "level_id": ObjectId(level_id),
+            "action": "deleted",
+            "old_data": level,
+            "removal_reason": removal_reason,
+            "admin": admin_username,
+            "timestamp": datetime.now(timezone.utc)
+        }
+        mongo_db.level_history.insert_one(history_entry)
+        
+        # Delete the level
+        mongo_db.levels.delete_one({"_id": ObjectId(level_id)})
+        
+        # Log enhanced level removal to changelog
+        log_level_change(
+            action="removed",
+            level_name=level['name'],
+            admin_username=admin_username,
+            old_position=level_position,
+            reason=removal_reason,
+            list_type="legacy" if is_legacy else "main"
+        )
+        
+        # Clear cache since levels changed
+        levels_cache['main_list'] = None
+        levels_cache['legacy_list'] = None
+        
+        # Shift positions of levels that were below the deleted level
+        mongo_db.levels.update_many(
+            {"position": {"$gt": level_position}, "is_legacy": is_legacy},
+            {"$inc": {"position": -1}}
+        )
+        
+        # Recalculate points for all levels after position changes
+        recalculate_all_points()
+        
+        # Log admin action
+        reason_text = f" (Reason: {removal_reason})" if removal_reason else ""
+        log_admin_action(admin_username, f"REMOVED LEVEL: {level['name']}", f"Position {level_position}{reason_text}")
+        
+        return {'success': True}
+        
+    except Exception as e:
+        print(f"Error in enhanced level deletion: {e}")
+        return {'error': str(e)}, 500
+
+@app.route('/admin/remove_level_with_reason', methods=['POST'])
+def admin_remove_level_with_reason():
+    """Remove level with optional reason"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        level_id = request.form.get('level_id')
+        reason = request.form.get('reason', '').strip()
+        
+        if not level_id:
+            flash('Level ID is required', 'danger')
+            return redirect(url_for('admin_levels_enhanced'))
+        
+        # Get level info
+        level = mongo_db.levels.find_one({"_id": ObjectId(level_id)})
+        if not level:
+            flash('Level not found', 'danger')
+            return redirect(url_for('admin_levels_enhanced'))
+        
+        # Remove the level (this will call the enhanced admin_delete_level logic)
+        request.form = request.form.copy()
+        request.form['level_id'] = str(level['_id'])
+        request.form['removal_reason'] = reason
+        
+        return admin_delete_level()
+        
+    except Exception as e:
+        flash(f'Error removing level: {str(e)}', 'danger')
+        return redirect(url_for('admin_levels_enhanced'))
 @app.route('/admin/dashboard')
 def admin_dashboard():
     """New categorized admin dashboard"""
@@ -7140,6 +7792,7 @@ def admin_delete_level():
         return redirect(url_for('index'))
     
     level_id = int(request.form.get('level_id'))
+    removal_reason = request.form.get('removal_reason', '').strip()  # Get optional removal reason
     
     # Get level info before deletion
     level = mongo_db.levels.find_one({"_id": level_id})
@@ -7149,6 +7802,7 @@ def admin_delete_level():
     
     level_position = level['position']
     is_legacy = level.get('is_legacy', False)
+    admin_username = session.get('username', 'Unknown')
     
     # Delete associated records
     mongo_db.records.delete_many({"level_id": level_id})
@@ -7158,6 +7812,8 @@ def admin_delete_level():
         "level_id": level_id,
         "action": "deleted",
         "old_data": level,
+        "removal_reason": removal_reason,
+        "admin": admin_username,
         "timestamp": datetime.now(timezone.utc)
     }
     mongo_db.level_history.insert_one(history_entry)
@@ -7165,12 +7821,13 @@ def admin_delete_level():
     # Delete the level
     mongo_db.levels.delete_one({"_id": level_id})
     
-    # Log level removal to changelog
+    # Log enhanced level removal to changelog
     log_level_change(
         action="removed",
         level_name=level['name'],
-        admin_username=session.get('username', 'Unknown'),
+        admin_username=admin_username,
         old_position=level_position,
+        reason=removal_reason,
         list_type="legacy" if is_legacy else "main"
     )
     
@@ -7187,7 +7844,11 @@ def admin_delete_level():
     # Recalculate points for all levels after position changes
     recalculate_all_points()
     
-    flash('Level deleted successfully!', 'success')
+    # Log admin action
+    reason_text = f" (Reason: {removal_reason})" if removal_reason else ""
+    log_admin_action(admin_username, f"REMOVED LEVEL: {level['name']}", f"Position {level_position}{reason_text}")
+    
+    flash(f'Level "{level["name"]}" deleted successfully!', 'success')
     return redirect(url_for('admin_levels'))
 
 @app.route('/admin/move_to_legacy', methods=['POST'])

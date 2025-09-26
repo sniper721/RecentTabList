@@ -47,7 +47,7 @@
                         <tbody>
                             {% for level in levels %}
                             <tr class="level-row" data-level-id="{{ level.id if level is not mapping else level['id'] }}">
-                                <td class="position">{{ level.position if level is not mapping else level['position'] }}</td>
+                                <td class="position">{{ (level.position if level is not mapping else level['position']) + 100 }}</td>
                                 <td class="level-name">
                                     {% set difficulty = level.difficulty if level is not mapping else level['difficulty'] %}
                                     <span class="level-difficulty level-difficulty-{{ difficulty|round|int }}"></span>

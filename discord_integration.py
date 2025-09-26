@@ -95,6 +95,14 @@ class DiscordNotifier:
                 "inline": False
             })
         
+        # Add comments if available
+        if record_data.get('comments') and record_data['comments'].strip():
+            embed["fields"].append({
+                "name": "💬 Comments",
+                "value": record_data['comments'][:500] + ("..." if len(record_data['comments']) > 500 else ""),
+                "inline": False
+            })
+        
         # Add admin panel link
         website_url = os.environ.get('WEBSITE_URL', 'http://localhost:10000')
         embed["fields"].append({
@@ -260,13 +268,14 @@ class DiscordNotifier:
 # Global notifier instance
 discord_notifier = DiscordNotifier()
 
-def notify_record_submitted(username, level_name, progress, video_url):
+def notify_record_submitted(username, level_name, progress, video_url, comments=None):
     """Convenience function to notify about new record submission"""
     record_data = {
         'username': username,
         'level_name': level_name,
         'progress': progress,
-        'video_url': video_url
+        'video_url': video_url,
+        'comments': comments
     }
     
     print(f"🔔 notify_record_submitted called for {username}")

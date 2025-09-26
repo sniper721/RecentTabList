@@ -94,3 +94,93 @@ changelog_notifier = ChangelogDiscordNotifier()
 def notify_changelog(message, admin_username=None):
     """Convenience function to send changelog notifications"""
     return changelog_notifier.send_changelog_message(message, admin_username)
+
+def send_changelog_notification(action, level_name, admin_username=None, **kwargs):
+    """Send changelog notification with enhanced formatting"""
+    try:
+        message = ""
+        
+        if action == "placed":
+            position = kwargs.get('position', '?')
+            above_level = kwargs.get('above_level', '')
+            below_level = kwargs.get('below_level', '')
+            
+            if position == 1:
+                # Special case for #1 placement
+                dethroned_level = kwargs.get('dethroned_level', '')
+                pushed_to_legacy = kwargs.get('pushed_to_legacy', '')
+                
+                message = f"**{level_name}** has been placed at **#1**"
+                if dethroned_level:
+                    message += f" dethroning **{dethroned_level}**"
+                message += "."
+                
+                if pushed_to_legacy:
+                    message += f" This pushes **{pushed_to_legacy}** to the legacy list."
+            else:
+                # Regular placement
+                message = f"**{level_name}** has been placed at **#{position}**"
+                if below_level and above_level:
+                    message += f" below **{above_level}** and above **{below_level}**"
+                elif below_level:
+                    message += f" above **{below_level}**"
+                elif above_level:
+                    message += f" below **{above_level}**"
+                message += "."
+                
+                # Check if this placement pushed something to legacy
+                pushed_to_legacy = kwargs.get('pushed_to_legacy', '')
+                if pushed_to_legacy:
+                    message += f" This pushes **{pushed_to_legacy}** to the legacy list."
+        
+        elif action == "moved":
+            old_position = kwargs.get('old_position', '?')
+            new_position = kwargs.get('new_position', '?')
+            above_level = kwargs.get('above_level', '')
+            below_level = kwargs.get('below_level', '')
+            
+            message = f"**{level_name}** has been moved from **#{old_position}** to **#{new_position}**"
+            if below_level and above_level:
+                message += f" below **{above_level}** and above **{below_level}**"
+            elif below_level:
+                message += f" above **{below_level}**"
+            elif above_level:
+                message += f" below **{above_level}**"
+            message += "."
+            
+            # Check if this move pushed something to legacy
+            pushed_to_legacy = kwargs.get('pushed_to_legacy', '')
+            if pushed_to_legacy:
+                message += f" This pushes **{pushed_to_legacy}** to the legacy list."
+        
+        elif action == "removed":
+            old_position = kwargs.get('old_position', '?')
+            reason = kwargs.get('reason', '')
+            
+            message = f"**{level_name}** has been removed"
+            if old_position and old_position != '?':
+                message += f" from **#{old_position}**"
+            
+            if reason:
+                message += f". Reason: {reason}"
+            else:
+                message += "."
+        
+        elif action == "legacy":
+            old_position = kwargs.get('old_position', '?')
+            legacy_position = kwargs.get('legacy_position', '?')
+            
+            message = f"**{level_name}** has been moved to the legacy list"
+            if legacy_position and legacy_position != '?':
+                message += f" at position **#{legacy_position + 100}**"  # Legacy starts from #101
+            message += "."
+        
+        # Send the notification
+        if message:
+            return notify_changelog(message, admin_username)
+        
+        return False
+        
+    except Exception as e:
+        print(f"Error sending changelog notification: {e}")
+        return False
