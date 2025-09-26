@@ -3,6 +3,29 @@
 {% block title %}Legacy List - Geometry Dash Demon List{% endblock %}
 
 {% block content %}
+
+<!-- 🎭 April Fools Easter Egg -->
+{% if april_fools_active %}
+<div class="alert alert-info alert-dismissible fade show" role="alert" style="background: linear-gradient(45deg, #667eea, #764ba2, #f093fb, #f5576c); background-size: 400% 400%; animation: gradient 3s ease infinite;">
+    <div class="d-flex align-items-center">
+        <span style="font-size: 1.2em; margin-right: 10px;">🎭</span>
+        <div>
+            <strong>Even the legacy levels are confused! 🌪️</strong><br>
+            <small>The chaos has spread to the old list too! Nothing is where it should be! 😵‍💫</small>
+        </div>
+    </div>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+
+<style>
+@keyframes gradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+</style>
+{% endif %}
+
 <div class="row">
     <div class="col-lg-8">
         <div class="card shadow-sm">
