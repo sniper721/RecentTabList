@@ -781,7 +781,7 @@ def log_level_change(action, level_name, admin_username, **kwargs):
         print(f"Error logging level change: {e}")
 
 def send_enhanced_changelog_notification(action, level_name, admin_username, **kwargs):
-    """Send enhanced changelog notifications with proper formatting"""
+    """Send changelog notifications with simple text formatting (no bold)"""
     try:
         message = ""
         
@@ -795,28 +795,28 @@ def send_enhanced_changelog_notification(action, level_name, admin_username, **k
                 dethroned_level = kwargs.get('dethroned_level', '')
                 pushed_to_legacy = kwargs.get('pushed_to_legacy', '')
                 
-                message = f"**{level_name}** has been placed at **#1**"
+                message = f"{level_name} has been placed at #1"
                 if dethroned_level:
-                    message += f" dethroning **{dethroned_level}**"
+                    message += f" dethroning {dethroned_level}"
                 message += "."
                 
                 if pushed_to_legacy:
-                    message += f" This pushes **{pushed_to_legacy}** to the legacy list."
+                    message += f" This pushes {pushed_to_legacy} to the legacy list."
             else:
                 # Regular placement
-                message = f"**{level_name}** has been placed at **#{position}**"
+                message = f"{level_name} has been placed at #{position}"
                 if below_level and above_level:
-                    message += f" below **{above_level}** and above **{below_level}**"
+                    message += f" below {above_level} and above {below_level}"
                 elif below_level:
-                    message += f" above **{below_level}**"
+                    message += f" above {below_level}"
                 elif above_level:
-                    message += f" below **{above_level}**"
+                    message += f" below {above_level}"
                 message += "."
                 
                 # Check if this placement pushed something to legacy
                 pushed_to_legacy = kwargs.get('pushed_to_legacy', '')
                 if pushed_to_legacy:
-                    message += f" This pushes **{pushed_to_legacy}** to the legacy list."
+                    message += f" This pushes {pushed_to_legacy} to the legacy list."
         
         elif action == "moved":
             old_position = kwargs.get('old_position', '?')
@@ -824,27 +824,27 @@ def send_enhanced_changelog_notification(action, level_name, admin_username, **k
             above_level = kwargs.get('above_level', '')
             below_level = kwargs.get('below_level', '')
             
-            message = f"**{level_name}** has been moved from **#{old_position}** to **#{new_position}**"
+            message = f"{level_name} has been moved from #{old_position} to #{new_position}"
             if below_level and above_level:
-                message += f" below **{above_level}** and above **{below_level}**"
+                message += f" below {above_level} and above {below_level}"
             elif below_level:
-                message += f" above **{below_level}**"
+                message += f" above {below_level}"
             elif above_level:
-                message += f" below **{above_level}**"
+                message += f" below {above_level}"
             message += "."
             
             # Check if this move pushed something to legacy
             pushed_to_legacy = kwargs.get('pushed_to_legacy', '')
             if pushed_to_legacy:
-                message += f" This pushes **{pushed_to_legacy}** to the legacy list."
+                message += f" This pushes {pushed_to_legacy} to the legacy list."
         
         elif action == "removed":
             old_position = kwargs.get('old_position', '?')
             reason = kwargs.get('reason', '')
             
-            message = f"**{level_name}** has been removed"
+            message = f"{level_name} has been removed"
             if old_position and old_position != '?':
-                message += f" from **#{old_position}**"
+                message += f" from #{old_position}"
             
             if reason:
                 message += f". Reason: {reason}"
@@ -855,18 +855,18 @@ def send_enhanced_changelog_notification(action, level_name, admin_username, **k
             old_position = kwargs.get('old_position', '?')
             legacy_position = kwargs.get('legacy_position', '?')
             
-            message = f"**{level_name}** has been moved to the legacy list"
+            message = f"{level_name} has been moved to the legacy list"
             if legacy_position and legacy_position != '?':
-                message += f" at position **#{legacy_position + 100}**"  # Legacy starts from #101
+                message += f" at position #{legacy_position + 100}"  # Legacy starts from #101
             message += "."
         
-        # Send the notification
+        # Send the notification - ensure only one message is sent
         if message and CHANGELOG_DISCORD_AVAILABLE:
             notify_changelog(message, admin_username)
-            print(f"✅ Enhanced changelog notification sent: {message}")
+            print(f"✅ Changelog notification sent: {message}")
         
     except Exception as e:
-        print(f"Error sending enhanced changelog notification: {e}")
+        print(f"Error sending changelog notification: {e}")
 
 def auto_manage_legacy_list():
     """Automatically manage legacy list - move level at position 101 to legacy"""
@@ -936,76 +936,8 @@ def get_level_neighbors(position, is_legacy=False):
     except Exception as e:
         print(f"Error getting level neighbors: {e}")
         return None, None
-        
-        # Send Discord notification for changelog
-        if CHANGELOG_DISCORD_AVAILABLE:
-            send_changelog_notification(action, level_name, admin_username, **kwargs)
-        
-    except Exception as e:
-        print(f"Error logging level change: {e}")
 
-def send_changelog_notification(action, level_name, admin_username, **kwargs):
-    """Send changelog notification to Discord webhook"""
-    try:
-        # Generate appropriate message based on action type
-        message = ""
-        if action == "placed":
-            # New level placement
-            position = kwargs.get("position", 1)
-            list_type = kwargs.get("list_type", "main")
-            
-            if position == 1:
-                # New #1 placement
-                # Find the previous #1 level
-                above_level_doc = mongo_db.levels.find_one({"position": 1, "is_legacy": False})
-                above_level_name = above_level_doc['name'] if above_level_doc and above_level_doc['name'] != level_name else None
-                
-                if above_level_name:
-                    message = f"{level_name} has been placed on #1 dethroning {above_level_name}."
-                else:
-                    message = f"{level_name} has been placed on #1."
-            else:
-                # Placement at another position
-                above_level = kwargs.get("above_level")
-                below_level = kwargs.get("below_level")
-                
-                message = f"{level_name} has been placed on #{position}"
-                
-                if above_level:
-                    message += f" below {above_level}"
-                if below_level:
-                    message += f" and above {below_level}"
-                
-        elif action == "moved":
-            # Level moved within the same list
-            old_position = kwargs.get("old_position")
-            new_position = kwargs.get("new_position")
-            above_level = kwargs.get("above_level")
-            below_level = kwargs.get("below_level")
-            list_type = kwargs.get("list_type", "main")
-            
-            message = f"{level_name} has been moved from #{old_position} to #{new_position}"
-            
-            if above_level:
-                message += f" below {above_level}"
-            if below_level:
-                message += f" and above {below_level}"
-                
-        elif action == "legacy":
-            # Level moved to legacy list
-            old_position = kwargs.get("old_position")
-            message = f"{level_name} has been moved to the legacy list from position #{old_position}"
-        else:
-            # Generic message for other actions
-            message = f"Level '{level_name}' has been updated ({action})"
-        
-        # Send the notification (without custom message)
-        notify_changelog(message, admin_username)
-        
-    except Exception as e:
-        print(f"Error sending changelog notification: {e}")
-        import traceback
-        traceback.print_exc()
+
 
 def log_admin_action(admin_username, action, details=""):
     """Log admin actions to database and Discord"""
@@ -8719,8 +8651,8 @@ def admin_test_webhook():
         admin_user = mongo_db.users.find_one({"_id": session['user_id']})
         admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
         
-        # Send test message without custom message
-        test_message = "🔔 **Webhook Test Message**\nThis is a test message to verify that the changelog webhook is working correctly."
+        # Send test message without formatting
+        test_message = "🔔 Webhook Test Message\nThis is a test message to verify that the changelog webhook is working correctly."
         
         result = notify_changelog(test_message, admin_username)
         
