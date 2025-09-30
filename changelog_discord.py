@@ -107,7 +107,7 @@ def notify_changelog(message, admin_username=None):
     return changelog_notifier.send_changelog_message(message, admin_username)
 
 def send_changelog_notification(action, level_name, admin_username=None, **kwargs):
-    """Send changelog notification with simple text formatting (no bold)"""
+    """Send changelog notification with enhanced formatting matching user requirements"""
     try:
         message = ""
         
@@ -115,49 +115,59 @@ def send_changelog_notification(action, level_name, admin_username=None, **kwarg
             position = kwargs.get('position', '?')
             above_level = kwargs.get('above_level', '')
             below_level = kwargs.get('below_level', '')
+            list_type = kwargs.get('list_type', 'main')  # main, legacy, future
             
-            if position == 1:
-                # Special case for #1 placement
-                dethroned_level = kwargs.get('dethroned_level', '')
-                pushed_to_legacy = kwargs.get('pushed_to_legacy', '')
-                
-                message = f"{level_name} has been placed at #1"
-                if dethroned_level:
-                    message += f" dethroning {dethroned_level}"
-                message += "."
-                
-                if pushed_to_legacy:
-                    message += f" This pushes {pushed_to_legacy} to the legacy list."
-            else:
-                # Regular placement
-                message = f"{level_name} has been placed at #{position}"
-                if below_level and above_level:
-                    message += f" below {above_level} and above {below_level}"
-                elif below_level:
-                    message += f" above {below_level}"
-                elif above_level:
-                    message += f" below {above_level}"
-                message += "."
-                
-                # Check if this placement pushed something to legacy
-                pushed_to_legacy = kwargs.get('pushed_to_legacy', '')
-                if pushed_to_legacy:
-                    message += f" This pushes {pushed_to_legacy} to the legacy list."
+            # Enhanced message format: "X has been placed at #place above X2 and below X3. This pushes X4 to the legacy list"
+            list_suffix = ""
+            if list_type == "legacy":
+                list_suffix = " from the legacy list"
+            elif list_type == "future":
+                list_suffix = " from the future list"
+            
+            message = f"{level_name} has been placed at #{position}"
+            
+            # Add positioning context
+            if above_level and below_level:
+                message += f" above {below_level} and below {above_level}"
+            elif below_level:
+                message += f" above {below_level}"
+            elif above_level:
+                message += f" below {above_level}"
+            
+            # Add list type suffix
+            message += list_suffix + "."
+            
+            # Check if this placement pushed something to legacy
+            pushed_to_legacy = kwargs.get('pushed_to_legacy', '')
+            if pushed_to_legacy:
+                message += f" This pushes {pushed_to_legacy} to the legacy list."
         
         elif action == "moved":
             old_position = kwargs.get('old_position', '?')
             new_position = kwargs.get('new_position', '?')
             above_level = kwargs.get('above_level', '')
             below_level = kwargs.get('below_level', '')
+            list_type = kwargs.get('list_type', 'main')
+            
+            # Enhanced message format for moves
+            list_suffix = ""
+            if list_type == "legacy":
+                list_suffix = " from the legacy list"
+            elif list_type == "future":
+                list_suffix = " from the future list"
             
             message = f"{level_name} has been moved from #{old_position} to #{new_position}"
-            if below_level and above_level:
-                message += f" below {above_level} and above {below_level}"
+            
+            # Add positioning context
+            if above_level and below_level:
+                message += f" above {below_level} and below {above_level}"
             elif below_level:
                 message += f" above {below_level}"
             elif above_level:
                 message += f" below {above_level}"
-            message += "."
+            
+            # Add list type suffix
+            message += list_suffix + "."
             
             # Check if this move pushed something to legacy
             pushed_to_legacy = kwargs.get('pushed_to_legacy', '')
@@ -167,10 +177,19 @@ def send_changelog_notification(action, level_name, admin_username=None, **kwarg
         elif action == "removed":
             old_position = kwargs.get('old_position', '?')
             reason = kwargs.get('reason', '')
+            list_type = kwargs.get('list_type', 'main')
+            
+            list_suffix = ""
+            if list_type == "legacy":
+                list_suffix = " from the legacy list"
+            elif list_type == "future":
+                list_suffix = " from the future list"
             
             message = f"{level_name} has been removed"
             if old_position and old_position != '?':
                 message += f" from #{old_position}"
+            
+            message += list_suffix
             
             if reason:
                 message += f". Reason: {reason}"
@@ -186,8 +205,21 @@ def send_changelog_notification(action, level_name, admin_username=None, **kwarg
                 message += f" at position #{legacy_position + 100}"  # Legacy starts from #101
             message += "."
         
-        # Send the notification - ensure only one message is sent
+        # Try to send via Discord bot first (enhanced), then fallback to webhook
         if message:
+            try:
+                # Try Discord bot first for enhanced formatting
+                from discord_bot import send_changelog_notification, DISCORD_BOT_AVAILABLE
+                # Re-import to get current status
+                import discord_bot
+                if discord_bot.DISCORD_BOT_AVAILABLE:
+                    bot_success = send_changelog_notification(message)
+                    if bot_success:
+                        return True
+            except Exception as e:
+                print(f"Discord bot changelog notification failed: {e}")
+            
+            # Fallback to webhook
             return notify_changelog(message, admin_username)
         
         return False

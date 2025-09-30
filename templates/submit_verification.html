@@ -1,0 +1,209 @@
+{% extends "layout.html" %}
+
+{% block title %}Submit Verification - RTL{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="mb-0">
+                        <i class="fas fa-check-circle text-success"></i>
+                        Submit Verification
+                    </h3>
+                    <small class="text-muted">Submit a verification for a level to be added to the list</small>
+                </div>
+                <div class="card-body">
+                    <!-- Requirements Notice -->
+                    <div class="alert alert-info">
+                        <h6><i class="fas fa-info-circle"></i> Requirements:</h6>
+                        <ul class="mb-0">
+                            <li>You must have the "List Player" role in the Discord server</li>
+                            <li>Your Discord account must be linked to your RTL account</li>
+                            <li>Provide a valid verification video URL</li>
+                            <li>Rate your experience and enjoyment honestly</li>
+                        </ul>
+                    </div>
+
+                    <form method="POST" action="{{ url_for('submit_verification') }}">
+                        <!-- Verification Video URL -->
+                        <div class="mb-3">
+                            <label for="verification_url" class="form-label">
+                                <i class="fas fa-video"></i> Verification Video URL *
+                            </label>
+                            <input type="url" class="form-control" id="verification_url" name="verification_url" 
+                                   placeholder="https://youtube.com/watch?v=..." required>
+                            <div class="form-text">YouTube, Streamable, Vimeo, or other video platform links</div>
+                        </div>
+
+                        <!-- Level ID -->
+                        <div class="mb-3">
+                            <label for="level_id" class="form-label">
+                                <i class="fas fa-hashtag"></i> Level ID *
+                            </label>
+                            <input type="number" class="form-control" id="level_id" name="level_id" 
+                                   placeholder="Enter the Geometry Dash level ID" required min="1">
+                            <div class="form-text">The numeric ID of the level in Geometry Dash</div>
+                        </div>
+
+                        <!-- Level Name -->
+                        <div class="mb-3">
+                            <label for="level_name" class="form-label">
+                                <i class="fas fa-gamepad"></i> Level Name *
+                            </label>
+                            <input type="text" class="form-control" id="level_name" name="level_name" 
+                                   placeholder="Enter the level name" required maxlength="100">
+                        </div>
+
+                        <!-- Creator -->
+                        <div class="mb-3">
+                            <label for="creator" class="form-label">
+                                <i class="fas fa-user-edit"></i> Creator *
+                            </label>
+                            <input type="text" class="form-control" id="creator" name="creator" 
+                                   placeholder="Enter the level creator's name" required maxlength="50">
+                            <div class="form-text">The username of the person who created this level</div>
+                        </div>
+
+                        <!-- Verifier -->
+                        <div class="mb-3">
+                            <label for="verifier" class="form-label">
+                                <i class="fas fa-user-check"></i> Verifier *
+                            </label>
+                            <input type="text" class="form-control" id="verifier" name="verifier" 
+                                   placeholder="Enter the verifier's name" required maxlength="50">
+                            <div class="form-text">The username of the person who verified this level</div>
+                        </div>
+
+                        <!-- Difficulty -->
+                        <div class="mb-3">
+                            <label for="difficulty" class="form-label">
+                                <i class="fas fa-star"></i> Difficulty *
+                            </label>
+                            <select class="form-select" id="difficulty" name="difficulty" required>
+                                <option value="">Select difficulty...</option>
+                                {% for difficulty in difficulty_options %}
+                                <option value="{{ difficulty }}">{{ difficulty }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Placement -->
+                        <div class="mb-3">
+                            <label for="placement" class="form-label">
+                                <i class="fas fa-trophy"></i> Placement on List *
+                            </label>
+                            <input type="number" class="form-control" id="placement" name="placement" 
+                                   placeholder="Enter position number (e.g., 1, 50, 150)" min="1" required>
+                            <div class="form-text">What position should this level be placed at?</div>
+                        </div>
+
+                        <!-- Experience Rating -->
+                        <div class="mb-3">
+                            <label for="experience" class="form-label">
+                                <i class="fas fa-brain"></i> Experience Rating (1-10) *
+                            </label>
+                            <select class="form-select" id="experience" name="experience" required>
+                                <option value="">Select rating...</option>
+                                {% for i in range(1, 11) %}
+                                <option value="{{ i }}">{{ i }} - {% if i <= 3 %}Poor{% elif i <= 5 %}Fair{% elif i <= 7 %}Good{% elif i <= 9 %}Great{% else %}Excellent{% endif %}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">How was your overall experience playing this level?</div>
+                        </div>
+
+                        <!-- Enjoyment Rating -->
+                        <div class="mb-3">
+                            <label for="enjoyment" class="form-label">
+                                <i class="fas fa-smile"></i> Enjoyment Rating (1-10) *
+                            </label>
+                            <select class="form-select" id="enjoyment" name="enjoyment" required>
+                                <option value="">Select rating...</option>
+                                {% for i in range(1, 11) %}
+                                <option value="{{ i }}">{{ i }} - {% if i <= 3 %}Not Fun{% elif i <= 5 %}Okay{% elif i <= 7 %}Fun{% elif i <= 9 %}Very Fun{% else %}Amazing{% endif %}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">How much did you enjoy playing this level?</div>
+                        </div>
+
+                        <!-- Comments -->
+                        <div class="mb-3">
+                            <label for="comments" class="form-label">
+                                <i class="fas fa-comment"></i> Comments (Optional)
+                            </label>
+                            <textarea class="form-control" id="comments" name="comments" rows="3" 
+                                      placeholder="Any additional comments about the level, verification, or placement..." maxlength="500"></textarea>
+                            <div class="form-text">Share any thoughts about the level or verification (max 500 characters)</div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-paper-plane"></i> Submit Verification
+                            </button>
+                            <a href="{{ url_for('profile') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Back to Profile
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Help Section -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-question-circle"></i> Need Help?</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Don't have the List Player role?</strong></p>
+                    <p>Join our Discord server and request the List Player role from a moderator to submit verifications.</p>
+                    
+                    <p><strong>Discord not linked?</strong></p>
+                    <p>Go to your <a href="{{ url_for('profile') }}">profile page</a> and click "Link Discord Account" to connect your Discord.</p>
+                    
+                    <p><strong>Questions about difficulty ratings?</strong></p>
+                    <ul>
+                        <li><strong>Easy/Normal/Hard/Harder/Insane:</strong> Non-demon difficulties</li>
+                        <li><strong>Easy/Medium/Hard/Insane/Extreme Demon:</strong> Demon difficulties</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border: none;
+}
+
+.card-header {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    border-bottom: none;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    border: none;
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #218838, #1ea085);
+    transform: translateY(-1px);
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #28a745;
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
+
+.alert-info {
+    background-color: #e3f2fd;
+    border-color: #2196f3;
+    color: #1976d2;
+}
+</style>
+{% endblock %}

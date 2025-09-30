@@ -1,0 +1,181 @@
+{% extends "layout.html" %}
+
+{% block title %}Verification Submissions - Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="mb-0">
+                        <i class="fas fa-check-circle text-success"></i>
+                        Verification Submissions
+                    </h3>
+                    <div>
+                        <a href="{{ url_for('admin_verification_details') }}" class="btn btn-outline-info me-2">
+                            <i class="fas fa-list-alt"></i> View Details
+                        </a>
+                        <a href="{{ url_for('admin') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Back to Admin
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if submissions %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Submitted</th>
+                                    <th>Player</th>
+                                    <th>Level Name</th>
+                                    <th>Creator</th>
+                                    <th>Verifier</th>
+                                    <th>Difficulty</th>
+                                    <th>Placement</th>
+                                    <th>Experience</th>
+                                    <th>Enjoyment</th>
+                                    <th>Comments</th>
+                                    <th>Video</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for submission in submissions %}
+                                <tr class="{% if submission.status == 'pending' %}table-warning{% elif submission.status == 'approved' %}table-success{% elif submission.status == 'rejected' %}table-danger{% endif %}">
+                                    <td>
+                                        <small>{{ submission.date_submitted.strftime('%Y-%m-%d %H:%M') }} UTC</small>
+                                    </td>
+                                    <td>
+                                        <strong>{{ submission.user.username }}</strong>
+                                        {% if submission.user.discord_username %}
+                                        <br><small class="text-muted">{{ submission.user.discord_username }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <strong>{{ submission.level_name }}</strong>
+                                    </td>
+                                    <td>
+                                        <span class="text-muted">{{ submission.creator or 'N/A' }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="text-muted">{{ submission.verifier or 'N/A' }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info">{{ submission.difficulty }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary">#{{ submission.placement }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="text-center">
+                                            <span class="badge bg-secondary">{{ submission.experience }}/10</span>
+                                            <div class="progress mt-1" style="height: 4px;">
+                                                <div class="progress-bar bg-info" style="width: {{ (submission.experience / 10) * 100 }}%"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="text-center">
+                                            <span class="badge bg-secondary">{{ submission.enjoyment }}/10</span>
+                                            <div class="progress mt-1" style="height: 4px;">
+                                                <div class="progress-bar bg-success" style="width: {{ (submission.enjoyment / 10) * 100 }}%"></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if submission.comments %}
+                                            <small class="text-muted">{{ submission.comments[:50] }}{% if submission.comments|length > 50 %}...{% endif %}</small>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ submission.verification_url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-external-link-alt"></i> Watch
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">No verification submissions found</h5>
+                        <p class="text-muted">Verification submissions will appear here when users submit them.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Statistics Card -->
+            <div class="row mt-4">
+                <div class="col-md-3">
+                    <div class="card bg-warning text-dark">
+                        <div class="card-body text-center">
+                            <h3>{{ submissions | selectattr('status', 'equalto', 'pending') | list | length }}</h3>
+                            <p class="mb-0">Pending</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body text-center">
+                            <h3>{{ submissions | selectattr('status', 'equalto', 'approved') | list | length }}</h3>
+                            <p class="mb-0">Approved</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body text-center">
+                            <h3>{{ submissions | selectattr('status', 'equalto', 'rejected') | list | length }}</h3>
+                            <p class="mb-0">Rejected</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center">
+                            <h3>{{ submissions | length }}</h3>
+                            <p class="mb-0">Total</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.table-responsive {
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+.progress {
+    background-color: rgba(0,0,0,0.1);
+}
+
+.btn-group .btn {
+    margin-right: 2px;
+}
+
+.card {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border: none;
+}
+
+.badge {
+    font-size: 0.75em;
+}
+
+.modal-content {
+    border-radius: 0.5rem;
+}
+</style>
+
+
+{% endblock %}

@@ -299,13 +299,38 @@ def notify_record_approved(username, level_name, progress, points_earned):
     
     print(f"🔔 notify_record_approved called for {username}")
     
-    # Send directly instead of using threads (more reliable)
+    # Send webhook notification
     try:
         discord_notifier.send_record_approved_notification(record_data)
     except Exception as e:
-        print(f"❌ Error in notify_record_approved: {e}")
+        print(f"❌ Error in webhook notification: {e}")
         import traceback
         traceback.print_exc()
+    
+    # Send DM to user via bot
+    try:
+        from discord_bot import send_dm_to_user, is_bot_available
+        if is_bot_available():
+            # Get user's Discord ID from database
+            from main import mongo_db
+            user = mongo_db.users.find_one({"username": username})
+            if user and user.get('discord_id'):
+                dm_message = f"🎉 **Record Approved!**\n\n"
+                dm_message += f"Your {progress}% record on **{level_name}** has been approved!\n"
+                dm_message += f"You earned **{points_earned} points**! 🏆\n\n"
+                dm_message += f"Keep up the great work! 💪"
+                
+                success = send_dm_to_user(user['discord_id'], dm_message)
+                if success:
+                    print(f"✅ DM sent to {username}")
+                else:
+                    print(f"❌ Failed to send DM to {username}")
+            else:
+                print(f"⚠️ No Discord ID found for user {username}")
+        else:
+            print("⚠️ Discord bot not available for DMs")
+    except Exception as e:
+        print(f"❌ Error sending DM: {e}")
 
 def notify_record_rejected(username, level_name, progress, reason=None):
     """Convenience function to notify about rejected record"""
@@ -317,13 +342,39 @@ def notify_record_rejected(username, level_name, progress, reason=None):
     
     print(f"🔔 notify_record_rejected called for {username}")
     
-    # Send directly instead of using threads (more reliable)
+    # Send webhook notification
     try:
         discord_notifier.send_record_rejected_notification(record_data, reason)
     except Exception as e:
-        print(f"❌ Error in notify_record_rejected: {e}")
+        print(f"❌ Error in webhook notification: {e}")
         import traceback
         traceback.print_exc()
+    
+    # Send DM to user via bot
+    try:
+        from discord_bot import send_dm_to_user, is_bot_available
+        if is_bot_available():
+            # Get user's Discord ID from database
+            from main import mongo_db
+            user = mongo_db.users.find_one({"username": username})
+            if user and user.get('discord_id'):
+                dm_message = f"❌ **Record Rejected**\n\n"
+                dm_message += f"Your {progress}% record on **{level_name}** has been rejected.\n"
+                if reason:
+                    dm_message += f"**Reason:** {reason}\n\n"
+                dm_message += f"Don't give up! You can submit a new record anytime. 💪"
+                
+                success = send_dm_to_user(user['discord_id'], dm_message)
+                if success:
+                    print(f"✅ DM sent to {username}")
+                else:
+                    print(f"❌ Failed to send DM to {username}")
+            else:
+                print(f"⚠️ No Discord ID found for user {username}")
+        else:
+            print("⚠️ Discord bot not available for DMs")
+    except Exception as e:
+        print(f"❌ Error sending DM: {e}")
 
 def notify_admin_action(admin_username, action, details=""):
     """Convenience function to notify about admin actions"""

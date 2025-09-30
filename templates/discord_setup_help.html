@@ -1,0 +1,137 @@
+{% extends "layout.html" %}
+
+{% block title %}Discord Setup Help - RTL{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h3 class="mb-0">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Fix Discord OAuth Error
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <h5><i class="fas fa-info-circle"></i> Error: "invalid OAuth2 redirect_URL"</h5>
+                        <p class="mb-0">This happens when the redirect URI in your Discord application doesn't match what your app is sending.</p>
+                    </div>
+
+                    <h5 class="mt-4">🔧 How to Fix This:</h5>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6><i class="fas fa-external-link-alt"></i> Step 1: Open Discord Developer Portal</h6>
+                                    <p>Click this link to go directly to your Discord application:</p>
+                                    <a href="https://discord.com/developers/applications/1421837492524683374/oauth2/general" 
+                                       target="_blank" class="btn btn-primary btn-sm">
+                                        <i class="fab fa-discord"></i> Open Discord Developer Portal
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6><i class="fas fa-list"></i> Step 2: Add Redirect URIs</h6>
+                                    <p>Scroll down to "Redirects" section and add these URIs:</p>
+                                    <button class="btn btn-success btn-sm" onclick="copyAllURIs()">
+                                        <i class="fas fa-copy"></i> Copy All URIs
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <h6>📋 Redirect URIs to Add:</h6>
+                        <div class="bg-dark text-light p-3 rounded" style="font-family: monospace;">
+                            <div id="redirect-uris">
+http://localhost:10000/auth/discord/callback<br>
+https://localhost:10000/auth/discord/callback<br>
+http://127.0.0.1:10000/auth/discord/callback<br>
+https://127.0.0.1:10000/auth/discord/callback<br>
+https://recenttablist.onrender.com/auth/discord/callback<br>
+http://recenttablist.onrender.com/auth/discord/callback
+                            </div>
+                        </div>
+                        <small class="text-muted">
+                            <i class="fas fa-lightbulb"></i> 
+                            Copy each URI exactly as shown above and paste them one by one into the Discord Developer Portal.
+                        </small>
+                    </div>
+
+                    <div class="mt-4">
+                        <h6>🎯 After Adding the URIs:</h6>
+                        <ol>
+                            <li>Click "Save Changes" in Discord Developer Portal</li>
+                            <li>Come back to your profile</li>
+                            <li>Try clicking "Connect" under Discord Account again</li>
+                            <li>It should work now! 🎉</li>
+                        </ol>
+                    </div>
+
+                    <div class="mt-4 text-center">
+                        <a href="{{ url_for('profile') }}" class="btn btn-primary">
+                            <i class="fas fa-arrow-left"></i> Back to Profile
+                        </a>
+                        <a href="{{ url_for('debug_discord_redirect') }}" class="btn btn-info">
+                            <i class="fas fa-bug"></i> Debug Info
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyAllURIs() {
+    const uris = `http://localhost:10000/auth/discord/callback
+https://localhost:10000/auth/discord/callback
+http://127.0.0.1:10000/auth/discord/callback
+https://127.0.0.1:10000/auth/discord/callback
+https://recenttablist.onrender.com/auth/discord/callback
+http://recenttablist.onrender.com/auth/discord/callback`;
+    
+    navigator.clipboard.writeText(uris).then(function() {
+        alert('✅ All redirect URIs copied to clipboard!\n\nNow paste them one by one into Discord Developer Portal.');
+    }, function(err) {
+        console.error('Could not copy text: ', err);
+        // Fallback - select the text
+        const range = document.createRange();
+        range.selectNode(document.getElementById('redirect-uris'));
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+        alert('📋 URIs selected! Press Ctrl+C to copy them.');
+    });
+}
+</script>
+
+<style>
+.card {
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border: none;
+}
+
+.bg-dark {
+    background-color: #2d3748 !important;
+}
+
+.text-light {
+    color: #e2e8f0 !important;
+}
+
+code {
+    background-color: #4a5568;
+    color: #e2e8f0;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+</style>
+{% endblock %}

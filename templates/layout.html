@@ -202,8 +202,22 @@
                     <li class="nav-item">
                         <a class="nav-link {% if request.path == url_for('timemachine') %}active{% endif %}" href="{{ url_for('timemachine') }}">🕒 Time Machine</a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('submit_record') }}">📝 Submit</a>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="submitDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            📝 Submit
+                        </a>
+                        <ul class="dropdown-menu" aria-labelledby="submitDropdown">
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('submit_record') }}">
+                                    📊 Submit Record
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('submit_verification') }}">
+                                    ✅ Submit Verification
+                                </a>
+                            </li>
+                        </ul>
                     </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="toolsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">

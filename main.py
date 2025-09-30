@@ -23,6 +23,25 @@ except ImportError as e:
     def notify_admin_action(*args, **kwargs):
         print("❌ Discord integration not available - notify_admin_action")
 
+# Try to import Discord bot integration
+try:
+    from discord_bot import start_discord_bot, check_user_role, send_dm_to_user, is_bot_available, notify_verification_submission
+    print("✅ Discord bot integration loaded successfully")
+except ImportError as e:
+    print(f"❌ Discord bot integration failed to load: {e}")
+    # Create dummy functions so the app doesn't crash
+    def check_user_role(*args, **kwargs):
+        print("❌ Discord bot not available - check_user_role")
+        return False
+    def send_dm_to_user(*args, **kwargs):
+        print("❌ Discord bot not available - send_dm_to_user")
+        return False
+    def is_bot_available():
+        return False
+    def notify_verification_submission(*args, **kwargs):
+        print("❌ Discord bot not available - notify_verification_submission")
+        return False
+
 # Try to import Changelog Discord integration
 try:
     from changelog_discord import notify_changelog
@@ -38,6 +57,7 @@ from dotenv import load_dotenv
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
 import functools
+import requests
 
 # Import profanity filter
 from profanity_filter import check_username_profanity, check_level_name_profanity, check_comment_profanity, profanity_filter
@@ -63,6 +83,8 @@ mongodb_db = os.environ.get('MONGODB_DB', 'rtl_database')
 # Google OAuth configuration
 app.config['GOOGLE_CLIENT_ID'] = os.environ.get('GOOGLE_CLIENT_ID')
 app.config['GOOGLE_CLIENT_SECRET'] = os.environ.get('GOOGLE_CLIENT_SECRET')
+
+# Discord OAuth configuration will be set later with proper validation
 
 # Initialize MongoDB and OAuth
 # Initialize MongoDB and OAuth
@@ -165,6 +187,40 @@ if app.config['GOOGLE_CLIENT_ID'] and app.config['GOOGLE_CLIENT_SECRET']:
     print("✓ Google OAuth configured")
 else:
     print("No Google OAuth credentials found, skipping...")
+
+# Configure Discord OAuth
+print("Configuring Discord OAuth...")
+app.config['DISCORD_CLIENT_ID'] = os.environ.get('DISCORD_CLIENT_ID')
+app.config['DISCORD_CLIENT_SECRET'] = os.environ.get('DISCORD_CLIENT_SECRET')
+
+discord_oauth = None
+client_id = app.config['DISCORD_CLIENT_ID']
+client_secret = app.config['DISCORD_CLIENT_SECRET']
+
+if client_id and client_secret and client_secret != 'your_discord_client_secret_here':
+    print("Discord OAuth credentials found, registering...")
+    try:
+        discord_oauth = oauth.register(
+            name='discord',
+            client_id=client_id,
+            client_secret=client_secret,
+            authorize_url='https://discord.com/api/oauth2/authorize',
+            access_token_url='https://discord.com/api/oauth2/token',
+            client_kwargs={
+                'scope': 'identify'
+            }
+        )
+        print("✓ Discord OAuth configured successfully")
+    except Exception as e:
+        print(f"❌ Discord OAuth configuration failed: {e}")
+        discord_oauth = None
+else:
+    if not client_id:
+        print("❌ DISCORD_CLIENT_ID not found in environment")
+    elif not client_secret or client_secret == 'your_discord_client_secret_here':
+        print("❌ DISCORD_CLIENT_SECRET not configured (placeholder value detected)")
+        print("   Please get your Client Secret from Discord Developer Portal")
+    print("⚠️  Discord account linking will be disabled")
 
 # Simple cache for levels
 levels_cache = {
@@ -1109,6 +1165,20 @@ def send_discord_notification_direct(username, level_name, progress, video_url):
         traceback.print_exc()
 
 print("Setting up routes...")
+
+# Start Discord bot after all initialization is complete
+try:
+    from discord_bot import start_discord_bot
+    print("🤖 Attempting to start Discord bot...")
+    bot_started = start_discord_bot()
+    if bot_started:
+        print("🤖 Discord bot startup initiated")
+        print("⏳ Bot will be available once it connects to Discord")
+    else:
+        print("⚠️ Discord bot could not be started - continuing without bot features")
+except Exception as e:
+    print(f"❌ Failed to start Discord bot: {e}")
+    print("⚠️ Continuing without Discord bot features")
 
 @app.route('/thumb/<path:url>')
 def thumbnail_proxy(url):
@@ -5452,7 +5522,178 @@ def google_callback():
         flash(f'Google login failed: {str(e)}', 'danger')
         return redirect(url_for('login'))
 
+@app.route('/auth/discord')
+def discord_login():
+    """Discord OAuth login"""
+    if not discord_oauth:
+        client_id = app.config.get('DISCORD_CLIENT_ID')
+        client_secret = app.config.get('DISCORD_CLIENT_SECRET')
+        
+        if not client_id:
+            flash('Discord Sign-In is not configured: Missing Client ID', 'danger')
+        elif not client_secret or client_secret == 'your_discord_client_secret_here':
+            flash('Discord Sign-In is not configured: Please set up your Discord Client Secret in the Developer Portal', 'warning')
+        else:
+            flash('Discord Sign-In configuration error: Please check your credentials', 'danger')
+        
+        return redirect(url_for('profile'))
+    
+    # Generate redirect URI - try to use the configured website URL first
+    website_url = os.environ.get('WEBSITE_URL', '').rstrip('/')
+    if website_url and not request.host.startswith('localhost') and not request.host.startswith('127.0.0.1'):
+        # Production - use configured website URL
+        redirect_uri = f"{website_url}/auth/discord/callback"
+    else:
+        # Local development - use Flask's url_for
+        redirect_uri = url_for('discord_callback', _external=True)
+    
+    print(f"🔍 Discord OAuth redirect URI: {redirect_uri}")
+    return discord_oauth.authorize_redirect(redirect_uri)
+
+@app.route('/discord-setup-help')
+def discord_setup_help():
+    """Help page for Discord OAuth setup"""
+    return render_template('discord_setup_help.html')
+
+@app.route('/debug/discord-redirect')
+def debug_discord_redirect():
+    """Debug route to check what redirect URI is being generated"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return "Access denied", 403
+    
+    # Generate redirect URI the same way as the login route
+    website_url = os.environ.get('WEBSITE_URL', '').rstrip('/')
+    if website_url and not request.host.startswith('localhost') and not request.host.startswith('127.0.0.1'):
+        redirect_uri = f"{website_url}/auth/discord/callback"
+    else:
+        redirect_uri = url_for('discord_callback', _external=True)
+    
+    return f"""
+    <h3>Discord OAuth Debug Info</h3>
+    <p><strong>Generated Redirect URI:</strong> {redirect_uri}</p>
+    <p><strong>Request Host:</strong> {request.host}</p>
+    <p><strong>Request URL:</strong> {request.url}</p>
+    <p><strong>Is Secure:</strong> {request.is_secure}</p>
+    <p><strong>Website URL (env):</strong> {website_url}</p>
+    
+    <h4>Add this exact URI to your Discord application:</h4>
+    <code>{redirect_uri}</code>
+    
+    <br><br>
+    <a href="{url_for('discord_setup_help')}">Setup Help</a> | 
+    <a href="{url_for('profile')}">Back to Profile</a>
+    """
+
+@app.route('/auth/discord/callback')
+def discord_callback():
+    """Discord OAuth callback"""
+    if not discord_oauth:
+        flash('Discord Sign-In is not configured', 'danger')
         return redirect(url_for('login'))
+    
+    try:
+        token = discord_oauth.authorize_access_token()
+        
+        # Get user info from Discord API
+        headers = {'Authorization': f'Bearer {token["access_token"]}'}
+        resp = requests.get('https://discord.com/api/users/@me', headers=headers)
+        user_info = resp.json()
+        
+        discord_id = user_info['id']
+        username = user_info['username']
+        discriminator = user_info.get('discriminator', '0000')
+        
+        # Check if user is logged in to link account
+        if 'user_id' in session:
+            # Link Discord account to existing logged-in user
+            user = mongo_db.users.find_one({"_id": session['user_id']})
+            if user:
+                # Check if Discord account is already linked to another user
+                existing_discord_user = mongo_db.users.find_one({"discord_id": discord_id})
+                if existing_discord_user and existing_discord_user['_id'] != user['_id']:
+                    flash('This Discord account is already linked to another user', 'danger')
+                    return redirect(url_for('profile'))
+                
+                # Link Discord account
+                mongo_db.users.update_one(
+                    {"_id": user['_id']},
+                    {"$set": {
+                        "discord_id": discord_id,
+                        "discord_username": f"{username}#{discriminator}"
+                    }}
+                )
+                flash('Discord account linked successfully!', 'success')
+                return redirect(url_for('profile'))
+        else:
+            # Check if user exists with this Discord ID
+            user = mongo_db.users.find_one({"discord_id": discord_id})
+            
+            if not user:
+                flash('No account found with this Discord ID. Please create an account first and then link your Discord.', 'warning')
+                return redirect(url_for('register'))
+            
+            # Log in the user
+            session['user_id'] = user['_id']
+            session['username'] = user['username']
+            session['is_admin'] = user.get('is_admin', False)
+            session['head_admin'] = user.get('head_admin', False)
+            session.permanent = True
+            
+            # Load user preferences
+            session['theme'] = user.get('theme_preference', 'light')
+            
+            # Log login activity
+            login_entry = {
+                "user_id": user['_id'],
+                "timestamp": datetime.now(timezone.utc),
+                "ip_address": request.remote_addr,
+                "user_agent": request.headers.get('User-Agent', 'Unknown'),
+                "login_method": "discord"
+            }
+            mongo_db.login_history.insert_one(login_entry)
+            
+            # Update user's last IP address
+            try:
+                mongo_db.users.update_one(
+                    {"_id": user['_id']},
+                    {"$set": {"last_ip": request.remote_addr}}
+                )
+            except Exception as e:
+                print(f"Error updating user IP: {e}")
+            
+            flash('Successfully logged in with Discord!', 'success')
+            return redirect(url_for('index'))
+    
+    except Exception as e:
+        error_str = str(e).lower()
+        print(f"Discord OAuth error: {e}")
+        
+        # Check for redirect URI error specifically
+        if 'redirect_uri' in error_str or 'invalid_request' in error_str:
+            flash('Discord OAuth redirect URI error. Please check the setup instructions.', 'danger')
+            return redirect(url_for('discord_setup_help'))
+        else:
+            flash(f'Discord login failed: {str(e)}', 'danger')
+            return redirect(url_for('profile'))
+
+@app.route('/auth/discord/unlink', methods=['POST'])
+def discord_unlink():
+    """Unlink Discord account from user"""
+    if 'user_id' not in session:
+        flash('Please log in first', 'warning')
+        return redirect(url_for('login'))
+    
+    try:
+        mongo_db.users.update_one(
+            {"_id": session['user_id']},
+            {"$unset": {"discord_id": "", "discord_username": ""}}
+        )
+        flash('Discord account unlinked successfully!', 'success')
+    except Exception as e:
+        print(f"Error unlinking Discord: {e}")
+        flash('Error unlinking Discord account', 'danger')
+    
+    return redirect(url_for('profile'))
 
 @app.route('/profile')
 def profile():
@@ -5508,6 +5749,194 @@ def submit_record():
         return redirect(url_for('instant_load'))
 
     return render_template('submit_record.html', levels=levels)
+
+@app.route('/submit_verification', methods=['GET', 'POST'])
+def submit_verification():
+    """Handle verification submissions - requires Discord authentication and List Player role"""
+    if 'user_id' not in session:
+        flash('Please log in to submit a verification', 'warning')
+        return redirect(url_for('login'))
+    
+    # Check if user has connected their Discord account
+    user = mongo_db.users.find_one({"_id": session['user_id']})
+    if not user or not user.get('discord_id'):
+        flash('You must connect your Discord account to submit verifications. Please link your Discord account in your profile.', 'warning')
+        return redirect(url_for('profile'))
+    
+    # Check if user has the List Player role
+    try:
+        # Import bot availability dynamically to get current status
+        from discord_bot import is_bot_available, check_user_role
+        if is_bot_available():
+            has_role = check_user_role(user['discord_id'])
+            if not has_role:
+                flash('You need the "List Player" role in the Discord server to submit verifications.', 'danger')
+                return redirect(url_for('profile'))
+        else:
+            flash('Discord bot is not available. Verification submissions are temporarily disabled.', 'warning')
+            return redirect(url_for('profile'))
+    except Exception as e:
+        print(f"Error checking Discord role: {e}")
+        flash('Error checking Discord permissions. Please try again later.', 'danger')
+        return redirect(url_for('profile'))
+    
+    if request.method == 'POST':
+        return handle_verification_submission()
+    
+    # Get difficulty options for dropdown
+    difficulty_options = [
+        'Easy', 'Normal', 'Hard', 'Harder', 'Insane',
+        'Easy Demon', 'Medium Demon', 'Hard Demon', 'Insane Demon', 'Extreme Demon'
+    ]
+    
+    return render_template('submit_verification.html', difficulty_options=difficulty_options)
+
+def handle_verification_submission():
+    """Handle verification submission form processing"""
+    # Get form data
+    verification_url = request.form.get('verification_url', '').strip()
+    level_id = request.form.get('level_id', '').strip()
+    level_name = request.form.get('level_name', '').strip()
+    creator = request.form.get('creator', '').strip()
+    verifier = request.form.get('verifier', '').strip()
+    difficulty = request.form.get('difficulty', '').strip()
+    placement = request.form.get('placement', '').strip()
+    experience = request.form.get('experience', '').strip()
+    enjoyment = request.form.get('enjoyment', '').strip()
+    comments = request.form.get('comments', '').strip()
+    
+    # Validate required fields
+    if not verification_url:
+        flash('Please provide a verification video URL', 'danger')
+        return redirect(url_for('submit_verification'))
+    
+    if not level_id:
+        flash('Please enter the level ID', 'danger')
+        return redirect(url_for('submit_verification'))
+    
+    if not level_name:
+        flash('Please enter the level name', 'danger')
+        return redirect(url_for('submit_verification'))
+    
+    if not creator:
+        flash('Please enter the creator name', 'danger')
+        return redirect(url_for('submit_verification'))
+    
+    if not verifier:
+        flash('Please enter the verifier name', 'danger')
+        return redirect(url_for('submit_verification'))
+    
+    if not difficulty:
+        flash('Please select a difficulty', 'danger')
+        return redirect(url_for('submit_verification'))
+    
+    if not placement:
+        flash('Please enter the placement on the list', 'danger')
+        return redirect(url_for('submit_verification'))
+    
+    if not experience or not enjoyment:
+        flash('Please rate both experience and enjoyment', 'danger')
+        return redirect(url_for('submit_verification'))
+    
+    # Validate numeric fields
+    try:
+        level_id_num = int(level_id)
+        placement_num = int(placement)
+        experience_num = int(experience)
+        enjoyment_num = int(enjoyment)
+        
+        if level_id_num < 1:
+            flash('Level ID must be a positive number', 'danger')
+            return redirect(url_for('submit_verification'))
+        
+        if placement_num < 1:
+            flash('Placement must be a positive number', 'danger')
+            return redirect(url_for('submit_verification'))
+        
+        if experience_num < 1 or experience_num > 10:
+            flash('Experience rating must be between 1 and 10', 'danger')
+            return redirect(url_for('submit_verification'))
+        
+        if enjoyment_num < 1 or enjoyment_num > 10:
+            flash('Enjoyment rating must be between 1 and 10', 'danger')
+            return redirect(url_for('submit_verification'))
+            
+    except ValueError:
+        flash('Please enter valid numbers for level ID, placement, experience, and enjoyment', 'danger')
+        return redirect(url_for('submit_verification'))
+    
+    # Check for profanity in level name
+    is_allowed, reason = check_level_name_profanity(level_name)
+    if not is_allowed:
+        flash(f'Level name not allowed: {reason}', 'danger')
+        return redirect(url_for('submit_verification'))
+    
+    # Check for profanity in comments if provided
+    if comments:
+        is_allowed, reason = check_comment_profanity(comments)
+        if not is_allowed:
+            flash(f'Comments not allowed: {reason}', 'danger')
+            return redirect(url_for('submit_verification'))
+    
+    # Create verification submission record
+    verification_id = ObjectId()
+    verification_submission = {
+        "_id": verification_id,
+        "user_id": session['user_id'],
+        "verification_url": verification_url,
+        "level_id": level_id,
+        "level_name": level_name,
+        "creator": creator,
+        "verifier": verifier,
+        "difficulty": difficulty,
+        "placement": placement_num,
+        "experience": experience_num,
+        "enjoyment": enjoyment_num,
+        "comments": comments,
+        "status": "pending",
+        "date_submitted": datetime.now(timezone.utc),
+        "submission_type": "verification"
+    }
+    
+    # Insert into database
+    try:
+        mongo_db.verification_submissions.insert_one(verification_submission)
+        
+        # Get user info for notifications
+        user = mongo_db.users.find_one({"_id": session['user_id']})
+        username = user['username'] if user else 'Unknown'
+        
+        # Send Discord notification to admin channel
+        try:
+            if is_bot_available():
+                notify_verification_submission(
+                    username, level_name, creator, verifier, difficulty, placement_num, 
+                    experience_num, enjoyment_num, verification_url, comments
+                )
+                print(f"✅ Discord notification sent for verification submission by {username}")
+            else:
+                print("⚠️ Discord bot not available - skipping notification")
+        except Exception as e:
+            print(f"Error sending Discord notification: {e}")
+        
+        # Log the submission
+        try:
+            mongo_db.admin_logs.insert_one({
+                "timestamp": datetime.now(timezone.utc),
+                "action": "verification_submitted",
+                "admin": username,
+                "details": f"Verification submitted for {level_name} (#{placement_num})"
+            })
+        except Exception as e:
+            print(f"Error logging verification submission: {e}")
+        
+        flash('Verification submitted successfully! It will be reviewed by administrators.', 'success')
+        return redirect(url_for('profile'))
+        
+    except Exception as e:
+        print(f"Error submitting verification: {e}")
+        flash('Error submitting verification. Please try again.', 'danger')
+        return redirect(url_for('submit_verification'))
 
 def handle_single_record_submission():
     """Handle single record submission"""
@@ -6225,6 +6654,97 @@ def admin():
         print(f"Error generating admin stats: {e}")
     
     return render_template('admin/index.html', pending_records=pending_records, stats=stats)
+
+@app.route('/admin/verifications')
+def admin_verifications():
+    """Admin verification submissions management - View only (no approve/reject)"""
+    if 'user_id' not in session:
+        flash('Please log in to access admin panel', 'warning')
+        return redirect(url_for('login'))
+    
+    if not session.get('is_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Get all verification submissions with user info
+        pipeline = [
+            {"$lookup": {
+                "from": "users",
+                "localField": "user_id",
+                "foreignField": "_id",
+                "as": "user"
+            }},
+            {"$unwind": "$user"},
+            {"$sort": {"date_submitted": -1}},
+            {"$limit": 100}  # Limit to recent 100 submissions
+        ]
+        
+        verification_submissions = list(mongo_db.verification_submissions.aggregate(pipeline))
+        
+        return render_template('admin/verifications.html', submissions=verification_submissions)
+        
+    except Exception as e:
+        print(f"Error loading verification submissions: {e}")
+        flash('Error loading verification submissions', 'danger')
+        return redirect(url_for('admin'))
+
+@app.route('/admin/verification-details')
+def admin_verification_details():
+    """Admin verification details - ID, Creator, and Verifier information"""
+    if 'user_id' not in session:
+        flash('Please log in to access admin panel', 'warning')
+        return redirect(url_for('login'))
+    
+    if not session.get('is_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Get all verification submissions with user info and verifier info
+        pipeline = [
+            {"$lookup": {
+                "from": "users",
+                "localField": "user_id",
+                "foreignField": "_id",
+                "as": "user"
+            }},
+            {"$unwind": "$user"},
+            {"$lookup": {
+                "from": "users",
+                "localField": "approved_by",
+                "foreignField": "_id",
+                "as": "approved_verifier"
+            }},
+            {"$lookup": {
+                "from": "users",
+                "localField": "rejected_by",
+                "foreignField": "_id",
+                "as": "rejected_verifier"
+            }},
+            {"$addFields": {
+                "verifier": {
+                    "$cond": {
+                        "if": {"$gt": [{"$size": "$approved_verifier"}, 0]},
+                        "then": "$approved_verifier",
+                        "else": "$rejected_verifier"
+                    }
+                }
+            }},
+            {"$sort": {"date_submitted": -1}},
+            {"$limit": 100}  # Limit to recent 100 submissions
+        ]
+        
+        verification_submissions = list(mongo_db.verification_submissions.aggregate(pipeline))
+        
+        return render_template('admin/verification_details.html', submissions=verification_submissions)
+        
+    except Exception as e:
+        print(f"Error loading verification details: {e}")
+        flash('Error loading verification details', 'danger')
+        return redirect(url_for('admin'))
+
+
 
 @app.route('/admin/console')
 def admin_console():
