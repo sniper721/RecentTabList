@@ -1167,17 +1167,34 @@ def send_discord_notification_direct(username, level_name, progress, video_url):
 print("Setting up routes...")
 
 # Start Discord bot after all initialization is complete
+print("🔧 Initializing Discord bot integration...")
 try:
-    from discord_bot import start_discord_bot
+    print("📦 Importing Discord bot module...")
+    from discord_bot import start_discord_bot, is_bot_available
+    print("✅ Discord bot module imported successfully")
+    
     print("🤖 Attempting to start Discord bot...")
     bot_started = start_discord_bot()
     if bot_started:
         print("🤖 Discord bot startup initiated")
         print("⏳ Bot will be available once it connects to Discord")
+        
+        # Quick check after a moment
+        import time
+        time.sleep(2)
+        if is_bot_available():
+            print("🎉 Discord bot connected successfully!")
+        else:
+            print("⏳ Discord bot still connecting...")
     else:
         print("⚠️ Discord bot could not be started - continuing without bot features")
+except ImportError as e:
+    print(f"❌ Failed to import Discord bot module: {e}")
+    print("⚠️ Continuing without Discord bot features")
 except Exception as e:
     print(f"❌ Failed to start Discord bot: {e}")
+    import traceback
+    traceback.print_exc()
     print("⚠️ Continuing without Discord bot features")
 
 @app.route('/thumb/<path:url>')
