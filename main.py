@@ -4905,7 +4905,7 @@ def test_legacy_db():
 
 @app.route('/health')
 def health_check():
-    """Health check endpoint for database connectivity"""
+    """Health check endpoint for database connectivity and Discord bot status"""
     try:
         # Quick ping test
         mongo_client.admin.command('ping', maxTimeMS=5000)
@@ -4913,9 +4913,18 @@ def health_check():
         # Quick count test
         level_count = mongo_db.levels.count_documents({}, maxTimeMS=5000)
         
+        # Check Discord bot status
+        discord_status = 'unknown'
+        try:
+            from discord_bot import is_bot_available
+            discord_status = 'connected' if is_bot_available() else 'disconnected'
+        except Exception as e:
+            discord_status = f'error: {str(e)}'
+        
         return {
             'status': 'healthy',
             'database': 'connected',
+            'discord_bot': discord_status,
             'level_count': level_count,
             'timestamp': datetime.now(timezone.utc).isoformat()
         }
@@ -4923,6 +4932,7 @@ def health_check():
         return {
             'status': 'unhealthy',
             'database': 'disconnected',
+            'discord_bot': 'unknown',
             'error': str(e),
             'timestamp': datetime.now(timezone.utc).isoformat()
         }, 503

@@ -17,8 +17,22 @@ load_dotenv()
 
 # Discord Bot Configuration
 DISCORD_BOT_TOKEN = os.environ.get('DISCORD_BOT_TOKEN')
-DISCORD_GUILD_ID = int(os.environ.get('DISCORD_GUILD_ID', 0)) if os.environ.get('DISCORD_GUILD_ID') else None
-DISCORD_ADMIN_CHANNEL_ID = int(os.environ.get('DISCORD_ADMIN_CHANNEL_ID', 0)) if os.environ.get('DISCORD_ADMIN_CHANNEL_ID') else None
+print(f"🔍 Discord Bot Token: {'✅ Found' if DISCORD_BOT_TOKEN else '❌ Missing'}")
+
+try:
+    DISCORD_GUILD_ID = int(os.environ.get('DISCORD_GUILD_ID', 0)) if os.environ.get('DISCORD_GUILD_ID') else None
+    print(f"🔍 Discord Guild ID: {'✅ ' + str(DISCORD_GUILD_ID) if DISCORD_GUILD_ID else '❌ Missing'}")
+except ValueError as e:
+    print(f"❌ Invalid DISCORD_GUILD_ID format: {e}")
+    DISCORD_GUILD_ID = None
+
+try:
+    DISCORD_ADMIN_CHANNEL_ID = int(os.environ.get('DISCORD_ADMIN_CHANNEL_ID', 0)) if os.environ.get('DISCORD_ADMIN_CHANNEL_ID') else None
+    print(f"🔍 Discord Admin Channel ID: {'✅ ' + str(DISCORD_ADMIN_CHANNEL_ID) if DISCORD_ADMIN_CHANNEL_ID else '❌ Missing'}")
+except ValueError as e:
+    print(f"❌ Invalid DISCORD_ADMIN_CHANNEL_ID format: {e}")
+    DISCORD_ADMIN_CHANNEL_ID = None
+
 LIST_PLAYER_ROLE_NAME = "List Player"  # Role required for verification submissions
 
 # Global variables
@@ -80,25 +94,54 @@ class RTLBot(commands.Bot):
         await self.process_commands(message)
 
 # Initialize bot instance
-if DISCORD_BOT_TOKEN:
-    bot = RTLBot()
+if DISCORD_BOT_TOKEN and DISCORD_GUILD_ID and DISCORD_ADMIN_CHANNEL_ID:
+    try:
+        print("🤖 Creating Discord bot instance...")
+        bot = RTLBot()
+        print("✅ Discord bot instance created successfully")
+    except Exception as e:
+        print(f"❌ Failed to create Discord bot instance: {e}")
+        bot = None
 else:
-    print("❌ No Discord bot token provided")
+    missing = []
+    if not DISCORD_BOT_TOKEN:
+        missing.append("DISCORD_BOT_TOKEN")
+    if not DISCORD_GUILD_ID:
+        missing.append("DISCORD_GUILD_ID")
+    if not DISCORD_ADMIN_CHANNEL_ID:
+        missing.append("DISCORD_ADMIN_CHANNEL_ID")
+    print(f"❌ Cannot create Discord bot - Missing: {', '.join(missing)}")
     bot = None
 
 def start_discord_bot():
     """Start the Discord bot in a separate thread"""
+    if not bot:
+        print("❌ Cannot start Discord bot: Bot instance not created")
+        return False
+        
     if not DISCORD_BOT_TOKEN:
         print("❌ Cannot start Discord bot: No token provided")
         return False
     
+    print(f"🔑 Discord bot token found: {DISCORD_BOT_TOKEN[:20]}...")
+    print(f"🏠 Guild ID: {DISCORD_GUILD_ID}")
+    print(f"📢 Admin Channel ID: {DISCORD_ADMIN_CHANNEL_ID}")
+    
     def run_bot():
         try:
+            print("🚀 Starting Discord bot event loop...")
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
+            print("🔗 Connecting to Discord...")
             loop.run_until_complete(bot.start(DISCORD_BOT_TOKEN))
+        except discord.LoginFailure as e:
+            print(f"❌ Discord login failed - Invalid token: {e}")
+        except discord.HTTPException as e:
+            print(f"❌ Discord HTTP error: {e}")
         except Exception as e:
             print(f"❌ Discord bot error: {e}")
+            import traceback
+            traceback.print_exc()
     
     # Start bot in daemon thread so it doesn't prevent app shutdown
     bot_thread = threading.Thread(target=run_bot, daemon=True)
