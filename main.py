@@ -53,6 +53,26 @@ except ImportError as e:
     # Create dummy function so the app doesn't crash
     def notify_changelog(*args, **kwargs):
         print("❌ Changelog Discord integration not available - notify_changelog")
+
+# Try to import Discord Widget integration
+try:
+    from discord_widget import get_formatted_discord_data
+    DISCORD_WIDGET_AVAILABLE = True
+    print("✅ Discord widget integration loaded successfully")
+except ImportError as e:
+    print(f"❌ Discord widget integration failed to load: {e}")
+    DISCORD_WIDGET_AVAILABLE = False
+    # Create dummy function so the app doesn't crash
+    def get_formatted_discord_data():
+        return {
+            'online': False,
+            'name': 'RTL Discord Server',
+            'member_count': 0,
+            'online_count': 0,
+            'channels': [],
+            'members': [],
+            'invite_url': 'https://discord.gg/TSjXSecuaz'
+        }
 from dotenv import load_dotenv
 from bson.objectid import ObjectId
 from bson.errors import InvalidId
@@ -506,6 +526,22 @@ def utility_processor():
     # Get current theme from session
     current_theme = session.get('theme', 'light')
     
+    # Get Discord widget data
+    def get_discord_data():
+        """Helper function to get Discord data for templates"""
+        if DISCORD_WIDGET_AVAILABLE:
+            return get_formatted_discord_data()
+        else:
+            return {
+                'online': False,
+                'name': 'RTL Discord Server',
+                'member_count': 0,
+                'online_count': 0,
+                'channels': [],
+                'members': [],
+                'invite_url': 'https://discord.gg/TSjXSecuaz'
+            }
+    
     return dict(
         format_points=format_points, 
         get_video_embed_info=get_video_embed_info,
@@ -518,7 +554,8 @@ def utility_processor():
         get_demon_type_display=get_demon_type_display,
         get_difficulty_text=get_difficulty_text,
         datetime=datetime,
-        get_user_by_id=get_user_by_id
+        get_user_by_id=get_user_by_id,
+        get_discord_data=get_discord_data
     )
 
 def calculate_level_points(position, is_legacy=False, level_type="Level"):
@@ -837,14 +874,22 @@ def log_level_change(action, level_name, admin_username, **kwargs):
         print(f"Error logging level change: {e}")
 
 def send_enhanced_changelog_notification(action, level_name, admin_username, **kwargs):
-    """Send changelog notifications with simple text formatting (no bold)"""
+    """Send changelog notifications with enhanced list type detection and top 10 push notifications"""
     try:
         message = ""
+        list_type = kwargs.get('list_type', 'main')  # main, legacy, future
         
         if action == "placed":
             position = kwargs.get('position', '?')
             above_level = kwargs.get('above_level', '')
             below_level = kwargs.get('below_level', '')
+            
+            # Enhanced message format with list type specification
+            list_suffix = ""
+            if list_type == "legacy":
+                list_suffix = " from the legacy list"
+            elif list_type == "future":
+                list_suffix = " from the future list"
             
             if position == 1:
                 # Special case for #1 placement
@@ -854,7 +899,7 @@ def send_enhanced_changelog_notification(action, level_name, admin_username, **k
                 message = f"{level_name} has been placed at #1"
                 if dethroned_level:
                     message += f" dethroning {dethroned_level}"
-                message += "."
+                message += list_suffix + "."
                 
                 if pushed_to_legacy:
                     message += f" This pushes {pushed_to_legacy} to the legacy list."
@@ -867,18 +912,30 @@ def send_enhanced_changelog_notification(action, level_name, admin_username, **k
                     message += f" above {below_level}"
                 elif above_level:
                     message += f" below {above_level}"
-                message += "."
+                message += list_suffix + "."
                 
                 # Check if this placement pushed something to legacy
                 pushed_to_legacy = kwargs.get('pushed_to_legacy', '')
                 if pushed_to_legacy:
                     message += f" This pushes {pushed_to_legacy} to the legacy list."
+                
+                # Check if this placement pushed something out of top 10
+                pushed_out_of_top10 = kwargs.get('pushed_out_of_top10', '')
+                if pushed_out_of_top10 and position <= 10:
+                    message += f" This pushes {pushed_out_of_top10} out of the top 10."
         
         elif action == "moved":
             old_position = kwargs.get('old_position', '?')
             new_position = kwargs.get('new_position', '?')
             above_level = kwargs.get('above_level', '')
             below_level = kwargs.get('below_level', '')
+            
+            # Enhanced message format for moves with list type
+            list_suffix = ""
+            if list_type == "legacy":
+                list_suffix = " from the legacy list"
+            elif list_type == "future":
+                list_suffix = " from the future list"
             
             message = f"{level_name} has been moved from #{old_position} to #{new_position}"
             if below_level and above_level:
@@ -887,20 +944,34 @@ def send_enhanced_changelog_notification(action, level_name, admin_username, **k
                 message += f" above {below_level}"
             elif above_level:
                 message += f" below {above_level}"
-            message += "."
+            message += list_suffix + "."
             
             # Check if this move pushed something to legacy
             pushed_to_legacy = kwargs.get('pushed_to_legacy', '')
             if pushed_to_legacy:
                 message += f" This pushes {pushed_to_legacy} to the legacy list."
+            
+            # Check if this move pushed something out of top 10
+            pushed_out_of_top10 = kwargs.get('pushed_out_of_top10', '')
+            if pushed_out_of_top10 and new_position <= 10:
+                message += f" This pushes {pushed_out_of_top10} out of the top 10."
         
         elif action == "removed":
             old_position = kwargs.get('old_position', '?')
             reason = kwargs.get('reason', '')
             
+            # Enhanced message format for removals with list type
+            list_suffix = ""
+            if list_type == "legacy":
+                list_suffix = " from the legacy list"
+            elif list_type == "future":
+                list_suffix = " from the future list"
+            
             message = f"{level_name} has been removed"
             if old_position and old_position != '?':
                 message += f" from #{old_position}"
+            
+            message += list_suffix
             
             if reason:
                 message += f". Reason: {reason}"
@@ -925,7 +996,7 @@ def send_enhanced_changelog_notification(action, level_name, admin_username, **k
         print(f"Error sending changelog notification: {e}")
 
 def auto_manage_legacy_list():
-    """Automatically manage legacy list - move level at position 101 to legacy"""
+    """Automatically manage legacy list - move level at position 101 to legacy and shift positions"""
     try:
         # Find level at position 101 (should be moved to legacy)
         level_at_101 = mongo_db.levels.find_one({
@@ -934,25 +1005,26 @@ def auto_manage_legacy_list():
         })
         
         if level_at_101:
-            # Get the next legacy position (starting from 101, but in legacy list it's position 1, 2, 3...)
-            max_legacy_position = mongo_db.levels.find_one(
+            # IMPORTANT: Shift all existing legacy levels down by 1 position
+            # This ensures proper ordering when a new level enters legacy
+            mongo_db.levels.update_many(
                 {"is_legacy": True},
-                sort=[("position", -1)]
+                {"$inc": {"position": 1}}
             )
             
-            new_legacy_position = 1
-            if max_legacy_position:
-                new_legacy_position = max_legacy_position.get('position', 0) + 1
-            
-            # Move to legacy
+            # Move the level to legacy at position 1 (it becomes the newest legacy level)
             mongo_db.levels.update_one(
                 {"_id": level_at_101["_id"]},
                 {"$set": {
                     "is_legacy": True,
-                    "position": new_legacy_position,
+                    "position": 1,  # Always insert at position 1 in legacy
                     "points": 0  # Legacy levels have 0 points
                 }}
             )
+            
+            # Recalculate user points for this level (remove points since it's now legacy)
+            old_points = level_at_101.get('points', 0)
+            recalculate_user_points_after_level_move(level_at_101["_id"], old_points, 0.0)
             
             # Log the automatic legacy move
             log_level_change(
@@ -960,16 +1032,38 @@ def auto_manage_legacy_list():
                 level_name=level_at_101["name"],
                 admin_username="System",
                 old_position=101,
-                legacy_position=new_legacy_position
+                legacy_position=1
             )
             
-            print(f"🔄 Automatically moved {level_at_101['name']} to legacy list at position {new_legacy_position}")
+            print(f"🔄 Automatically moved {level_at_101['name']} to legacy list at position #101 (legacy position 1)")
+            print(f"🔄 Shifted all other legacy levels down by 1 position")
             return level_at_101["name"]
         
         return None
         
     except Exception as e:
         print(f"Error in auto legacy management: {e}")
+        return None
+
+def get_top10_pushout_info(new_position):
+    """Get information about what level gets pushed out of top 10 when a new level enters"""
+    try:
+        if new_position > 10:
+            return None  # Not entering top 10
+        
+        # Find the level currently at position 10
+        level_at_10 = mongo_db.levels.find_one({
+            "position": 10,
+            "is_legacy": {"$ne": True}
+        })
+        
+        if level_at_10:
+            return level_at_10["name"]
+        
+        return None
+        
+    except Exception as e:
+        print(f"Error getting top 10 pushout info: {e}")
         return None
 
 def get_level_neighbors(position, is_legacy=False):
@@ -2651,17 +2745,26 @@ def admin_move_level(level_id):
         levels_cache['main_list'] = None
         levels_cache['legacy_list'] = None
         
+        # Check if this move pushes something out of top 10
+        pushed_out_of_top10 = None
+        if new_position <= 10 and current_position > 10:
+            pushed_out_of_top10 = get_top10_pushout_info(new_position)
+        
         # Log enhanced changelog
         admin_username = session.get('username', 'Unknown Admin')
         changelog_kwargs = {
             'old_position': current_position,
             'new_position': new_position,
             'above_level': above_level,
-            'below_level': below_level
+            'below_level': below_level,
+            'list_type': 'main'  # This is a main list move
         }
         
         if pushed_to_legacy:
             changelog_kwargs['pushed_to_legacy'] = pushed_to_legacy
+        
+        if pushed_out_of_top10:
+            changelog_kwargs['pushed_out_of_top10'] = pushed_out_of_top10
         
         log_level_change(
             action="moved",
@@ -2810,11 +2913,17 @@ def admin_add_level():
         levels_cache['main_list'] = None
         levels_cache['legacy_list'] = None
         
+        # Check if this placement pushes something out of top 10
+        pushed_out_of_top10 = None
+        if position <= 10:
+            pushed_out_of_top10 = get_top10_pushout_info(position)
+        
         # Log enhanced changelog
         changelog_kwargs = {
             'position': position,
             'above_level': above_level,
-            'below_level': below_level
+            'below_level': below_level,
+            'list_type': 'main'  # This is a main list placement
         }
         
         if position == 1 and dethroned_level:
@@ -2822,6 +2931,9 @@ def admin_add_level():
         
         if pushed_to_legacy:
             changelog_kwargs['pushed_to_legacy'] = pushed_to_legacy
+        
+        if pushed_out_of_top10:
+            changelog_kwargs['pushed_out_of_top10'] = pushed_out_of_top10
         
         log_level_change(
             action="placed",
@@ -2838,6 +2950,67 @@ def admin_add_level():
         
     except Exception as e:
         flash(f'Error adding level: {str(e)}', 'danger')
+        return redirect(url_for('admin_levels_enhanced'))
+
+@app.route('/api/discord_refresh', methods=['POST'])
+def api_discord_refresh():
+    """API endpoint to refresh Discord widget data"""
+    try:
+        if DISCORD_WIDGET_AVAILABLE:
+            # Clear the cache to force refresh
+            from discord_widget import discord_cache
+            discord_cache['data'] = None
+            discord_cache['last_updated'] = None
+            return {'success': True}
+        else:
+            return {'success': False, 'error': 'Discord widget not available'}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+@app.route('/admin/test_environment')
+def admin_test_environment():
+    """Admin testing environment with all website features"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Get sample data for testing
+        sample_levels = list(mongo_db.levels.find({"is_legacy": {"$ne": True}}).sort("position", 1).limit(10))
+        sample_legacy_levels = list(mongo_db.levels.find({"is_legacy": True}).sort("position", 1).limit(5))
+        sample_users = list(mongo_db.users.find().sort("points", -1).limit(5))
+        sample_records = list(mongo_db.records.aggregate([
+            {"$match": {"status": "approved"}},
+            {"$lookup": {
+                "from": "levels",
+                "localField": "level_id",
+                "foreignField": "_id",
+                "as": "level"
+            }},
+            {"$unwind": "$level"},
+            {"$lookup": {
+                "from": "users",
+                "localField": "user_id",
+                "foreignField": "_id",
+                "as": "user"
+            }},
+            {"$unwind": "$user"},
+            {"$sort": {"date_submitted": -1}},
+            {"$limit": 10}
+        ]))
+        
+        # Get current admin user
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        
+        return render_template('admin_test_environment.html',
+                             sample_levels=sample_levels,
+                             sample_legacy_levels=sample_legacy_levels,
+                             sample_users=sample_users,
+                             sample_records=sample_records,
+                             admin_user=admin_user)
+        
+    except Exception as e:
+        flash(f'Error loading test environment: {str(e)}', 'danger')
         return redirect(url_for('admin_levels_enhanced'))
 
 @app.route('/admin/rebuild_image_system')

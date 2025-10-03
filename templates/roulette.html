@@ -84,6 +84,104 @@
         gap: 1rem;
     }
     
+    /* Mobile responsive fixes */
+    @media (max-width: 768px) {
+        .roulette-container {
+            padding: 1rem 0;
+        }
+        
+        .level-card {
+            padding: 1rem;
+            margin: 1rem auto;
+        }
+        
+        .level-display {
+            flex-direction: column;
+            gap: 1rem;
+            text-align: center;
+        }
+        
+        .level-thumbnail {
+            width: 80px;
+            height: 80px;
+            font-size: 2rem;
+            margin: 0 auto;
+        }
+        
+        .level-info {
+            text-align: center;
+        }
+        
+        .level-title {
+            font-size: 1.4rem;
+        }
+        
+        .level-details {
+            flex-direction: column;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        
+        .target-section {
+            align-items: center;
+            text-align: center;
+        }
+        
+        .target-display {
+            min-width: auto;
+            width: 100%;
+            max-width: 200px;
+        }
+        
+        .percentage-input {
+            width: 100%;
+            max-width: 200px;
+        }
+        
+        .action-buttons {
+            flex-direction: column;
+            width: 100%;
+            max-width: 200px;
+        }
+        
+        .btn-done, .btn-give-up {
+            width: 100%;
+        }
+        
+        .progress-badges {
+            gap: 0.3rem;
+        }
+        
+        .progress-badge {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.6rem;
+        }
+        
+        .start-section {
+            padding: 2rem 1rem;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .roulette-title {
+            font-size: 1.5rem;
+        }
+        
+        .level-title {
+            font-size: 1.2rem;
+        }
+        
+        .level-thumbnail {
+            width: 60px;
+            height: 60px;
+            font-size: 1.5rem;
+        }
+        
+        .level-details {
+            font-size: 0.8rem;
+        }
+    }
+    
     .target-display {
         background: #333;
         border: 1px solid #555;

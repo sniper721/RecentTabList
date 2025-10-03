@@ -141,6 +141,11 @@ def send_changelog_notification(action, level_name, admin_username=None, **kwarg
             pushed_to_legacy = kwargs.get('pushed_to_legacy', '')
             if pushed_to_legacy:
                 message += f" This pushes {pushed_to_legacy} to the legacy list."
+            
+            # Check if this placement pushed something out of top 10
+            pushed_out_of_top10 = kwargs.get('pushed_out_of_top10', '')
+            if pushed_out_of_top10 and position <= 10:
+                message += f" This pushes {pushed_out_of_top10} out of the top 10."
         
         elif action == "moved":
             old_position = kwargs.get('old_position', '?')
@@ -173,6 +178,11 @@ def send_changelog_notification(action, level_name, admin_username=None, **kwarg
             pushed_to_legacy = kwargs.get('pushed_to_legacy', '')
             if pushed_to_legacy:
                 message += f" This pushes {pushed_to_legacy} to the legacy list."
+            
+            # Check if this move pushed something out of top 10
+            pushed_out_of_top10 = kwargs.get('pushed_out_of_top10', '')
+            if pushed_out_of_top10 and new_position <= 10:
+                message += f" This pushes {pushed_out_of_top10} out of the top 10."
         
         elif action == "removed":
             old_position = kwargs.get('old_position', '?')

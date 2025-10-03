@@ -12,8 +12,8 @@
             <div class="card-body">
                 <div class="text-center mb-4">
                     <div class="profile-avatar mb-3">
-                        {% if user.profile_picture or user.avatar_url %}
-                            <img src="{{ user.profile_picture or user.avatar_url }}" alt="Avatar" class="rounded-circle" width="120" height="120" style="object-fit: cover;"
+                        {% if user.avatar_url %}
+                            <img src="{{ user.avatar_url }}" alt="Avatar" class="rounded-circle" width="120" height="120" style="object-fit: cover;"
                                  onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
                             <div class="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center text-white" style="width: 120px; height: 120px; font-size: 48px; display: none;">
                                 {{ user.username[0].upper() }}

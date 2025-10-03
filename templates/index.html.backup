@@ -208,16 +208,83 @@
         
 
         
-        <!-- Simple Discord Invite -->
+        <!-- Enhanced Discord Widget -->
         <div class="card shadow-sm mb-4">
-            <div class="card-header bg-primary text-white">
-                <h4 class="mb-0"><i class="fab fa-discord me-2"></i>Discord Server</h4>
-            </div>
-            <div class="card-body text-center">
-                <p class="mb-3">Join our community for discussions and level submissions!</p>
-                <a href="https://discord.gg/TSjXSecuaz" target="_blank" class="btn btn-primary">
-                    <i class="fab fa-discord me-2"></i>Join Discord Server
-                </a>
+            <div class="discord-widget">
+                {% set discord_data = get_discord_data() %}
+                <div class="discord-header">
+                    <div class="discord-logo">
+                        <i class="fab fa-discord"></i>
+                    </div>
+                    <div class="discord-info">
+                        <h4 class="discord-title">{{ discord_data.name }}</h4>
+                        <p class="discord-members">{{ discord_data.online_count }} Members Online</p>
+                    </div>
+                </div>
+                
+                {% if discord_data.online and discord_data.channels %}
+                <!-- Voice Channels -->
+                <div class="discord-channels">
+                    {% for channel in discord_data.channels[:4] %}
+                    <div class="discord-channel">
+                        <i class="fas fa-volume-up"></i>
+                        <span>{{ channel.name }}</span>
+                        <span class="channel-count">
+                            {{ discord_data.members | selectattr('channel_id', 'equalto', channel.id) | list | length }}
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                
+                <!-- Online Members -->
+                {% if discord_data.online and discord_data.members %}
+                <div class="discord-members-section">
+                    <h6 class="members-title">MEMBERS ONLINE</h6>
+                    <div class="discord-members-list">
+                        {% for member in discord_data.members[:8] %}
+                        <div class="discord-member">
+                            {% if member.avatar %}
+                                <img src="{{ member.avatar }}" alt="{{ member.username }}" class="member-avatar">
+                            {% else %}
+                                <div class="member-avatar-placeholder">{{ member.username[0].upper() }}</div>
+                            {% endif %}
+                            <div class="member-info">
+                                <span class="member-name">{{ member.username }}</span>
+                                {% if member.channel_name %}
+                                    <span class="member-status">🔊 {{ member.channel_name }}</span>
+                                {% elif member.game %}
+                                    <span class="member-status">🎮 {{ member.game }}</span>
+                                {% else %}
+                                    <span class="member-status">Online</span>
+                                {% endif %}
+                            </div>
+                            <div class="member-status-indicator status-{{ member.status }}"></div>
+                        </div>
+                        {% endfor %}
+                        {% if discord_data.members | length > 8 %}
+                        <div class="more-members">
+                            and {{ discord_data.members | length - 8 }} more...
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <div class="discord-footer">
+                    <div class="discord-invite-text">
+                        <p>Hangout with people who get it</p>
+                    </div>
+                    <a href="{{ discord_data.invite_url }}" target="_blank" class="discord-join-btn">
+                        Join Discord
+                    </a>
+                </div>
+                
+                {% if not discord_data.online %}
+                <div class="discord-offline">
+                    <p class="text-muted">Discord widget temporarily unavailable</p>
+                </div>
+                {% endif %}
             </div>
         </div>
         
@@ -246,8 +313,232 @@
         });
     });
     
+    // Simple thumbnail system - no complex fallbacks
+    
+
+    
 
 </script>
+{% endblock %}  
+  });
+    
+    // Auto-refresh Discord widget every 5 minutes
+    setInterval(function() {
+        fetch('/api/discord_refresh', {method: 'POST'})
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                }
+            })
+            .catch(error => console.log('Discord refresh failed:', error));
+    }, 300000); // 5 minutes
+</script>
 
+<style>
+/* Discord Widget Styles */
+.discord-widget {
+    background: linear-gradient(135deg, #5865F2 0%, #4752C4 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 0;
+    overflow: hidden;
+}
 
+.discord-header {
+    display: flex;
+    align-items: center;
+    padding: 16px 20px;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.discord-logo {
+    font-size: 32px;
+    margin-right: 12px;
+}
+
+.discord-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.discord-members {
+    margin: 0;
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+.discord-channels {
+    padding: 0 20px;
+    margin-bottom: 16px;
+}
+
+.discord-channel {
+    display: flex;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+.discord-channel i {
+    margin-right: 8px;
+    width: 16px;
+}
+
+.channel-count {
+    margin-left: auto;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 12px;
+}
+
+.discord-members-section {
+    padding: 0 20px;
+    margin-bottom: 16px;
+}
+
+.members-title {
+    font-size: 12px;
+    font-weight: 600;
+    opacity: 0.7;
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+}
+
+.discord-members-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.discord-member {
+    display: flex;
+    align-items: center;
+    padding: 4px 0;
+    position: relative;
+}
+
+.member-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.member-avatar-placeholder {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #36393f;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    margin-right: 8px;
+}
+
+.member-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.member-name {
+    font-size: 14px;
+    font-weight: 500;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.member-status {
+    font-size: 12px;
+    opacity: 0.7;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.member-status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-left: 8px;
+    flex-shrink: 0;
+}
+
+.status-online { background: #3ba55c; }
+.status-idle { background: #faa61a; }
+.status-dnd { background: #ed4245; }
+.status-offline { background: #747f8d; }
+
+.more-members {
+    font-size: 12px;
+    opacity: 0.7;
+    padding: 4px 0;
+    text-align: center;
+}
+
+.discord-footer {
+    padding: 16px 20px;
+    background: rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.discord-invite-text p {
+    margin: 0;
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+.discord-join-btn {
+    background: white;
+    color: #5865F2;
+    padding: 8px 16px;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.discord-join-btn:hover {
+    background: #f2f3f5;
+    color: #4752C4;
+    text-decoration: none;
+}
+
+.discord-offline {
+    padding: 20px;
+    text-align: center;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .discord-header {
+        padding: 12px 16px;
+    }
+    
+    .discord-channels,
+    .discord-members-section {
+        padding: 0 16px;
+    }
+    
+    .discord-footer {
+        padding: 12px 16px;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .discord-members-list {
+        max-height: 150px;
+    }
+}
+</style>
 {% endblock %}
