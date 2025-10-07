@@ -185,13 +185,17 @@
                                         <div class="btn-group" role="group">
                                             <!-- Quick Actions -->
                                             {% if record.status == 'pending' %}
-                                                <form method="POST" action="{{ url_for('admin_approve_record', record_id=record._id|string) }}" class="d-inline">
-                                                    <button type="submit" class="btn btn-sm btn-success" title="Approve">
+                                                <form method="POST" action="{{ url_for('admin_approve_record', record_id=record._id|string) }}" class="d-inline" 
+                                                      onsubmit="return confirm('✅ Approve this record?\n\nUser: {{ record.user.username }}\nLevel: {{ record.level.name }}\nPercentage: {{ record.percentage }}%');">
+                                                    <button type="submit" class="btn btn-sm btn-success approve-btn" title="Approve Record" 
+                                                            style="min-width: 40px; cursor: pointer;">
                                                         <i class="fas fa-check"></i>
                                                     </button>
                                                 </form>
-                                                <form method="POST" action="{{ url_for('admin_reject_record', record_id=record._id|string) }}" class="d-inline">
-                                                    <button type="submit" class="btn btn-sm btn-danger" title="Reject">
+                                                <form method="POST" action="{{ url_for('admin_reject_record', record_id=record._id|string) }}" class="d-inline"
+                                                      onsubmit="return confirm('❌ Reject this record?\n\nUser: {{ record.user.username }}\nLevel: {{ record.level.name }}\nPercentage: {{ record.percentage }}%');">
+                                                    <button type="submit" class="btn btn-sm btn-danger reject-btn" title="Reject Record"
+                                                            style="min-width: 40px; cursor: pointer;">
                                                         <i class="fas fa-times"></i>
                                                     </button>
                                                 </form>
@@ -280,11 +284,72 @@
 {% endblock %}
 
 {% block extra_js %}
+<style>
+    /* Ensure buttons are properly clickable on all devices */
+    .approve-btn, .reject-btn {
+        pointer-events: auto !important;
+        user-select: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+    }
+    
+    .approve-btn:hover {
+        background-color: #198754 !important;
+        border-color: #198754 !important;
+    }
+    
+    .reject-btn:hover {
+        background-color: #dc3545 !important;
+        border-color: #dc3545 !important;
+    }
+    
+    /* Fix for potential button interaction issues */
+    .btn-group .btn {
+        position: relative;
+        z-index: 1;
+    }
+    
+    /* Ensure forms don't interfere with each other */
+    .d-inline {
+        display: inline-block !important;
+        margin-right: 2px;
+    }
+</style>
+
 <script>
     // Auto-submit form when filters change
     document.querySelectorAll('select[name="status"]').forEach(select => {
         select.addEventListener('change', function() {
             this.form.submit();
+        });
+    });
+
+    // Fix for PC button interaction issues
+    document.addEventListener('DOMContentLoaded', function() {
+        // Ensure all approve/reject buttons are properly clickable
+        const approveButtons = document.querySelectorAll('.approve-btn');
+        const rejectButtons = document.querySelectorAll('.reject-btn');
+        
+        approveButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.stopPropagation();
+                // The form submission will be handled by the onsubmit event
+            });
+        });
+        
+        rejectButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.stopPropagation();
+                // The form submission will be handled by the onsubmit event
+            });
+        });
+        
+        // Debug: Log button clicks
+        document.querySelectorAll('.approve-btn, .reject-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                console.log('Button clicked:', this.className, this.title);
+            });
         });
     });
 

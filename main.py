@@ -82,6 +82,15 @@ import requests
 # Import profanity filter
 from profanity_filter import check_username_profanity, check_level_name_profanity, check_comment_profanity, profanity_filter
 
+# Import real-time points system
+try:
+    from real_time_points_system import RealTimePointsManager, handle_level_move, recalculate_all_points
+    REAL_TIME_POINTS_AVAILABLE = True
+    print("✅ Real-time points system loaded successfully")
+except ImportError as e:
+    print(f"❌ Real-time points system failed to load: {e}")
+    REAL_TIME_POINTS_AVAILABLE = False
+
 # Load environment variables from .env file
 load_dotenv()
 
@@ -622,31 +631,16 @@ def text_difficulty_to_range(text_difficulty):
     return ranges.get(text_difficulty.lower())
 
 def recalculate_user_points_after_level_move(level_id, old_points, new_points):
-    """Recalculate user points when a level's points change due to position movement"""
+    """Recalculate user points when a level's points change due to position movement - DEPRECATED"""
+    # This function is deprecated in favor of the real-time points system
+    # Import and use the new system
     try:
-        points_difference = new_points - old_points
+        from real_time_points_system import RealTimePointsManager
+        manager = RealTimePointsManager(mongo_db)
         
-        # Find all users who have completed this level
-        records = list(mongo_db.records.find({
-            "level_id": level_id,
-            "status": "approved",
-            "progress": 100
-        }))
-        
-        updated_users = []
-        for record in records:
-            user_id = record["user_id"]
-            
-            # Update user's total points
-            result = mongo_db.users.update_one(
-                {"_id": user_id},
-                {"$inc": {"points": points_difference}}
-            )
-            
-            if result.modified_count > 0:
-                updated_users.append(user_id)
-        
-        return len(updated_users)
+        # Recalculate all user points to ensure accuracy
+        users_updated = manager.recalculate_all_user_points()
+        return users_updated
         
     except Exception as e:
         print(f"Error recalculating user points after level move: {e}")
@@ -874,7 +868,7 @@ def log_level_change(action, level_name, admin_username, **kwargs):
         print(f"Error logging level change: {e}")
 
 def send_enhanced_changelog_notification(action, level_name, admin_username, **kwargs):
-    """Send changelog notifications with enhanced list type detection and top 10 push notifications"""
+    """Send changelog notifications with enhanced dethroning and legacy push messaging"""
     try:
         message = ""
         list_type = kwargs.get('list_type', 'main')  # main, legacy, future
@@ -892,19 +886,19 @@ def send_enhanced_changelog_notification(action, level_name, admin_username, **k
                 list_suffix = " from the future list"
             
             if position == 1:
-                # Special case for #1 placement
+                # Special case for #1 placement with enhanced dethroning message
                 dethroned_level = kwargs.get('dethroned_level', '')
                 pushed_to_legacy = kwargs.get('pushed_to_legacy', '')
                 
                 message = f"{level_name} has been placed at #1"
                 if dethroned_level:
-                    message += f" dethroning {dethroned_level}"
+                    message += f", dethroning {dethroned_level}"
                 message += list_suffix + "."
                 
                 if pushed_to_legacy:
                     message += f" This pushes {pushed_to_legacy} to the legacy list."
             else:
-                # Regular placement
+                # Regular placement with enhanced messaging
                 message = f"{level_name} has been placed at #{position}"
                 if below_level and above_level:
                     message += f" below {above_level} and above {below_level}"
@@ -914,7 +908,7 @@ def send_enhanced_changelog_notification(action, level_name, admin_username, **k
                     message += f" below {above_level}"
                 message += list_suffix + "."
                 
-                # Check if this placement pushed something to legacy
+                # Always check if this placement pushed something to legacy
                 pushed_to_legacy = kwargs.get('pushed_to_legacy', '')
                 if pushed_to_legacy:
                     message += f" This pushes {pushed_to_legacy} to the legacy list."
@@ -929,6 +923,7 @@ def send_enhanced_changelog_notification(action, level_name, admin_username, **k
             new_position = kwargs.get('new_position', '?')
             above_level = kwargs.get('above_level', '')
             below_level = kwargs.get('below_level', '')
+            dethroned_level = kwargs.get('dethroned_level', '')
             
             # Enhanced message format for moves with list type
             list_suffix = ""
@@ -937,14 +932,20 @@ def send_enhanced_changelog_notification(action, level_name, admin_username, **k
             elif list_type == "future":
                 list_suffix = " from the future list"
             
-            message = f"{level_name} has been moved from #{old_position} to #{new_position}"
-            if below_level and above_level:
-                message += f" below {above_level} and above {below_level}"
-            elif below_level:
-                message += f" above {below_level}"
-            elif above_level:
-                message += f" below {above_level}"
-            message += list_suffix + "."
+            if new_position == 1 and dethroned_level:
+                # Special case for moves to #1 with dethroning
+                message = f"{level_name} has been moved from #{old_position} to #1, dethroning {dethroned_level}"
+                message += list_suffix + "."
+            else:
+                # Regular move
+                message = f"{level_name} has been moved from #{old_position} to #{new_position}"
+                if below_level and above_level:
+                    message += f" below {above_level} and above {below_level}"
+                elif below_level:
+                    message += f" above {below_level}"
+                elif above_level:
+                    message += f" below {above_level}"
+                message += list_suffix + "."
             
             # Check if this move pushed something to legacy
             pushed_to_legacy = kwargs.get('pushed_to_legacy', '')
@@ -2676,13 +2677,14 @@ def admin_levels_enhanced():
 
 @app.route('/admin/move_level/<level_id>', methods=['POST'])
 def admin_move_level(level_id):
-    """Move a level up or down in the list"""
+    """Move a level up or down in the list with real-time points recalculation"""
     if 'user_id' not in session or not session.get('is_admin'):
         return {'error': 'Access denied'}, 403
     
     try:
         from bson.objectid import ObjectId
         from flask import request
+        from real_time_points_system import RealTimePointsManager
         
         data = request.get_json()
         direction = data.get('direction')
@@ -2710,32 +2712,21 @@ def admin_move_level(level_id):
         else:
             return {'error': 'Invalid move'}, 400
         
-        # Get levels that will be above and below after the move
-        above_level, below_level = get_level_neighbors(new_position, False)
+        # Get admin info for logging
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
         
-        # Check if this move will push something to legacy
-        pushed_to_legacy = None
-        if new_position <= 100 and current_position > 100:
-            # Moving up into top 100, check what's at position 100
-            level_at_100 = mongo_db.levels.find_one({
-                "position": 100,
-                "is_legacy": {"$ne": True}
-            })
-            if level_at_100:
-                pushed_to_legacy = level_at_100["name"]
-        
-        # Calculate old and new points
-        old_points = level.get('points', 0)
-        new_points = calculate_level_points(new_position, False)
-        
-        # Update the level's position and points
-        mongo_db.levels.update_one(
-            {"_id": ObjectId(level_id)},
-            {"$set": {"position": new_position, "points": new_points}}
+        # Use the real-time points system to handle the complete recalculation
+        manager = RealTimePointsManager(mongo_db)
+        success = manager.handle_level_position_change(
+            ObjectId(level_id), 
+            current_position, 
+            new_position, 
+            admin_username
         )
         
-        # Update user points for this level
-        users_updated = recalculate_user_points_after_level_move(ObjectId(level_id), old_points, new_points)
+        if not success:
+            return {'error': 'Failed to update points system'}, 500
         
         # Handle automatic legacy management if needed
         if new_position <= 100:
@@ -2745,13 +2736,44 @@ def admin_move_level(level_id):
         levels_cache['main_list'] = None
         levels_cache['legacy_list'] = None
         
+        # Check if this move will push something to legacy
+        pushed_to_legacy = None
+        if new_position <= 100 and current_position > 100:
+            level_at_100 = mongo_db.levels.find_one({
+                "position": 100,
+                "is_legacy": {"$ne": True}
+            })
+            if level_at_100:
+                pushed_to_legacy = level_at_100["name"]
+        
+        # Get levels that will be above and below after the move
+        above_level, below_level = get_level_neighbors(new_position, False)
+        
+        # Special handling for moves to #1 (dethroning)
+        dethroned_level = None
+        if new_position == 1 and current_position > 1:
+            # This level is moving to #1, so it's dethroning whoever was there
+            current_first = mongo_db.levels.find_one({
+                "position": 1,
+                "is_legacy": {"$ne": True},
+                "_id": {"$ne": ObjectId(level_id)}  # Exclude the level being moved
+            })
+            if current_first:
+                dethroned_level = current_first["name"]
+        
         # Check if this move pushes something out of top 10
         pushed_out_of_top10 = None
         if new_position <= 10 and current_position > 10:
-            pushed_out_of_top10 = get_top10_pushout_info(new_position)
+            # Find what level is currently at position 10 that will be pushed out
+            level_at_10 = mongo_db.levels.find_one({
+                "position": 10,
+                "is_legacy": {"$ne": True},
+                "_id": {"$ne": ObjectId(level_id)}
+            })
+            if level_at_10:
+                pushed_out_of_top10 = level_at_10["name"]
         
         # Log enhanced changelog
-        admin_username = session.get('username', 'Unknown Admin')
         changelog_kwargs = {
             'old_position': current_position,
             'new_position': new_position,
@@ -2759,6 +2781,10 @@ def admin_move_level(level_id):
             'below_level': below_level,
             'list_type': 'main'  # This is a main list move
         }
+        
+        # Add dethroning info for #1 moves
+        if new_position == 1 and dethroned_level:
+            changelog_kwargs['dethroned_level'] = dethroned_level
         
         if pushed_to_legacy:
             changelog_kwargs['pushed_to_legacy'] = pushed_to_legacy
@@ -2774,7 +2800,7 @@ def admin_move_level(level_id):
         )
         
         # Log admin action
-        log_admin_action(admin_username, f"MOVED LEVEL: {level['name']}", f"Position {current_position} → {new_position}, Updated {users_updated} users")
+        log_admin_action(admin_username, f"MOVED LEVEL: {level['name']}", f"Position {current_position} → {new_position}")
         
         return {'success': True, 'users_updated': users_updated}
         
@@ -2783,46 +2809,65 @@ def admin_move_level(level_id):
 
 @app.route('/admin/recalculate_all_points', methods=['POST'])
 def admin_recalculate_all_points():
-    """Recalculate all level points and user points"""
+    """Recalculate all level points and user points using the real-time system"""
     if 'user_id' not in session or not session.get('is_admin'):
         return {'error': 'Access denied'}, 403
     
     try:
-        # Recalculate level points
-        levels = list(mongo_db.levels.find({"is_legacy": {"$ne": True}}, {"_id": 1, "position": 1}))
-        levels_updated = 0
-        
-        for level in levels:
-            new_points = calculate_level_points(level['position'], False)
-            result = mongo_db.levels.update_one(
-                {"_id": level["_id"]},
-                {"$set": {"points": new_points}}
-            )
-            if result.modified_count > 0:
-                levels_updated += 1
-        
-        # Recalculate user points
-        users = list(mongo_db.users.find({"points": {"$exists": True}}, {"_id": 1}))
-        users_updated = 0
-        
-        for user in users:
-            try:
-                update_user_points(user["_id"])
-                users_updated += 1
-            except:
-                continue
+        if REAL_TIME_POINTS_AVAILABLE:
+            # Use the new real-time points system
+            from real_time_points_system import RealTimePointsManager
+            manager = RealTimePointsManager(mongo_db)
+            
+            # Recalculate all level points
+            levels_updated = manager.recalculate_all_level_points()
+            
+            # Recalculate all user points
+            users_updated = manager.recalculate_all_user_points()
+            
+            # Clear cache
+            levels_cache['main_list'] = None
+            levels_cache['legacy_list'] = None
+            
+        else:
+            # Fallback to old system
+            levels = list(mongo_db.levels.find({"is_legacy": {"$ne": True}}, {"_id": 1, "position": 1}))
+            levels_updated = 0
+            
+            for level in levels:
+                new_points = calculate_level_points(level['position'], False)
+                result = mongo_db.levels.update_one(
+                    {"_id": level["_id"]},
+                    {"$set": {"points": new_points}}
+                )
+                if result.modified_count > 0:
+                    levels_updated += 1
+            
+            # Recalculate user points
+            users = list(mongo_db.users.find({"points": {"$exists": True}}, {"_id": 1}))
+            users_updated = 0
+            
+            for user in users:
+                try:
+                    update_user_points(user["_id"])
+                    users_updated += 1
+                except:
+                    continue
         
         # Log the action
-        admin_username = session.get('username', 'Unknown Admin')
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
         log_admin_action(admin_username, "RECALCULATED ALL POINTS", f"Updated {levels_updated} levels and {users_updated} users")
         
         return {
             'success': True, 
             'levels_updated': levels_updated, 
-            'users_updated': users_updated
+            'users_updated': users_updated,
+            'message': f'Successfully recalculated points for {levels_updated} levels and {users_updated} users'
         }
         
     except Exception as e:
+        print(f"Error in admin_recalculate_all_points: {e}")
         return {'error': str(e)}, 500
 
 @app.route('/admin/add_level', methods=['POST'])
@@ -2856,14 +2901,19 @@ def admin_add_level():
         # Check if this placement will push something to legacy
         pushed_to_legacy = None
         if position <= 100:
-            # Check what's currently at position 100 (will be pushed to 101, then to legacy)
-            level_at_100 = mongo_db.levels.find_one({
-                "position": 100,
-                "is_legacy": {"$ne": True}
-            })
+            # Count current main list levels
+            main_list_count = mongo_db.levels.count_documents({"is_legacy": {"$ne": True}})
             
-            if level_at_100:
-                pushed_to_legacy = level_at_100["name"]
+            # If we already have 100 levels, adding one more will push the last one to legacy
+            if main_list_count >= 100:
+                # Find what's currently at position 100 (will be pushed to 101, then to legacy)
+                level_at_100 = mongo_db.levels.find_one({
+                    "position": 100,
+                    "is_legacy": {"$ne": True}
+                })
+                
+                if level_at_100:
+                    pushed_to_legacy = level_at_100["name"]
         
         # Get levels that will be above and below the new level
         above_level, below_level = get_level_neighbors(position, False)

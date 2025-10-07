@@ -100,6 +100,33 @@
         </div>
     </div>
     
+    <!-- Points System Tools -->
+    <div class="card mb-4">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">🧮 Points System Tools</h5>
+        </div>
+        <div class="card-body">
+            <!-- Real-time Points Recalculation -->
+            <div class="mb-4">
+                <h6>🔄 Recalculate All Points</h6>
+                <p>Recalculate all level points and user points using the real-time system. This ensures all points are accurate based on current level positions.</p>
+                <div class="alert alert-info">
+                    <strong>ℹ️ What this does:</strong>
+                    <ul class="mb-0">
+                        <li>Recalculates points for all levels based on their current positions</li>
+                        <li>Recalculates total points for all users based on their approved records</li>
+                        <li>Fixes any inconsistencies in the points system</li>
+                        <li>Updates the database with correct values</li>
+                    </ul>
+                </div>
+                <button type="button" class="btn btn-warning" id="recalculatePointsBtn">
+                    <i class="fas fa-calculator"></i> Recalculate All Points
+                </button>
+                <div id="recalculationResult" class="mt-3" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Verifier Points Tools -->
     <div class="card mb-4">
         <div class="card-header bg-success text-white">
@@ -129,6 +156,66 @@
 </div>
 
 <script>
+// Points recalculation functionality
+document.getElementById('recalculatePointsBtn').addEventListener('click', function() {
+    const confirmMsg = '🔄 Recalculate All Points\n\nThis will recalculate points for ALL levels and users in the system.\n\nThis process may take a few moments and will:\n• Update all level points based on current positions\n• Recalculate all user points based on approved records\n• Fix any inconsistencies in the points system\n\nProceed with recalculation?';
+    
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+    
+    const button = this;
+    const resultDiv = document.getElementById('recalculationResult');
+    
+    // Disable button and show loading
+    button.disabled = true;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Recalculating...';
+    
+    resultDiv.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin"></i> Recalculating points... This may take a moment.</div>';
+    resultDiv.style.display = 'block';
+    
+    fetch('/admin/recalculate_all_points', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            resultDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <h6>✅ Recalculation Completed Successfully!</h6>
+                    <p><strong>Levels updated:</strong> ${data.levels_updated}</p>
+                    <p><strong>Users updated:</strong> ${data.users_updated}</p>
+                    <p class="mb-0">${data.message || 'All points have been recalculated and updated.'}</p>
+                </div>
+            `;
+        } else {
+            resultDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <h6>❌ Recalculation Failed</h6>
+                    <p class="mb-0">Error: ${data.error}</p>
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        resultDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <h6>❌ Recalculation Failed</h6>
+                <p class="mb-0">An unexpected error occurred: ${error.message}</p>
+            </div>
+        `;
+    })
+    .finally(() => {
+        // Re-enable button
+        button.disabled = false;
+        button.innerHTML = '<i class="fas fa-calculator"></i> Recalculate All Points';
+    });
+});
+
 document.getElementById('ipBanForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
