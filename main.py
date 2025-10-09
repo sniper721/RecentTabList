@@ -985,7 +985,7 @@ def send_enhanced_changelog_notification(action, level_name, admin_username, **k
             
             message = f"{level_name} has been moved to the legacy list"
             if legacy_position and legacy_position != '?':
-                message += f" at position #{legacy_position + 100}"  # Legacy starts from #101
+                message += f" at position #{legacy_position}"  # Legacy positions are now direct (101, 102, etc.)
             message += "."
         
         # Send the notification - ensure only one message is sent
@@ -1013,12 +1013,12 @@ def auto_manage_legacy_list():
                 {"$inc": {"position": 1}}
             )
             
-            # Move the level to legacy at position 1 (it becomes the newest legacy level)
+            # Move the level to legacy at position 101 (legacy position 1 = main position 101)
             mongo_db.levels.update_one(
                 {"_id": level_at_101["_id"]},
                 {"$set": {
                     "is_legacy": True,
-                    "position": 1,  # Always insert at position 1 in legacy
+                    "position": 101,  # Position 101 is the first legacy position
                     "points": 0  # Legacy levels have 0 points
                 }}
             )
@@ -1033,10 +1033,10 @@ def auto_manage_legacy_list():
                 level_name=level_at_101["name"],
                 admin_username="System",
                 old_position=101,
-                legacy_position=1
+                legacy_position=101
             )
             
-            print(f"🔄 Automatically moved {level_at_101['name']} to legacy list at position #101 (legacy position 1)")
+            print(f"🔄 Automatically moved {level_at_101['name']} to legacy list at position #101")
             print(f"🔄 Shifted all other legacy levels down by 1 position")
             return level_at_101["name"]
         
@@ -5675,6 +5675,31 @@ def update_theme(theme_id):
         print(f"Error updating theme: {e}")
         return {'success': False, 'error': 'Failed to update theme'}
 
+@app.route('/update_theme', methods=['POST'])
+def update_theme_preference():
+    """Update user theme preference for mobile"""
+    if 'user_id' not in session:
+        return {'success': False, 'error': 'Not logged in'}
+    
+    try:
+        theme = request.form.get('theme', 'light')
+        if theme not in ['light', 'dark']:
+            theme = 'light'
+        
+        user_id = session['user_id']
+        mongo_db.users.update_one(
+            {"_id": user_id},
+            {"$set": {"theme": theme}}
+        )
+        
+        # Update session theme
+        session['theme'] = theme
+        
+        return {'success': True}
+    except Exception as e:
+        print(f"Error updating theme preference: {e}")
+        return {'success': False, 'error': 'Failed to update theme'}
+
 @app.route('/auth/google')
 def google_login():
     if not google:
@@ -8574,7 +8599,7 @@ def admin_move_to_legacy():
         {"is_legacy": True}, 
         sort=[("position", -1)]
     )
-    new_position = 1 if not highest_legacy else highest_legacy['position'] + 1
+    new_position = 101 if not highest_legacy else highest_legacy['position'] + 1
     
     # Move level to legacy
     mongo_db.levels.update_one(
@@ -10065,9 +10090,16 @@ def admin_bulk_actions():
         for level_id in level_ids:
             level = mongo_db.levels.find_one({"_id": level_id})
             if level and not level.get('is_legacy', False):
+                # Find the highest position in the legacy list
+                highest_legacy = mongo_db.levels.find_one(
+                    {"is_legacy": True}, 
+                    sort=[("position", -1)]
+                )
+                new_position = 101 if not highest_legacy else highest_legacy['position'] + 1
+                
                 mongo_db.levels.update_one(
                     {"_id": level_id},
-                    {"$set": {"is_legacy": True, "position": mongo_db.levels.count_documents({"is_legacy": True}) + 1}}
+                    {"$set": {"is_legacy": True, "position": new_position}}
                 )
                 log_level_change(
                     action="legacy",
@@ -11061,6 +11093,7 @@ def update_user_settings():
             email = request.form.get('email', '').strip()
             bio = request.form.get('bio', '').strip()
             timezone_setting = request.form.get('timezone', 'UTC').strip()
+            country = request.form.get('country', '').strip()
             
             # Validation
             if not username or len(username) < 3:
@@ -11083,7 +11116,8 @@ def update_user_settings():
                     "nickname": nickname,
                     "email": email,
                     "bio": bio,
-                    "timezone": timezone_setting
+                    "timezone": timezone_setting,
+                    "country": country
                 }}
             )
             session['username'] = username  # Update session

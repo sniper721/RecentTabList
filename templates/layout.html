@@ -399,6 +399,11 @@
                         📖 Guide
                     </a>
                 </div>
+                <div class="col-6">
+                    <button id="mobile-theme-toggle" class="btn btn-outline-secondary w-100 btn-sm">
+                        🌙 Dark Mode
+                    </button>
+                </div>
                 {% if session.get('user_id') %}
                 <div class="col-6">
                     <a href="{{ url_for('profile') }}" class="btn btn-outline-primary w-100 btn-sm">
@@ -571,6 +576,9 @@
     <footer class="footer mt-5 py-3">
         <div class="container text-center">
             <span class="text-muted">© 2025 GD Recent Tab List - Not affiliated with RobTop Games</span>
+            <div class="mt-2">
+                <span style="font-size: 1.5rem; color: #ff6b35;">🎃</span>
+            </div>
         </div>
     </footer>
 
@@ -610,7 +618,198 @@
                 console.error('Error closing poll:', error);
             });
         }
+
+        // Mobile Theme Toggle Functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const mobileThemeToggle = document.getElementById('mobile-theme-toggle');
+            
+            if (mobileThemeToggle) {
+                // Get current theme from localStorage or default to light
+                let currentTheme = localStorage.getItem('theme') || 'light';
+                
+                // Apply theme on page load
+                applyTheme(currentTheme);
+                updateToggleButton(currentTheme);
+                
+                // Add click event listener
+                mobileThemeToggle.addEventListener('click', function() {
+                    currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+                    applyTheme(currentTheme);
+                    updateToggleButton(currentTheme);
+                    localStorage.setItem('theme', currentTheme);
+                    
+                    // Send theme preference to server
+                    fetch('/update_theme', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: 'theme=' + encodeURIComponent(currentTheme)
+                    }).catch(error => {
+                        console.log('Theme update failed:', error);
+                    });
+                });
+            }
+            
+            function applyTheme(theme) {
+                if (theme === 'dark') {
+                    document.body.classList.add('dark-theme');
+                    document.body.classList.remove('light-theme');
+                } else {
+                    document.body.classList.add('light-theme');
+                    document.body.classList.remove('dark-theme');
+                }
+            }
+            
+            function updateToggleButton(theme) {
+                if (mobileThemeToggle) {
+                    if (theme === 'dark') {
+                        mobileThemeToggle.innerHTML = '☀️ Light Mode';
+                        mobileThemeToggle.className = 'btn btn-outline-warning w-100 btn-sm';
+                    } else {
+                        mobileThemeToggle.innerHTML = '🌙 Dark Mode';
+                        mobileThemeToggle.className = 'btn btn-outline-secondary w-100 btn-sm';
+                    }
+                }
+            }
+        });
     </script>
+    
+    <!-- Mobile Dark Theme CSS -->
+    <style>
+        .dark-theme {
+            background-color: #1a1a1a !important;
+            color: #e0e0e0 !important;
+        }
+        
+        .dark-theme .card {
+            background-color: #2d2d2d !important;
+            border-color: #404040 !important;
+            color: #e0e0e0 !important;
+        }
+        
+        .dark-theme .card-header {
+            background-color: #404040 !important;
+            border-color: #555 !important;
+            color: #fff !important;
+        }
+        
+        .dark-theme .navbar {
+            background-color: #2d2d2d !important;
+        }
+        
+        .dark-theme .navbar-brand,
+        .dark-theme .navbar-nav .nav-link {
+            color: #e0e0e0 !important;
+        }
+        
+        .dark-theme .btn-outline-primary {
+            color: #66b3ff !important;
+            border-color: #66b3ff !important;
+        }
+        
+        .dark-theme .btn-outline-primary:hover {
+            background-color: #66b3ff !important;
+            color: #000 !important;
+        }
+        
+        .dark-theme .btn-outline-secondary {
+            color: #aaa !important;
+            border-color: #666 !important;
+        }
+        
+        .dark-theme .btn-outline-secondary:hover {
+            background-color: #666 !important;
+            color: #fff !important;
+        }
+        
+        .dark-theme .btn-outline-success {
+            color: #66ff66 !important;
+            border-color: #66ff66 !important;
+        }
+        
+        .dark-theme .btn-outline-success:hover {
+            background-color: #66ff66 !important;
+            color: #000 !important;
+        }
+        
+        .dark-theme .btn-outline-warning {
+            color: #ffcc66 !important;
+            border-color: #ffcc66 !important;
+        }
+        
+        .dark-theme .btn-outline-warning:hover {
+            background-color: #ffcc66 !important;
+            color: #000 !important;
+        }
+        
+        .dark-theme .btn-outline-info {
+            color: #66ccff !important;
+            border-color: #66ccff !important;
+        }
+        
+        .dark-theme .btn-outline-info:hover {
+            background-color: #66ccff !important;
+            color: #000 !important;
+        }
+        
+        .dark-theme .btn-outline-dark {
+            color: #ccc !important;
+            border-color: #666 !important;
+        }
+        
+        .dark-theme .btn-outline-dark:hover {
+            background-color: #666 !important;
+            color: #fff !important;
+        }
+        
+        .dark-theme .form-control,
+        .dark-theme .form-select {
+            background-color: #404040 !important;
+            border-color: #666 !important;
+            color: #e0e0e0 !important;
+        }
+        
+        .dark-theme .form-control:focus,
+        .dark-theme .form-select:focus {
+            background-color: #404040 !important;
+            border-color: #66b3ff !important;
+            color: #e0e0e0 !important;
+            box-shadow: 0 0 0 0.2rem rgba(102, 179, 255, 0.25) !important;
+        }
+        
+        .dark-theme .table {
+            color: #e0e0e0 !important;
+        }
+        
+        .dark-theme .table-striped > tbody > tr:nth-of-type(odd) > td {
+            background-color: #333 !important;
+        }
+        
+        .dark-theme .alert {
+            background-color: #404040 !important;
+            border-color: #666 !important;
+            color: #e0e0e0 !important;
+        }
+        
+        .dark-theme .text-muted {
+            color: #aaa !important;
+        }
+        
+        .dark-theme .border-bottom {
+            border-color: #555 !important;
+        }
+        
+        .dark-theme .footer {
+            background-color: #2d2d2d !important;
+            border-top: 1px solid #404040 !important;
+        }
+        
+        /* Spooky avatar adjustments for dark theme */
+        .dark-theme .spooky-avatar {
+            box-shadow: 0 0 20px rgba(255, 107, 53, 0.8), inset 0 0 20px rgba(0, 0, 0, 0.4) !important;
+        }
+    </style>
     
     {% block extra_js %}{% endblock %}
 </body>

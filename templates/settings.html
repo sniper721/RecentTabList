@@ -75,7 +75,261 @@
                                    value="{{ user.email }}" required>
                         </div>
                         
-
+                        <div class="mb-3">
+                            <label for="country" class="form-label">Country</label>
+                            <select class="form-select form-select-sm" id="country" name="country">
+                                <option value="">🌍 Select Country</option>
+                                <option value="AD" {% if user.country == 'AD' %}selected{% endif %}>🇦🇩 Andorra</option>
+                                <option value="AE" {% if user.country == 'AE' %}selected{% endif %}>🇦🇪 United Arab Emirates</option>
+                                <option value="AF" {% if user.country == 'AF' %}selected{% endif %}>🇦🇫 Afghanistan</option>
+                                <option value="AG" {% if user.country == 'AG' %}selected{% endif %}>🇦🇬 Antigua and Barbuda</option>
+                                <option value="AI" {% if user.country == 'AI' %}selected{% endif %}>🇦🇮 Anguilla</option>
+                                <option value="AL" {% if user.country == 'AL' %}selected{% endif %}>🇦🇱 Albania</option>
+                                <option value="AM" {% if user.country == 'AM' %}selected{% endif %}>🇦🇲 Armenia</option>
+                                <option value="AO" {% if user.country == 'AO' %}selected{% endif %}>🇦🇴 Angola</option>
+                                <option value="AQ" {% if user.country == 'AQ' %}selected{% endif %}>🇦🇶 Antarctica</option>
+                                <option value="AR" {% if user.country == 'AR' %}selected{% endif %}>🇦🇷 Argentina</option>
+                                <option value="AS" {% if user.country == 'AS' %}selected{% endif %}>🇦🇸 American Samoa</option>
+                                <option value="AT" {% if user.country == 'AT' %}selected{% endif %}>🇦🇹 Austria</option>
+                                <option value="AU" {% if user.country == 'AU' %}selected{% endif %}>🇦🇺 Australia</option>
+                                <option value="AW" {% if user.country == 'AW' %}selected{% endif %}>🇦🇼 Aruba</option>
+                                <option value="AX" {% if user.country == 'AX' %}selected{% endif %}>🇦🇽 Åland Islands</option>
+                                <option value="AZ" {% if user.country == 'AZ' %}selected{% endif %}>🇦🇿 Azerbaijan</option>
+                                <option value="BA" {% if user.country == 'BA' %}selected{% endif %}>🇧🇦 Bosnia and Herzegovina</option>
+                                <option value="BB" {% if user.country == 'BB' %}selected{% endif %}>🇧🇧 Barbados</option>
+                                <option value="BD" {% if user.country == 'BD' %}selected{% endif %}>🇧🇩 Bangladesh</option>
+                                <option value="BE" {% if user.country == 'BE' %}selected{% endif %}>🇧🇪 Belgium</option>
+                                <option value="BF" {% if user.country == 'BF' %}selected{% endif %}>🇧🇫 Burkina Faso</option>
+                                <option value="BG" {% if user.country == 'BG' %}selected{% endif %}>🇧🇬 Bulgaria</option>
+                                <option value="BH" {% if user.country == 'BH' %}selected{% endif %}>🇧🇭 Bahrain</option>
+                                <option value="BI" {% if user.country == 'BI' %}selected{% endif %}>🇧🇮 Burundi</option>
+                                <option value="BJ" {% if user.country == 'BJ' %}selected{% endif %}>🇧🇯 Benin</option>
+                                <option value="BL" {% if user.country == 'BL' %}selected{% endif %}>🇧🇱 Saint Barthélemy</option>
+                                <option value="BM" {% if user.country == 'BM' %}selected{% endif %}>🇧🇲 Bermuda</option>
+                                <option value="BN" {% if user.country == 'BN' %}selected{% endif %}>🇧🇳 Brunei</option>
+                                <option value="BO" {% if user.country == 'BO' %}selected{% endif %}>🇧🇴 Bolivia</option>
+                                <option value="BQ" {% if user.country == 'BQ' %}selected{% endif %}>🇧🇶 Caribbean Netherlands</option>
+                                <option value="BR" {% if user.country == 'BR' %}selected{% endif %}>🇧🇷 Brazil</option>
+                                <option value="BS" {% if user.country == 'BS' %}selected{% endif %}>🇧🇸 Bahamas</option>
+                                <option value="BT" {% if user.country == 'BT' %}selected{% endif %}>🇧🇹 Bhutan</option>
+                                <option value="BV" {% if user.country == 'BV' %}selected{% endif %}>🇧🇻 Bouvet Island</option>
+                                <option value="BW" {% if user.country == 'BW' %}selected{% endif %}>🇧🇼 Botswana</option>
+                                <option value="BY" {% if user.country == 'BY' %}selected{% endif %}>🇧🇾 Belarus</option>
+                                <option value="BZ" {% if user.country == 'BZ' %}selected{% endif %}>🇧🇿 Belize</option>
+                                <option value="CA" {% if user.country == 'CA' %}selected{% endif %}>🇨🇦 Canada</option>
+                                <option value="CC" {% if user.country == 'CC' %}selected{% endif %}>🇨🇨 Cocos Islands</option>
+                                <option value="CD" {% if user.country == 'CD' %}selected{% endif %}>🇨🇩 Democratic Republic of the Congo</option>
+                                <option value="CF" {% if user.country == 'CF' %}selected{% endif %}>🇨🇫 Central African Republic</option>
+                                <option value="CG" {% if user.country == 'CG' %}selected{% endif %}>🇨🇬 Republic of the Congo</option>
+                                <option value="CH" {% if user.country == 'CH' %}selected{% endif %}>🇨🇭 Switzerland</option>
+                                <option value="CI" {% if user.country == 'CI' %}selected{% endif %}>🇨🇮 Côte d'Ivoire</option>
+                                <option value="CK" {% if user.country == 'CK' %}selected{% endif %}>🇨🇰 Cook Islands</option>
+                                <option value="CL" {% if user.country == 'CL' %}selected{% endif %}>🇨🇱 Chile</option>
+                                <option value="CM" {% if user.country == 'CM' %}selected{% endif %}>🇨🇲 Cameroon</option>
+                                <option value="CN" {% if user.country == 'CN' %}selected{% endif %}>🇨🇳 China</option>
+                                <option value="CO" {% if user.country == 'CO' %}selected{% endif %}>🇨🇴 Colombia</option>
+                                <option value="CR" {% if user.country == 'CR' %}selected{% endif %}>🇨🇷 Costa Rica</option>
+                                <option value="CU" {% if user.country == 'CU' %}selected{% endif %}>🇨🇺 Cuba</option>
+                                <option value="CV" {% if user.country == 'CV' %}selected{% endif %}>🇨🇻 Cape Verde</option>
+                                <option value="CW" {% if user.country == 'CW' %}selected{% endif %}>🇨🇼 Curaçao</option>
+                                <option value="CX" {% if user.country == 'CX' %}selected{% endif %}>🇨🇽 Christmas Island</option>
+                                <option value="CY" {% if user.country == 'CY' %}selected{% endif %}>🇨🇾 Cyprus</option>
+                                <option value="CZ" {% if user.country == 'CZ' %}selected{% endif %}>🇨🇿 Czech Republic</option>
+                                <option value="DE" {% if user.country == 'DE' %}selected{% endif %}>🇩🇪 Germany</option>
+                                <option value="DJ" {% if user.country == 'DJ' %}selected{% endif %}>🇩🇯 Djibouti</option>
+                                <option value="DK" {% if user.country == 'DK' %}selected{% endif %}>🇩🇰 Denmark</option>
+                                <option value="DM" {% if user.country == 'DM' %}selected{% endif %}>🇩🇲 Dominica</option>
+                                <option value="DO" {% if user.country == 'DO' %}selected{% endif %}>🇩🇴 Dominican Republic</option>
+                                <option value="DZ" {% if user.country == 'DZ' %}selected{% endif %}>🇩🇿 Algeria</option>
+                                <option value="EC" {% if user.country == 'EC' %}selected{% endif %}>🇪🇨 Ecuador</option>
+                                <option value="EE" {% if user.country == 'EE' %}selected{% endif %}>🇪🇪 Estonia</option>
+                                <option value="EG" {% if user.country == 'EG' %}selected{% endif %}>🇪🇬 Egypt</option>
+                                <option value="EH" {% if user.country == 'EH' %}selected{% endif %}>🇪🇭 Western Sahara</option>
+                                <option value="ER" {% if user.country == 'ER' %}selected{% endif %}>🇪🇷 Eritrea</option>
+                                <option value="ES" {% if user.country == 'ES' %}selected{% endif %}>🇪🇸 Spain</option>
+                                <option value="ET" {% if user.country == 'ET' %}selected{% endif %}>🇪🇹 Ethiopia</option>
+                                <option value="FI" {% if user.country == 'FI' %}selected{% endif %}>🇫🇮 Finland</option>
+                                <option value="FJ" {% if user.country == 'FJ' %}selected{% endif %}>🇫🇯 Fiji</option>
+                                <option value="FK" {% if user.country == 'FK' %}selected{% endif %}>🇫🇰 Falkland Islands</option>
+                                <option value="FM" {% if user.country == 'FM' %}selected{% endif %}>🇫🇲 Micronesia</option>
+                                <option value="FO" {% if user.country == 'FO' %}selected{% endif %}>🇫🇴 Faroe Islands</option>
+                                <option value="FR" {% if user.country == 'FR' %}selected{% endif %}>🇫🇷 France</option>
+                                <option value="GA" {% if user.country == 'GA' %}selected{% endif %}>🇬🇦 Gabon</option>
+                                <option value="GB" {% if user.country == 'GB' %}selected{% endif %}>🇬🇧 United Kingdom</option>
+                                <option value="GD" {% if user.country == 'GD' %}selected{% endif %}>🇬🇩 Grenada</option>
+                                <option value="GE" {% if user.country == 'GE' %}selected{% endif %}>🇬🇪 Georgia</option>
+                                <option value="GF" {% if user.country == 'GF' %}selected{% endif %}>🇬🇫 French Guiana</option>
+                                <option value="GG" {% if user.country == 'GG' %}selected{% endif %}>🇬🇬 Guernsey</option>
+                                <option value="GH" {% if user.country == 'GH' %}selected{% endif %}>🇬🇭 Ghana</option>
+                                <option value="GI" {% if user.country == 'GI' %}selected{% endif %}>🇬🇮 Gibraltar</option>
+                                <option value="GL" {% if user.country == 'GL' %}selected{% endif %}>🇬🇱 Greenland</option>
+                                <option value="GM" {% if user.country == 'GM' %}selected{% endif %}>🇬🇲 Gambia</option>
+                                <option value="GN" {% if user.country == 'GN' %}selected{% endif %}>🇬🇳 Guinea</option>
+                                <option value="GP" {% if user.country == 'GP' %}selected{% endif %}>🇬🇵 Guadeloupe</option>
+                                <option value="GQ" {% if user.country == 'GQ' %}selected{% endif %}>🇬🇶 Equatorial Guinea</option>
+                                <option value="GR" {% if user.country == 'GR' %}selected{% endif %}>🇬🇷 Greece</option>
+                                <option value="GS" {% if user.country == 'GS' %}selected{% endif %}>🇬🇸 South Georgia</option>
+                                <option value="GT" {% if user.country == 'GT' %}selected{% endif %}>🇬🇹 Guatemala</option>
+                                <option value="GU" {% if user.country == 'GU' %}selected{% endif %}>🇬🇺 Guam</option>
+                                <option value="GW" {% if user.country == 'GW' %}selected{% endif %}>🇬🇼 Guinea-Bissau</option>
+                                <option value="GY" {% if user.country == 'GY' %}selected{% endif %}>🇬🇾 Guyana</option>
+                                <option value="HK" {% if user.country == 'HK' %}selected{% endif %}>🇭🇰 Hong Kong</option>
+                                <option value="HM" {% if user.country == 'HM' %}selected{% endif %}>🇭🇲 Heard Island</option>
+                                <option value="HN" {% if user.country == 'HN' %}selected{% endif %}>🇭🇳 Honduras</option>
+                                <option value="HR" {% if user.country == 'HR' %}selected{% endif %}>🇭🇷 Croatia</option>
+                                <option value="HT" {% if user.country == 'HT' %}selected{% endif %}>🇭🇹 Haiti</option>
+                                <option value="HU" {% if user.country == 'HU' %}selected{% endif %}>🇭🇺 Hungary</option>
+                                <option value="ID" {% if user.country == 'ID' %}selected{% endif %}>🇮🇩 Indonesia</option>
+                                <option value="IE" {% if user.country == 'IE' %}selected{% endif %}>🇮🇪 Ireland</option>
+                                <option value="IL" {% if user.country == 'IL' %}selected{% endif %}>🇮🇱 Israel</option>
+                                <option value="IM" {% if user.country == 'IM' %}selected{% endif %}>🇮🇲 Isle of Man</option>
+                                <option value="IN" {% if user.country == 'IN' %}selected{% endif %}>🇮🇳 India</option>
+                                <option value="IO" {% if user.country == 'IO' %}selected{% endif %}>🇮🇴 British Indian Ocean Territory</option>
+                                <option value="IQ" {% if user.country == 'IQ' %}selected{% endif %}>🇮🇶 Iraq</option>
+                                <option value="IR" {% if user.country == 'IR' %}selected{% endif %}>🇮🇷 Iran</option>
+                                <option value="IS" {% if user.country == 'IS' %}selected{% endif %}>🇮🇸 Iceland</option>
+                                <option value="IT" {% if user.country == 'IT' %}selected{% endif %}>🇮🇹 Italy</option>
+                                <option value="JE" {% if user.country == 'JE' %}selected{% endif %}>🇯🇪 Jersey</option>
+                                <option value="JM" {% if user.country == 'JM' %}selected{% endif %}>🇯🇲 Jamaica</option>
+                                <option value="JO" {% if user.country == 'JO' %}selected{% endif %}>🇯🇴 Jordan</option>
+                                <option value="JP" {% if user.country == 'JP' %}selected{% endif %}>🇯🇵 Japan</option>
+                                <option value="KE" {% if user.country == 'KE' %}selected{% endif %}>🇰🇪 Kenya</option>
+                                <option value="KG" {% if user.country == 'KG' %}selected{% endif %}>🇰🇬 Kyrgyzstan</option>
+                                <option value="KH" {% if user.country == 'KH' %}selected{% endif %}>🇰🇭 Cambodia</option>
+                                <option value="KI" {% if user.country == 'KI' %}selected{% endif %}>🇰🇮 Kiribati</option>
+                                <option value="KM" {% if user.country == 'KM' %}selected{% endif %}>🇰🇲 Comoros</option>
+                                <option value="KN" {% if user.country == 'KN' %}selected{% endif %}>🇰🇳 Saint Kitts and Nevis</option>
+                                <option value="KP" {% if user.country == 'KP' %}selected{% endif %}>🇰🇵 North Korea</option>
+                                <option value="KR" {% if user.country == 'KR' %}selected{% endif %}>🇰🇷 South Korea</option>
+                                <option value="KW" {% if user.country == 'KW' %}selected{% endif %}>🇰🇼 Kuwait</option>
+                                <option value="KY" {% if user.country == 'KY' %}selected{% endif %}>🇰🇾 Cayman Islands</option>
+                                <option value="KZ" {% if user.country == 'KZ' %}selected{% endif %}>🇰🇿 Kazakhstan</option>
+                                <option value="LA" {% if user.country == 'LA' %}selected{% endif %}>🇱🇦 Laos</option>
+                                <option value="LB" {% if user.country == 'LB' %}selected{% endif %}>🇱🇧 Lebanon</option>
+                                <option value="LC" {% if user.country == 'LC' %}selected{% endif %}>🇱🇨 Saint Lucia</option>
+                                <option value="LI" {% if user.country == 'LI' %}selected{% endif %}>🇱🇮 Liechtenstein</option>
+                                <option value="LK" {% if user.country == 'LK' %}selected{% endif %}>🇱🇰 Sri Lanka</option>
+                                <option value="LR" {% if user.country == 'LR' %}selected{% endif %}>🇱🇷 Liberia</option>
+                                <option value="LS" {% if user.country == 'LS' %}selected{% endif %}>🇱🇸 Lesotho</option>
+                                <option value="LT" {% if user.country == 'LT' %}selected{% endif %}>🇱🇹 Lithuania</option>
+                                <option value="LU" {% if user.country == 'LU' %}selected{% endif %}>🇱🇺 Luxembourg</option>
+                                <option value="LV" {% if user.country == 'LV' %}selected{% endif %}>🇱🇻 Latvia</option>
+                                <option value="LY" {% if user.country == 'LY' %}selected{% endif %}>🇱🇾 Libya</option>
+                                <option value="MA" {% if user.country == 'MA' %}selected{% endif %}>🇲🇦 Morocco</option>
+                                <option value="MC" {% if user.country == 'MC' %}selected{% endif %}>🇲🇨 Monaco</option>
+                                <option value="MD" {% if user.country == 'MD' %}selected{% endif %}>🇲🇩 Moldova</option>
+                                <option value="ME" {% if user.country == 'ME' %}selected{% endif %}>🇲🇪 Montenegro</option>
+                                <option value="MF" {% if user.country == 'MF' %}selected{% endif %}>🇲🇫 Saint Martin</option>
+                                <option value="MG" {% if user.country == 'MG' %}selected{% endif %}>🇲🇬 Madagascar</option>
+                                <option value="MH" {% if user.country == 'MH' %}selected{% endif %}>🇲🇭 Marshall Islands</option>
+                                <option value="MK" {% if user.country == 'MK' %}selected{% endif %}>🇲🇰 North Macedonia</option>
+                                <option value="ML" {% if user.country == 'ML' %}selected{% endif %}>🇲🇱 Mali</option>
+                                <option value="MM" {% if user.country == 'MM' %}selected{% endif %}>🇲🇲 Myanmar</option>
+                                <option value="MN" {% if user.country == 'MN' %}selected{% endif %}>🇲🇳 Mongolia</option>
+                                <option value="MO" {% if user.country == 'MO' %}selected{% endif %}>🇲🇴 Macao</option>
+                                <option value="MP" {% if user.country == 'MP' %}selected{% endif %}>🇲🇵 Northern Mariana Islands</option>
+                                <option value="MQ" {% if user.country == 'MQ' %}selected{% endif %}>🇲🇶 Martinique</option>
+                                <option value="MR" {% if user.country == 'MR' %}selected{% endif %}>🇲🇷 Mauritania</option>
+                                <option value="MS" {% if user.country == 'MS' %}selected{% endif %}>🇲🇸 Montserrat</option>
+                                <option value="MT" {% if user.country == 'MT' %}selected{% endif %}>🇲🇹 Malta</option>
+                                <option value="MU" {% if user.country == 'MU' %}selected{% endif %}>🇲🇺 Mauritius</option>
+                                <option value="MV" {% if user.country == 'MV' %}selected{% endif %}>🇲🇻 Maldives</option>
+                                <option value="MW" {% if user.country == 'MW' %}selected{% endif %}>🇲🇼 Malawi</option>
+                                <option value="MX" {% if user.country == 'MX' %}selected{% endif %}>🇲🇽 Mexico</option>
+                                <option value="MY" {% if user.country == 'MY' %}selected{% endif %}>🇲🇾 Malaysia</option>
+                                <option value="MZ" {% if user.country == 'MZ' %}selected{% endif %}>🇲🇿 Mozambique</option>
+                                <option value="NA" {% if user.country == 'NA' %}selected{% endif %}>🇳🇦 Namibia</option>
+                                <option value="NC" {% if user.country == 'NC' %}selected{% endif %}>🇳🇨 New Caledonia</option>
+                                <option value="NE" {% if user.country == 'NE' %}selected{% endif %}>🇳🇪 Niger</option>
+                                <option value="NF" {% if user.country == 'NF' %}selected{% endif %}>🇳🇫 Norfolk Island</option>
+                                <option value="NG" {% if user.country == 'NG' %}selected{% endif %}>🇳🇬 Nigeria</option>
+                                <option value="NI" {% if user.country == 'NI' %}selected{% endif %}>🇳🇮 Nicaragua</option>
+                                <option value="NL" {% if user.country == 'NL' %}selected{% endif %}>🇳🇱 Netherlands</option>
+                                <option value="NO" {% if user.country == 'NO' %}selected{% endif %}>🇳🇴 Norway</option>
+                                <option value="NP" {% if user.country == 'NP' %}selected{% endif %}>🇳🇵 Nepal</option>
+                                <option value="NR" {% if user.country == 'NR' %}selected{% endif %}>🇳🇷 Nauru</option>
+                                <option value="NU" {% if user.country == 'NU' %}selected{% endif %}>🇳🇺 Niue</option>
+                                <option value="NZ" {% if user.country == 'NZ' %}selected{% endif %}>🇳🇿 New Zealand</option>
+                                <option value="OM" {% if user.country == 'OM' %}selected{% endif %}>🇴🇲 Oman</option>
+                                <option value="PA" {% if user.country == 'PA' %}selected{% endif %}>🇵🇦 Panama</option>
+                                <option value="PE" {% if user.country == 'PE' %}selected{% endif %}>🇵🇪 Peru</option>
+                                <option value="PF" {% if user.country == 'PF' %}selected{% endif %}>🇵🇫 French Polynesia</option>
+                                <option value="PG" {% if user.country == 'PG' %}selected{% endif %}>🇵🇬 Papua New Guinea</option>
+                                <option value="PH" {% if user.country == 'PH' %}selected{% endif %}>🇵🇭 Philippines</option>
+                                <option value="PK" {% if user.country == 'PK' %}selected{% endif %}>🇵🇰 Pakistan</option>
+                                <option value="PL" {% if user.country == 'PL' %}selected{% endif %}>🇵🇱 Poland</option>
+                                <option value="PM" {% if user.country == 'PM' %}selected{% endif %}>🇵🇲 Saint Pierre and Miquelon</option>
+                                <option value="PN" {% if user.country == 'PN' %}selected{% endif %}>🇵🇳 Pitcairn</option>
+                                <option value="PR" {% if user.country == 'PR' %}selected{% endif %}>🇵🇷 Puerto Rico</option>
+                                <option value="PS" {% if user.country == 'PS' %}selected{% endif %}>🇵🇸 Palestine</option>
+                                <option value="PT" {% if user.country == 'PT' %}selected{% endif %}>🇵🇹 Portugal</option>
+                                <option value="PW" {% if user.country == 'PW' %}selected{% endif %}>🇵🇼 Palau</option>
+                                <option value="PY" {% if user.country == 'PY' %}selected{% endif %}>🇵🇾 Paraguay</option>
+                                <option value="QA" {% if user.country == 'QA' %}selected{% endif %}>🇶🇦 Qatar</option>
+                                <option value="RE" {% if user.country == 'RE' %}selected{% endif %}>🇷🇪 Réunion</option>
+                                <option value="RO" {% if user.country == 'RO' %}selected{% endif %}>🇷🇴 Romania</option>
+                                <option value="RS" {% if user.country == 'RS' %}selected{% endif %}>🇷🇸 Serbia</option>
+                                <option value="RU" {% if user.country == 'RU' %}selected{% endif %}>🇷🇺 Russia</option>
+                                <option value="RW" {% if user.country == 'RW' %}selected{% endif %}>🇷🇼 Rwanda</option>
+                                <option value="SA" {% if user.country == 'SA' %}selected{% endif %}>🇸🇦 Saudi Arabia</option>
+                                <option value="SB" {% if user.country == 'SB' %}selected{% endif %}>🇸🇧 Solomon Islands</option>
+                                <option value="SC" {% if user.country == 'SC' %}selected{% endif %}>🇸🇨 Seychelles</option>
+                                <option value="SD" {% if user.country == 'SD' %}selected{% endif %}>🇸🇩 Sudan</option>
+                                <option value="SE" {% if user.country == 'SE' %}selected{% endif %}>🇸🇪 Sweden</option>
+                                <option value="SG" {% if user.country == 'SG' %}selected{% endif %}>🇸🇬 Singapore</option>
+                                <option value="SH" {% if user.country == 'SH' %}selected{% endif %}>🇸🇭 Saint Helena</option>
+                                <option value="SI" {% if user.country == 'SI' %}selected{% endif %}>🇸🇮 Slovenia</option>
+                                <option value="SJ" {% if user.country == 'SJ' %}selected{% endif %}>🇸🇯 Svalbard and Jan Mayen</option>
+                                <option value="SK" {% if user.country == 'SK' %}selected{% endif %}>🇸🇰 Slovakia</option>
+                                <option value="SL" {% if user.country == 'SL' %}selected{% endif %}>🇸🇱 Sierra Leone</option>
+                                <option value="SM" {% if user.country == 'SM' %}selected{% endif %}>🇸🇲 San Marino</option>
+                                <option value="SN" {% if user.country == 'SN' %}selected{% endif %}>🇸🇳 Senegal</option>
+                                <option value="SO" {% if user.country == 'SO' %}selected{% endif %}>🇸🇴 Somalia</option>
+                                <option value="SR" {% if user.country == 'SR' %}selected{% endif %}>🇸🇷 Suriname</option>
+                                <option value="SS" {% if user.country == 'SS' %}selected{% endif %}>🇸🇸 South Sudan</option>
+                                <option value="ST" {% if user.country == 'ST' %}selected{% endif %}>🇸🇹 São Tomé and Príncipe</option>
+                                <option value="SV" {% if user.country == 'SV' %}selected{% endif %}>🇸🇻 El Salvador</option>
+                                <option value="SX" {% if user.country == 'SX' %}selected{% endif %}>🇸🇽 Sint Maarten</option>
+                                <option value="SY" {% if user.country == 'SY' %}selected{% endif %}>🇸🇾 Syria</option>
+                                <option value="SZ" {% if user.country == 'SZ' %}selected{% endif %}>🇸🇿 Eswatini</option>
+                                <option value="TC" {% if user.country == 'TC' %}selected{% endif %}>🇹🇨 Turks and Caicos Islands</option>
+                                <option value="TD" {% if user.country == 'TD' %}selected{% endif %}>🇹🇩 Chad</option>
+                                <option value="TF" {% if user.country == 'TF' %}selected{% endif %}>🇹🇫 French Southern Territories</option>
+                                <option value="TG" {% if user.country == 'TG' %}selected{% endif %}>🇹🇬 Togo</option>
+                                <option value="TH" {% if user.country == 'TH' %}selected{% endif %}>🇹🇭 Thailand</option>
+                                <option value="TJ" {% if user.country == 'TJ' %}selected{% endif %}>🇹🇯 Tajikistan</option>
+                                <option value="TK" {% if user.country == 'TK' %}selected{% endif %}>🇹🇰 Tokelau</option>
+                                <option value="TL" {% if user.country == 'TL' %}selected{% endif %}>🇹🇱 Timor-Leste</option>
+                                <option value="TM" {% if user.country == 'TM' %}selected{% endif %}>🇹🇲 Turkmenistan</option>
+                                <option value="TN" {% if user.country == 'TN' %}selected{% endif %}>🇹🇳 Tunisia</option>
+                                <option value="TO" {% if user.country == 'TO' %}selected{% endif %}>🇹🇴 Tonga</option>
+                                <option value="TR" {% if user.country == 'TR' %}selected{% endif %}>🇹🇷 Turkey</option>
+                                <option value="TT" {% if user.country == 'TT' %}selected{% endif %}>🇹🇹 Trinidad and Tobago</option>
+                                <option value="TV" {% if user.country == 'TV' %}selected{% endif %}>🇹🇻 Tuvalu</option>
+                                <option value="TW" {% if user.country == 'TW' %}selected{% endif %}>🇹🇼 Taiwan</option>
+                                <option value="TZ" {% if user.country == 'TZ' %}selected{% endif %}>🇹🇿 Tanzania</option>
+                                <option value="UA" {% if user.country == 'UA' %}selected{% endif %}>🇺🇦 Ukraine</option>
+                                <option value="UG" {% if user.country == 'UG' %}selected{% endif %}>🇺🇬 Uganda</option>
+                                <option value="UM" {% if user.country == 'UM' %}selected{% endif %}>🇺🇲 U.S. Minor Outlying Islands</option>
+                                <option value="US" {% if user.country == 'US' %}selected{% endif %}>🇺🇸 United States</option>
+                                <option value="UY" {% if user.country == 'UY' %}selected{% endif %}>🇺🇾 Uruguay</option>
+                                <option value="UZ" {% if user.country == 'UZ' %}selected{% endif %}>🇺🇿 Uzbekistan</option>
+                                <option value="VA" {% if user.country == 'VA' %}selected{% endif %}>🇻🇦 Vatican City</option>
+                                <option value="VC" {% if user.country == 'VC' %}selected{% endif %}>🇻🇨 Saint Vincent and the Grenadines</option>
+                                <option value="VE" {% if user.country == 'VE' %}selected{% endif %}>🇻🇪 Venezuela</option>
+                                <option value="VG" {% if user.country == 'VG' %}selected{% endif %}>🇻🇬 British Virgin Islands</option>
+                                <option value="VI" {% if user.country == 'VI' %}selected{% endif %}>🇻🇮 U.S. Virgin Islands</option>
+                                <option value="VN" {% if user.country == 'VN' %}selected{% endif %}>🇻🇳 Vietnam</option>
+                                <option value="VU" {% if user.country == 'VU' %}selected{% endif %}>🇻🇺 Vanuatu</option>
+                                <option value="WF" {% if user.country == 'WF' %}selected{% endif %}>🇼🇫 Wallis and Futuna</option>
+                                <option value="WS" {% if user.country == 'WS' %}selected{% endif %}>🇼🇸 Samoa</option>
+                                <option value="YE" {% if user.country == 'YE' %}selected{% endif %}>🇾🇪 Yemen</option>
+                                <option value="YT" {% if user.country == 'YT' %}selected{% endif %}>🇾🇹 Mayotte</option>
+                                <option value="ZA" {% if user.country == 'ZA' %}selected{% endif %}>🇿🇦 South Africa</option>
+                                <option value="ZM" {% if user.country == 'ZM' %}selected{% endif %}>🇿🇲 Zambia</option>
+                                <option value="ZW" {% if user.country == 'ZW' %}selected{% endif %}>🇿🇼 Zimbabwe</option>
+                            </select>
+                        </div>
                         
                         <div class="mb-3">
                             <label for="timezone" class="form-label">Timezone</label>
@@ -481,6 +735,20 @@
                     <h5 class="mb-0">⚠️ Danger Zone</h5>
                 </div>
                 <div class="card-body">
+                    <!-- Mobile Logout Button -->
+                    <div class="row mb-3 d-block d-lg-none">
+                        <div class="col-md-8">
+                            <h6>Logout</h6>
+                            <p class="text-muted">Sign out of your account on this device.</p>
+                        </div>
+                        <div class="col-md-4">
+                            <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-sm w-100">
+                                🚪 Logout
+                            </a>
+                        </div>
+                    </div>
+                    <hr class="d-block d-lg-none">
+                    
                     <div class="row mb-3">
                         <div class="col-md-8">
                             <h6>Reset API Key</h6>
