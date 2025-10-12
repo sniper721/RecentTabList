@@ -126,9 +126,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
-                if (!videoUrl.includes('youtube.com') && !videoUrl.includes('youtu.be')) {
+                if (!videoUrl.includes('youtube.com') && !videoUrl.includes('youtu.be') && 
+                    !videoUrl.includes('streamable.com') && !videoUrl.includes('vimeo.com') && 
+                    !videoUrl.includes('tiktok.com')) {
                     e.preventDefault();
-                    alert('Please provide a valid YouTube URL');
+                    alert('Please provide a valid video URL (YouTube, Streamable, Vimeo, or TikTok)');
                     return;
                 }
             }
