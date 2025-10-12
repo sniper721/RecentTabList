@@ -823,7 +823,27 @@ def shift_level_positions(position, is_legacy=False, direction=1):
     )
 
 def recalculate_all_points():
-    """Recalculate points for all levels based on their current positions - OPTIMIZED with bulk operations"""
+    """Recalculate points for all levels AND users using the real-time system"""
+    if REAL_TIME_POINTS_AVAILABLE:
+        try:
+            from real_time_points_system import RealTimePointsManager
+            manager = RealTimePointsManager(mongo_db)
+            
+            # Recalculate all level points
+            levels_updated = manager.recalculate_all_level_points()
+            
+            # Recalculate all user points
+            users_updated = manager.recalculate_all_user_points()
+            
+            print(f"✅ Real-time recalculation: {levels_updated} levels, {users_updated} users updated")
+            return levels_updated, users_updated
+            
+        except Exception as e:
+            print(f"❌ Real-time recalculation failed: {e}")
+            # Fall back to old method for levels only
+            pass
+    
+    # Fallback: old method (levels only)
     from pymongo import UpdateOne
     
     levels = list(mongo_db.levels.find({}, {"_id": 1, "position": 1, "is_legacy": 1, "points": 1}))
@@ -845,7 +865,10 @@ def recalculate_all_points():
     # Execute all updates in a single bulk operation
     if bulk_operations:
         mongo_db.levels.bulk_write(bulk_operations)
-        print(f"Updated points for {len(bulk_operations)} levels")
+        print(f"⚠️ Fallback: Updated points for {len(bulk_operations)} levels only (users not updated)")
+        return len(bulk_operations), 0
+    
+    return 0, 0
 
 def log_level_change(action, level_name, admin_username, **kwargs):
     """Log level placement/movement changes to changelog and send Discord notification"""
@@ -2928,18 +2951,12 @@ def admin_add_level():
             if current_first:
                 dethroned_level = current_first["name"]
         
-        # Shift existing levels down
-        mongo_db.levels.update_many(
-            {"position": {"$gte": position}, "is_legacy": {"$ne": True}},
-            {"$inc": {"position": 1}}
-        )
-        
-        # Calculate points
+        # Create new level first
+        new_level_id = ObjectId()
         points = calculate_level_points(position, False)
         
-        # Create new level
         new_level = {
-            "_id": ObjectId(),
+            "_id": new_level_id,
             "name": name,
             "creator": creator,
             "verifier": verifier,
@@ -2954,7 +2971,31 @@ def admin_add_level():
             "date_added": datetime.now(timezone.utc)
         }
         
+        # Shift existing levels down
+        mongo_db.levels.update_many(
+            {"position": {"$gte": position}, "is_legacy": {"$ne": True}},
+            {"$inc": {"position": 1}}
+        )
+        
+        # Insert the new level
         mongo_db.levels.insert_one(new_level)
+        
+        # Use real-time points system to handle the addition and recalculate all points
+        if REAL_TIME_POINTS_AVAILABLE:
+            try:
+                from real_time_points_system import RealTimePointsManager
+                manager = RealTimePointsManager(mongo_db)
+                
+                # Recalculate all level points (since positions shifted)
+                levels_updated = manager.recalculate_all_level_points()
+                
+                # Recalculate all user points (since level points changed)
+                users_updated = manager.recalculate_all_user_points()
+                
+                print(f"✅ Level addition triggered real-time recalculation: {levels_updated} levels, {users_updated} users updated")
+                
+            except Exception as e:
+                print(f"⚠️ Warning: Real-time points recalculation failed after level addition: {e}")
         
         # Handle automatic legacy management
         auto_manage_legacy_list()
