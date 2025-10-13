@@ -146,20 +146,16 @@
                             <span class="badge bg-warning text-dark rounded-pill">{{ format_points(user.points or 0) }}</span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <span><i class="fas fa-list text-primary"></i> Total Records</span>
-                            <span class="badge bg-primary rounded-pill">{{ records|length }}</span>
+                            <span><i class="fas fa-star text-primary"></i> Main List Completions</span>
+                            <span class="badge bg-primary rounded-pill">{{ main_completed_count }}</span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center">
-                            <span><i class="fas fa-check-circle text-success"></i> Completed Levels</span>
-                            <span class="badge bg-success rounded-pill">
-                                {{ records|selectattr('progress', 'equalto', 100)|list|length }}
-                            </span>
+                            <span><i class="fas fa-history text-secondary"></i> Legacy List Completions</span>
+                            <span class="badge bg-secondary rounded-pill">{{ legacy_completed_count }}</span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             <span><i class="fas fa-clock text-warning"></i> Pending Records</span>
-                            <span class="badge bg-warning rounded-pill">
-                                {{ records|selectattr('status', 'equalto', 'pending')|list|length }}
-                            </span>
+                            <span class="badge bg-warning rounded-pill">{{ pending_count }}</span>
                         </li>
                     </ul>
                 </div>

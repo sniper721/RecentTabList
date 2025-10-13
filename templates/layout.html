@@ -109,6 +109,19 @@
                 padding: 0.5rem 0.6rem !important;
             }
         }
+        
+        /* Notification badge styling */
+        .notification-badge {
+            font-size: 0.65rem;
+            min-width: 16px;
+            height: 16px;
+            line-height: 16px;
+            text-align: center;
+            border-radius: 50%;
+            padding: 0;
+            top: -2px !important;
+            right: -6px !important;
+        }
     </style>
     
     {% if current_theme.startswith('custom_') and 'user_id' in session %}
@@ -318,6 +331,17 @@
                         </ul>
                     </li>
                     {% if 'user_id' in session %}
+                    <li class="nav-item">
+                        <a class="nav-link position-relative" href="{{ url_for('notifications') }}" title="Notifications">
+                            🔔
+                            {% set notification_count = get_notification_count() %}
+                            {% if notification_count > 0 %}
+                            <span class="position-absolute badge rounded-pill bg-danger notification-badge" style="top: -2px; right: -6px;">
+                                {{ notification_count }}
+                            </span>
+                            {% endif %}
+                        </a>
+                    </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             Account
@@ -325,6 +349,7 @@
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
                             <li><a class="dropdown-item" href="{{ url_for('profile') }}">👤 Profile</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('user_settings') }}">⚙️ Settings</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('notifications') }}">🔔 Notifications</a></li>
                             {% if session.get('is_admin') %}
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{{ url_for('admin') }}">🔧 Admin Panel</a></li>
@@ -345,103 +370,7 @@
         </div>
     </nav>
 
-    <!-- Mobile Navigation Menu (only visible on mobile) -->
-    <div class="d-block d-lg-none bg-light border-bottom">
-        <div class="container">
-            <div class="row g-2 py-3">
-                <div class="col-6">
-                    <a href="{{ url_for('index') }}" class="btn btn-outline-primary w-100 btn-sm">
-                        🏠 Main List
-                    </a>
-                </div>
-                <div class="col-6">
-                    <a href="{{ url_for('legacy') }}" class="btn btn-outline-secondary w-100 btn-sm">
-                        📜 Legacy List
-                    </a>
-                </div>
-                <div class="col-6">
-                    <a href="{{ url_for('future_list') }}" class="btn btn-outline-info w-100 btn-sm">
-                        🔮 Future List
-                    </a>
-                </div>
-                <div class="col-6">
-                    <a href="{{ url_for('stats_players') }}" class="btn btn-outline-success w-100 btn-sm">
-                        🏆 Leaderboard
-                    </a>
-                </div>
-                <div class="col-6">
-                    <a href="{{ url_for('submit_record') }}" class="btn btn-outline-warning w-100 btn-sm">
-                        📝 Submit
-                    </a>
-                </div>
-                <div class="col-6">
-                    <a href="{{ url_for('recent_tab_roulette') }}" class="btn btn-outline-info w-100 btn-sm">
-                        🎯 Roulette
-                    </a>
-                </div>
-                <div class="col-6">
-                    <a href="{{ url_for('news_blog') }}" class="btn btn-outline-primary w-100 btn-sm">
-                        📰 News
-                    </a>
-                </div>
-                <div class="col-6">
-                    <a href="{{ url_for('timemachine') }}" class="btn btn-outline-info w-100 btn-sm">
-                        🕒 Time Machine
-                    </a>
-                </div>
-                <div class="col-6">
-                    <a href="{{ url_for('changelog') }}" class="btn btn-outline-info w-100 btn-sm">
-                        📋 Changelog
-                    </a>
-                </div>
-                <div class="col-6">
-                    <a href="{{ url_for('guidelines') }}" class="btn btn-outline-dark w-100 btn-sm">
-                        📖 Guide
-                    </a>
-                </div>
-                <div class="col-6">
-                    <button id="mobile-theme-toggle" class="btn btn-outline-secondary w-100 btn-sm">
-                        🌙 Dark Mode
-                    </button>
-                </div>
-                {% if session.get('user_id') %}
-                <div class="col-6">
-                    <a href="{{ url_for('profile') }}" class="btn btn-outline-primary w-100 btn-sm">
-                        👤 Profile
-                    </a>
-                </div>
-                <div class="col-6">
-                    <a href="{{ url_for('user_settings') }}" class="btn btn-outline-secondary w-100 btn-sm">
-                        ⚙️ Settings
-                    </a>
-                </div>
-                {% if session.get('is_admin') %}
-                <div class="col-12">
-                    <a href="{{ url_for('admin') }}" class="btn btn-danger w-100 btn-sm">
-                        🔧 Admin Panel
-                    </a>
-                </div>
-                <div class="col-12">
-                    <a href="{{ url_for('admin_console') }}" class="btn btn-dark w-100 btn-sm">
-                        👑 Console
-                    </a>
-                </div>
-                {% endif %}
-                {% else %}
-                <div class="col-6">
-                    <a href="{{ url_for('login') }}" class="btn btn-success w-100 btn-sm">
-                        🔑 Login
-                    </a>
-                </div>
-                <div class="col-6">
-                    <a href="{{ url_for('register') }}" class="btn btn-primary w-100 btn-sm">
-                        📝 Register
-                    </a>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
+
 
     <div class="container mt-4">
         {% with messages = get_flashed_messages(with_categories=true) %}

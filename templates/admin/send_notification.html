@@ -1,0 +1,51 @@
+{% extends "layout.html" %}
+
+{% block title %}Send Notification - Admin{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">📢 Send Global Notification</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Title</label>
+                            <input type="text" class="form-control" id="title" name="title" required 
+                                   placeholder="Enter notification title">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="message" class="form-label">Message</label>
+                            <textarea class="form-control" id="message" name="message" rows="4" required 
+                                      placeholder="Enter notification message"></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="type" class="form-label">Notification Type</label>
+                            <select class="form-select" id="type" name="type">
+
+                                <option value="announcement">📢 Announcement</option>
+                                <option value="news">📰 News</option>
+                                <option value="poll">📊 Poll</option>
+                            </select>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <strong>Note:</strong> This notification will be sent to all users who have this notification type enabled in their settings.
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('admin') }}" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">Send Notification</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -551,6 +551,12 @@ def utility_processor():
                 'invite_url': 'https://discord.gg/TSjXSecuaz'
             }
     
+    def get_notification_count():
+        """Get unread notification count for current user"""
+        if 'user_id' in session:
+            return get_unread_notification_count(session['user_id'])
+        return 0
+    
     return dict(
         format_points=format_points, 
         get_video_embed_info=get_video_embed_info,
@@ -564,7 +570,8 @@ def utility_processor():
         get_difficulty_text=get_difficulty_text,
         datetime=datetime,
         get_user_by_id=get_user_by_id,
-        get_discord_data=get_discord_data
+        get_discord_data=get_discord_data,
+        get_notification_count=get_notification_count
     )
 
 def calculate_level_points(position, is_legacy=False, level_type="Level"):
@@ -751,6 +758,100 @@ def award_verifier_points(level_id, verifier_user_id):
         print(f"Error awarding verifier points: {e}")
         return False
 
+def create_notification(user_id, notification_type, title, message, related_id=None, related_type=None):
+    """Create a notification for a user"""
+    try:
+        notification = {
+            "_id": ObjectId(),
+            "user_id": user_id,
+            "type": notification_type,  # 'news', 'poll', 'announcement', 'record_status', 'top_1'
+            "title": title,
+            "message": message,
+            "related_id": related_id,  # ID of related object (record, news, etc.)
+            "related_type": related_type,  # Type of related object
+            "read": False,
+            "created_at": datetime.now(timezone.utc)
+        }
+        mongo_db.notifications.insert_one(notification)
+        return True
+    except Exception as e:
+        print(f"Error creating notification: {e}")
+        return False
+
+def create_global_notification(notification_type, title, message, related_id=None, related_type=None, sender_username="System"):
+    """Create a notification for all users"""
+    try:
+        # Get all users
+        users = mongo_db.users.find({}, {"_id": 1})
+        
+        notifications = []
+        for user in users:
+            # Check user's notification preferences
+            user_data = mongo_db.users.find_one({"_id": user["_id"]})
+            notification_prefs = user_data.get('notification_preferences', {})
+            
+            # Check if user wants this type of notification (default to True if not set)
+            if notification_prefs.get(notification_type, True):
+                notification = {
+                    "_id": ObjectId(),
+                    "user_id": user["_id"],
+                    "type": notification_type,
+                    "title": title,
+                    "message": message,
+                    "related_id": related_id,
+                    "related_type": related_type,
+                    "read": False,
+                    "created_at": datetime.now(timezone.utc),
+                    "sender": sender_username
+                }
+                notifications.append(notification)
+        
+        if notifications:
+            mongo_db.notifications.insert_many(notifications)
+        
+        return len(notifications)
+    except Exception as e:
+        print(f"Error creating global notification: {e}")
+        return 0
+
+def get_user_notifications(user_id, limit=20, unread_only=False):
+    """Get notifications for a user"""
+    try:
+        query = {"user_id": user_id}
+        if unread_only:
+            query["read"] = False
+            
+        notifications = list(mongo_db.notifications.find(query)
+                           .sort("created_at", -1)
+                           .limit(limit))
+        return notifications
+    except Exception as e:
+        print(f"Error getting user notifications: {e}")
+        return []
+
+def mark_notification_read(notification_id, user_id):
+    """Mark a notification as read"""
+    try:
+        mongo_db.notifications.update_one(
+            {"_id": ObjectId(notification_id), "user_id": user_id},
+            {"$set": {"read": True}}
+        )
+        return True
+    except Exception as e:
+        print(f"Error marking notification as read: {e}")
+        return False
+
+def get_unread_notification_count(user_id):
+    """Get count of unread notifications for a user"""
+    try:
+        return mongo_db.notifications.count_documents({
+            "user_id": user_id,
+            "read": False
+        })
+    except Exception as e:
+        print(f"Error getting unread notification count: {e}")
+        return 0
+
 def track_position_change(level_id, old_position, new_position, admin_username="System"):
     """Track position changes for history"""
     try:
@@ -768,6 +869,20 @@ def track_position_change(level_id, old_position, new_position, admin_username="
         }
         
         mongo_db.position_history.insert_one(position_change)
+        
+        mongo_db.position_history.insert_one(position_change)
+        
+        # Check if this is a new #1 and create notification
+        if new_position == 1 and old_position != 1:
+            level = mongo_db.levels.find_one({"_id": level_id})
+            if level:
+                create_global_notification(
+                    "top_1",
+                    "New #1 Level!",
+                    f"'{level['name']}' is now the new #1 level on the list!",
+                    level_id,
+                    "level"
+                )
         
     except Exception as e:
         print(f"Error tracking position change: {e}")
@@ -2473,6 +2588,17 @@ def admin_create_news():
                 article['published_at'] = datetime.now(timezone.utc)
             
             mongo_db.news.insert_one(article)
+            
+            # Create notification for published articles
+            if status == 'published':
+                create_global_notification(
+                    'news',
+                    'New News Article! 📰',
+                    f'"{title}" - {excerpt[:100]}...',
+                    article['_id'],
+                    'news',
+                    session.get('username', 'Admin')
+                )
             
             # Log admin action
             admin_username = session.get('username', 'Unknown Admin')
@@ -5999,7 +6125,9 @@ def profile():
         return redirect(url_for('login'))
     
     user = mongo_db.users.find_one({"_id": session['user_id']}, max_time_ms=60000)
-    user_records = list(mongo_db.records.aggregate([
+    
+    # Get ALL records for display in tabs (includes pending/rejected)
+    all_user_records = list(mongo_db.records.aggregate([
         {"$match": {"user_id": session['user_id']}},
         {"$lookup": {
             "from": "levels",
@@ -6007,10 +6135,67 @@ def profile():
             "foreignField": "_id",
             "as": "level"
         }},
-        {"$unwind": "$level"}
+        {"$unwind": "$level"},
+        {"$sort": {"date_submitted": -1}}
     ]))
     
-    return render_template('profile.html', user=user, records=user_records)
+    # Get only APPROVED records for accurate stats counting
+    approved_records = list(mongo_db.records.aggregate([
+        {"$match": {"user_id": session['user_id'], "status": "approved"}},
+        {"$lookup": {
+            "from": "levels",
+            "localField": "level_id",
+            "foreignField": "_id",
+            "as": "level"
+        }},
+        {"$unwind": "$level"},
+        {"$sort": {"date_submitted": -1}}
+    ]))
+    
+    # Get only APPROVED records on MAIN LIST levels (exclude legacy) for completion counting
+    main_list_approved = list(mongo_db.records.aggregate([
+        {"$match": {"user_id": session['user_id'], "status": "approved"}},
+        {"$lookup": {
+            "from": "levels",
+            "localField": "level_id",
+            "foreignField": "_id",
+            "as": "level"
+        }},
+        {"$unwind": "$level"},
+        {"$match": {"level.is_legacy": {"$ne": True}}},  # Exclude legacy levels
+        {"$sort": {"date_submitted": -1}}
+    ]))
+    
+    # Get only APPROVED records on LEGACY levels for legacy completion counting
+    legacy_list_approved = list(mongo_db.records.aggregate([
+        {"$match": {"user_id": session['user_id'], "status": "approved"}},
+        {"$lookup": {
+            "from": "levels",
+            "localField": "level_id",
+            "foreignField": "_id",
+            "as": "level"
+        }},
+        {"$unwind": "$level"},
+        {"$match": {"level.is_legacy": True}},  # Only legacy levels
+        {"$sort": {"date_submitted": -1}}
+    ]))
+    
+    # Calculate accurate stats
+    approved_count = len(approved_records)  # All approved records
+    main_completed_count = len([r for r in main_list_approved if r['progress'] == 100])  # Main list completions
+    legacy_completed_count = len([r for r in legacy_list_approved if r['progress'] == 100])  # Legacy completions
+    total_submissions = len(all_user_records)
+    pending_count = len([r for r in all_user_records if r.get('status') == 'pending'])
+    
+    return render_template('profile.html', 
+                         user=user, 
+                         records=all_user_records,  # For displaying in tabs
+                         approved_records=approved_records,  # For stats calculations
+                         approved_count=approved_count,
+                         main_completed_count=main_completed_count,
+                         legacy_completed_count=legacy_completed_count,
+                         total_submissions=total_submissions,
+                         pending_count=pending_count)
 
 @app.route('/submit_record', methods=['GET', 'POST'])
 def submit_record():
@@ -8799,6 +8984,16 @@ def admin_approve_record(record_id):
             f"Approved {user['username']}'s {record['progress']}% record on {level['name']} (Position #{level.get('position', '?')}) - Earned {points_earned} points (Total: {old_points} → {new_points})"
         )
         
+        # Create notification for user
+        create_notification(
+            record['user_id'],
+            'record_status',
+            'Record Approved! ✅',
+            f'Your {record["progress"]}% record on "{level["name"]}" has been approved! You earned {points_earned} points.',
+            record_object_id,
+            'record'
+        )
+        
         # Send Discord notification
         try:
             if DISCORD_AVAILABLE:
@@ -8852,18 +9047,14 @@ def admin_reject_record(record_id):
         admin_user = mongo_db.users.find_one({"_id": session['user_id']})
         admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
         
-        # Get rejection reason from form if provided
-        rejection_reason = request.form.get('reason', 'No reason provided')
-        
-        # Reject the record with timestamp and reason
+        # Reject the record with timestamp
         rejection_time = datetime.now(timezone.utc)
         mongo_db.records.update_one(
             {"_id": record_object_id},
             {"$set": {
                 "status": "rejected",
                 "rejected_by": admin_username,
-                "rejected_at": rejection_time,
-                "rejection_reason": rejection_reason
+                "rejected_at": rejection_time
             }}
         )
         
@@ -8876,7 +9067,17 @@ def admin_reject_record(record_id):
             log_admin_action(
                 admin_username,
                 "Record Rejected",
-                f"Rejected {user['username']}'s {record['progress']}% record on {level['name']} - Reason: {rejection_reason}"
+                f"Rejected {user['username']}'s {record['progress']}% record on {level['name']}"
+            )
+            
+            # Create notification for user
+            create_notification(
+                record['user_id'],
+                'record_status',
+                'Record Rejected ❌',
+                f'Your {record["progress"]}% record on "{level["name"]}" has been rejected.',
+                record_object_id,
+                'record'
             )
             
             # Send Discord notification
@@ -8958,8 +9159,7 @@ def admin_bulk_records():
                             {"$set": {
                                 "status": "rejected",
                                 "rejected_by": admin_username,
-                                "rejected_at": datetime.now(timezone.utc),
-                                "rejection_reason": "Bulk rejection"
+                                "rejected_at": datetime.now(timezone.utc)
                             }}
                         )
                         success_count += 1
@@ -9836,6 +10036,16 @@ def admin_announcements():
         
         mongo_db.announcements.insert_one(announcement)
         
+        # Create notification for all users
+        create_global_notification(
+            'announcement',
+            f'New Announcement! 📢',
+            f'{title} - {message[:100]}...',
+            announcement.get('_id'),
+            'announcement',
+            session.get('username', 'Admin')
+        )
+        
         flash(f'Announcement created! Will expire in {expires_in_hours} hours.', 'success')
         return redirect(url_for('admin_announcements'))
     
@@ -9896,6 +10106,16 @@ def admin_polls():
         }
         
         mongo_db.polls.insert_one(poll)
+        
+        # Create notification for all users
+        create_global_notification(
+            'poll',
+            'New Poll! 📊',
+            f'{question} - Vote now!',
+            poll.get('_id'),
+            'poll',
+            session.get('username', 'Admin')
+        )
         
         flash(f'Poll created! Will expire in {expires_in_hours} hours.', 'success')
         return redirect(url_for('admin_polls'))
@@ -11092,6 +11312,21 @@ def user_settings():
         )
         user['backup_codes'] = backup_codes
     
+    # Initialize notification preferences if they don't exist
+    if not user.get('notification_preferences'):
+        default_notification_prefs = {
+            'news': True,
+            'announcement': True,
+            'poll': True,
+            'record_status': True,
+            'top_1': True
+        }
+        mongo_db.users.update_one(
+            {"_id": session['user_id']},
+            {"$set": {"notification_preferences": default_notification_prefs}}
+        )
+        user['notification_preferences'] = default_notification_prefs
+    
     return render_template('settings_advanced.html', 
                          user=user, 
                          login_history=login_history,
@@ -11265,6 +11500,22 @@ def update_user_settings():
                 {"$set": {"password_hash": new_hash}}
             )
             flash('Password changed successfully!', 'success')
+        
+        elif action == 'notification_preferences':
+            # Handle notification preferences
+            notification_prefs = {
+                'news': 'news' in request.form,
+                'announcement': 'announcement' in request.form,
+                'poll': 'poll' in request.form,
+                'record_status': 'record_status' in request.form,
+                'top_1': 'top_1' in request.form
+            }
+            
+            mongo_db.users.update_one(
+                {"_id": user_id},
+                {"$set": {"notification_preferences": notification_prefs}}
+            )
+            flash('Notification preferences updated successfully!', 'success')
         
         elif action == 'revoke_session':
             # Handle session revocation (simplified - in production you'd track actual sessions)
@@ -11604,7 +11855,7 @@ def public_profile(username):
         flash('This profile is private', 'warning')
         return redirect(url_for('index'))
     
-    # Get user's approved records with level info - ensure we're getting the right user's records
+    # Get user's recent approved records for display (limited to 50)
     user_records = list(mongo_db.records.aggregate([
         {"$match": {"user_id": profile_user['_id'], "status": "approved"}},
         {"$lookup": {
@@ -11618,15 +11869,44 @@ def public_profile(username):
         {"$limit": 50}
     ]))
     
+    # Get ALL approved completions on MAIN LIST levels only (exclude legacy)
+    main_list_completions = list(mongo_db.records.aggregate([
+        {"$match": {"user_id": profile_user['_id'], "status": "approved", "progress": 100}},
+        {"$lookup": {
+            "from": "levels",
+            "localField": "level_id",
+            "foreignField": "_id",
+            "as": "level"
+        }},
+        {"$unwind": "$level"},
+        {"$match": {"level.is_legacy": {"$ne": True}}},  # Exclude legacy levels
+        {"$project": {"level_id": 1}}
+    ]))
+    
+    # Get ALL approved completions on LEGACY levels for legacy stats
+    legacy_list_completions = list(mongo_db.records.aggregate([
+        {"$match": {"user_id": profile_user['_id'], "status": "approved", "progress": 100}},
+        {"$lookup": {
+            "from": "levels",
+            "localField": "level_id",
+            "foreignField": "_id",
+            "as": "level"
+        }},
+        {"$unwind": "$level"},
+        {"$match": {"level.is_legacy": True}},  # Only legacy levels
+        {"$project": {"level_id": 1}}
+    ]))
+    
     # Get all main list levels for completion grid
     all_levels = list(mongo_db.levels.find({"is_legacy": False}).sort("position", 1))
     
-    # Create a set of completed level IDs for quick lookup
-    completed_levels = {record['level_id']: record for record in user_records if record['progress'] == 100}
+    # Create a set of completed level IDs for quick lookup (only main list completions)
+    completed_levels = {completion['level_id'] for completion in main_list_completions}
     
     # Calculate stats
-    total_main_levels = len([level for level in all_levels if not level.get('is_legacy')])
+    total_main_levels = len(all_levels)  # all_levels already filtered for non-legacy
     completed_main_levels = len(completed_levels)
+    legacy_completed_count = len(legacy_list_completions)
     
     # Debug logging to help identify the issue
     print(f"DEBUG: Viewing profile for user: {profile_user['username']} (ID: {profile_user['_id']})")
@@ -11639,7 +11919,9 @@ def public_profile(username):
                          all_levels=all_levels,
                          completed_levels=completed_levels,
                          total_main_levels=total_main_levels,
-                         completed_main_levels=completed_main_levels)
+                         completed_main_levels=completed_main_levels,
+                         main_completed_count=completed_main_levels,
+                         legacy_completed_count=legacy_completed_count)
 
 @app.route('/world')
 def world_leaderboard():
@@ -11949,6 +12231,181 @@ def recent_tab_roulette():
     return render_template('roulette.html', 
                          current_session=current_session,
                          current_level=current_level_info)
+
+# Notification System Routes
+@app.route('/notifications')
+def notifications():
+    """Display user notifications"""
+    if 'user_id' not in session:
+        flash('Please log in to view notifications', 'warning')
+        return redirect(url_for('login'))
+    
+    user_id = session['user_id']
+    notifications = get_user_notifications(user_id, limit=50)
+    unread_count = get_unread_notification_count(user_id)
+    
+    return render_template('notifications.html', 
+                         notifications=notifications,
+                         unread_count=unread_count)
+
+@app.route('/notifications/mark_read/<notification_id>', methods=['POST'])
+def mark_notification_read_route(notification_id):
+    """Mark a notification as read"""
+    if 'user_id' not in session:
+        return {'success': False, 'error': 'Not logged in'}, 401
+    
+    user_id = session['user_id']
+    success = mark_notification_read(notification_id, user_id)
+    
+    if success:
+        return {'success': True}
+    else:
+        return {'success': False, 'error': 'Failed to mark as read'}, 500
+
+@app.route('/notifications/mark_all_read', methods=['POST'])
+def mark_all_notifications_read():
+    """Mark all notifications as read for current user"""
+    if 'user_id' not in session:
+        return {'success': False, 'error': 'Not logged in'}, 401
+    
+    try:
+        user_id = session['user_id']
+        mongo_db.notifications.update_many(
+            {"user_id": user_id, "read": False},
+            {"$set": {"read": True}}
+        )
+        return {'success': True}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}, 500
+
+@app.route('/admin/send_notification', methods=['GET', 'POST'])
+def admin_send_notification():
+    """Admin route to send notifications to all users"""
+    if not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        try:
+            title = request.form.get('title', '').strip()
+            message = request.form.get('message', '').strip()
+            notification_type = request.form.get('type', 'announcement')
+            
+            if not title or not message:
+                flash('Title and message are required', 'danger')
+                return redirect(url_for('admin_send_notification'))
+            
+            # Create notification for all users
+            count = create_global_notification(
+                notification_type,
+                title,
+                message,
+                sender_username=session.get('username', 'Admin')
+            )
+            
+            flash(f'Notification sent to {count} users successfully!', 'success')
+            return redirect(url_for('admin'))
+            
+        except Exception as e:
+            flash(f'Error sending notification: {str(e)}', 'danger')
+            return redirect(url_for('admin_send_notification'))
+    
+    return render_template('admin/send_notification.html')
+
+@app.route('/api/notification_count')
+def api_notification_count():
+    """API endpoint to get unread notification count"""
+    if 'user_id' not in session:
+        return {'count': 0}
+    
+    user_id = session['user_id']
+    count = get_unread_notification_count(user_id)
+    return {'count': count}
+
+@app.route('/test_notifications')
+def test_notifications():
+    """Test route to create sample notifications"""
+    if not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    if 'user_id' not in session:
+        flash('Please log in', 'warning')
+        return redirect(url_for('login'))
+    
+    user_id = session['user_id']
+    
+    # Create test notifications
+    test_notifications = [
+        ('news', 'New Article Published! 📰', 'Check out our latest news article about the recent updates.'),
+        ('announcement', 'Site Maintenance Notice 📢', 'The site will be under maintenance tomorrow from 2-4 PM UTC.'),
+        ('poll', 'New Poll Available! 📊', 'Vote on which features you\'d like to see next!'),
+        ('record_status', 'Record Approved! ✅', 'Your 87% record on "Bloodbath" has been approved! You earned 156.2 points.'),
+
+        ('top_1', 'New #1 Level! 🏆', '"Slaughterhouse" is now the new #1 level on the list!')
+    ]
+    
+    for notif_type, title, message in test_notifications:
+        create_notification(user_id, notif_type, title, message)
+    
+    flash(f'Created {len(test_notifications)} test notifications!', 'success')
+    return redirect(url_for('notifications'))
+
+@app.route('/clear_test_notifications')
+def clear_test_notifications():
+    """Clear test notifications for current user"""
+    if not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    if 'user_id' not in session:
+        flash('Please log in', 'warning')
+        return redirect(url_for('login'))
+    
+    user_id = session['user_id']
+    result = mongo_db.notifications.delete_many({"user_id": user_id})
+    
+    flash(f'Cleared {result.deleted_count} notifications!', 'success')
+    return redirect(url_for('notifications'))
+
+@app.route('/admin/migrate_notification_preferences')
+def migrate_notification_preferences():
+    """Admin route to initialize notification preferences for all users"""
+    if not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Find users without notification preferences
+        users_without_prefs = mongo_db.users.find({
+            "$or": [
+                {"notification_preferences": {"$exists": False}},
+                {"notification_preferences": None}
+            ]
+        })
+        
+        default_prefs = {
+            'news': True,
+            'announcement': True,
+            'poll': True,
+            'record_status': True,
+            'top_1': True
+        }
+        
+        updated_count = 0
+        for user in users_without_prefs:
+            mongo_db.users.update_one(
+                {"_id": user["_id"]},
+                {"$set": {"notification_preferences": default_prefs}}
+            )
+            updated_count += 1
+        
+        flash(f'✅ Initialized notification preferences for {updated_count} users!', 'success')
+        return redirect(url_for('admin'))
+        
+    except Exception as e:
+        flash(f'Error migrating notification preferences: {str(e)}', 'danger')
+        return redirect(url_for('admin'))
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))

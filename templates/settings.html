@@ -800,6 +800,86 @@
             </div>
         </div>
     </div>
+    
+    <!-- Row 5: Notification Preferences -->
+    <div class="row">
+        <div class="col-12 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">🔔 Notification Preferences</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('update_user_settings') }}">
+                        <input type="hidden" name="action" value="notification_preferences">
+                        
+                        <p class="text-muted mb-3">Choose which types of notifications you want to receive:</p>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" name="news" id="notif_news" 
+                                           {% if user.notification_preferences.get('news', True) %}checked{% endif %}>
+                                    <label class="form-check-label" for="notif_news">
+                                        <strong>📰 News Articles</strong><br>
+                                        <small class="text-muted">Get notified when new news articles are published</small>
+                                    </label>
+                                </div>
+                                
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" name="announcement" id="notif_announcement" 
+                                           {% if user.notification_preferences.get('announcement', True) %}checked{% endif %}>
+                                    <label class="form-check-label" for="notif_announcement">
+                                        <strong>📢 Announcements</strong><br>
+                                        <small class="text-muted">Get notified about site announcements and updates</small>
+                                    </label>
+                                </div>
+                                
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" name="poll" id="notif_poll" 
+                                           {% if user.notification_preferences.get('poll', True) %}checked{% endif %}>
+                                    <label class="form-check-label" for="notif_poll">
+                                        <strong>📊 Polls</strong><br>
+                                        <small class="text-muted">Get notified when new polls are created</small>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" name="record_status" id="notif_record_status" 
+                                           {% if user.notification_preferences.get('record_status', True) %}checked{% endif %}>
+                                    <label class="form-check-label" for="notif_record_status">
+                                        <strong>📋 Record Status</strong><br>
+                                        <small class="text-muted">Get notified when your records are approved or rejected</small>
+                                    </label>
+                                </div>
+                                
+
+                                
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" name="top_1" id="notif_top_1" 
+                                           {% if user.notification_preferences.get('top_1', True) %}checked{% endif %}>
+                                    <label class="form-check-label" for="notif_top_1">
+                                        <strong>🏆 New #1 Levels</strong><br>
+                                        <small class="text-muted">Get notified when a new level reaches #1 on the list</small>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Note:</strong> You can always view all notifications in your notification center, regardless of these settings.
+                        </div>
+                        
+                        <button type="submit" class="btn btn-info">
+                            <i class="fas fa-save"></i> Save Notification Preferences
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Delete Account Modal -->

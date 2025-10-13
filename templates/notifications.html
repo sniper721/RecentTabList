@@ -1,0 +1,217 @@
+{% extends "layout.html" %}
+
+{% block title %}Notifications{% endblock %}
+
+{% block extra_css %}
+<style>
+    .notification-item {
+        transition: all 0.3s ease;
+        border-left: 4px solid transparent;
+    }
+    
+    .notification-item.unread {
+        background-color: rgba(13, 110, 253, 0.1);
+        border-left-color: #0d6efd;
+    }
+    
+    .notification-item:hover {
+        background-color: rgba(0, 0, 0, 0.05);
+        transform: translateX(5px);
+    }
+    
+    .notification-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+    }
+    
+    .notification-news { background-color: #e3f2fd; color: #1976d2; }
+    .notification-poll { background-color: #f3e5f5; color: #7b1fa2; }
+    .notification-announcement { background-color: #fff3e0; color: #f57c00; }
+    .notification-record_status { background-color: #e8f5e8; color: #388e3c; }
+
+    .notification-top_1 { background-color: #fff8e1; color: #f9a825; }
+    
+    .mark-read-btn {
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    
+    .notification-item:hover .mark-read-btn {
+        opacity: 1;
+    }
+    
+    .notification-item.unread .mark-read-btn {
+        opacity: 1;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>🔔 Notifications</h1>
+                <div>
+                    {% if unread_count > 0 %}
+                    <button id="markAllReadBtn" class="btn btn-outline-primary me-2">
+                        Mark All Read ({{ unread_count }})
+                    </button>
+                    {% endif %}
+                    <a href="{{ url_for('user_settings') }}" class="btn btn-secondary">
+                        ⚙️ Notification Settings
+                    </a>
+                </div>
+            </div>
+            
+            {% if notifications %}
+                <div class="list-group">
+                    {% for notification in notifications %}
+                    <div class="list-group-item notification-item {% if not notification.read %}unread{% endif %}" 
+                         data-notification-id="{{ notification._id }}">
+                        <div class="d-flex align-items-start">
+                            <div class="notification-icon notification-{{ notification.type }} me-3">
+                                {% if notification.type == 'news' %}📰
+                                {% elif notification.type == 'poll' %}📊
+                                {% elif notification.type == 'announcement' %}📢
+                                {% elif notification.type == 'record_status' %}📋
+
+                                {% elif notification.type == 'top_1' %}🏆
+                                {% else %}🔔
+                                {% endif %}
+                            </div>
+                            
+                            <div class="flex-grow-1">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <h6 class="mb-1 {% if not notification.read %}fw-bold{% endif %}">
+                                        {{ notification.title }}
+                                        {% if not notification.read %}
+                                        <span class="badge bg-primary ms-2">New</span>
+                                        {% endif %}
+                                    </h6>
+                                    <div class="d-flex align-items-center">
+                                        <small class="text-muted me-2">
+                                            {{ notification.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                        </small>
+                                        {% if not notification.read %}
+                                        <button class="btn btn-sm btn-outline-primary mark-read-btn" 
+                                                onclick="markAsRead('{{ notification._id }}')">
+                                            Mark Read
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                
+                                <p class="mb-1">{{ notification.message }}</p>
+                                
+                                {% if notification.sender and notification.sender != 'System' %}
+                                <small class="text-muted">From: {{ notification.sender }}</small>
+                                {% endif %}
+                                
+                                {% if notification.related_type and notification.related_id %}
+                                <div class="mt-2">
+                                    {% if notification.related_type == 'news' %}
+                                    <a href="{{ url_for('news_article', article_id=notification.related_id) }}" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        Read Article
+                                    </a>
+                                    {% elif notification.related_type == 'level' %}
+                                    <a href="{{ url_for('level_detail', level_id=notification.related_id) }}" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        View Level
+                                    </a>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                {% if notifications|length >= 50 %}
+                <div class="text-center mt-4">
+                    <p class="text-muted">Showing latest 50 notifications</p>
+                </div>
+                {% endif %}
+            {% else %}
+                <div class="text-center py-5">
+                    <div class="mb-3" style="font-size: 4rem;">🔔</div>
+                    <h3>No notifications yet</h3>
+                    <p class="text-muted">You'll see notifications here when there are new announcements, news, or updates about your records.</p>
+                    <a href="{{ url_for('index') }}" class="btn btn-primary">Go to Main List</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function markAsRead(notificationId) {
+    fetch(`/notifications/mark_read/${notificationId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const notificationElement = document.querySelector(`[data-notification-id="${notificationId}"]`);
+            if (notificationElement) {
+                notificationElement.classList.remove('unread');
+                const badge = notificationElement.querySelector('.badge');
+                if (badge) badge.remove();
+                const markReadBtn = notificationElement.querySelector('.mark-read-btn');
+                if (markReadBtn) markReadBtn.remove();
+                const title = notificationElement.querySelector('h6');
+                if (title) title.classList.remove('fw-bold');
+            }
+            updateNotificationCount();
+        }
+    })
+    .catch(error => {
+        console.error('Error marking notification as read:', error);
+    });
+}
+
+document.getElementById('markAllReadBtn')?.addEventListener('click', function() {
+    fetch('/notifications/mark_all_read', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        }
+    })
+    .catch(error => {
+        console.error('Error marking all notifications as read:', error);
+    });
+});
+
+function updateNotificationCount() {
+    fetch('/api/notification_count')
+    .then(response => response.json())
+    .then(data => {
+        const badge = document.querySelector('.notification-badge');
+        if (badge) {
+            if (data.count > 0) {
+                badge.textContent = data.count;
+                badge.style.display = 'inline';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+    });
+}
+</script>
+{% endblock %}
