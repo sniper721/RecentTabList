@@ -5252,10 +5252,7 @@ def test_discord():
 
 @app.route('/')
 def index():
-    """AUTO-LOAD - Instantly loads everything automatically"""
-    page = request.args.get('page', 1, type=int)
-    per_page = 10  # Show 10 levels per page for maximum speed
-    
+    """AUTO-LOAD - Instantly loads everything automatically - ALL LEVELS ON ONE PAGE"""
     main_list = get_cached_levels(is_legacy=False)
     
     # If no cache, auto-load it now
@@ -5283,27 +5280,11 @@ def index():
     if is_april_fools_active():
         main_list = randomize_level_positions(main_list.copy())
     
-    # Pagination
+    # Show all levels on one page (no pagination)
     total_levels = len(main_list)
-    start_idx = (page - 1) * per_page
-    end_idx = start_idx + per_page
-    paginated_levels = main_list[start_idx:end_idx]
-    
-    # Pagination info
-    has_prev = page > 1
-    has_next = end_idx < total_levels
-    prev_page = page - 1 if has_prev else None
-    next_page = page + 1 if has_next else None
-    total_pages = (total_levels + per_page - 1) // per_page
     
     return render_template('index.html', 
-                         levels=paginated_levels,
-                         page=page,
-                         has_prev=has_prev,
-                         has_next=has_next,
-                         prev_page=prev_page,
-                         next_page=next_page,
-                         total_pages=total_pages,
+                         levels=main_list,
                          total_levels=total_levels,
                          april_fools_active=is_april_fools_active())
 
