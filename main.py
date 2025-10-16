@@ -870,8 +870,6 @@ def track_position_change(level_id, old_position, new_position, admin_username="
         
         mongo_db.position_history.insert_one(position_change)
         
-        mongo_db.position_history.insert_one(position_change)
-        
         # Check if this is a new #1 and create notification
         if new_position == 1 and old_position != 1:
             level = mongo_db.levels.find_one({"_id": level_id})
@@ -5459,13 +5457,123 @@ def timemachine():
     if selected_date:
         try:
             target_date = datetime.strptime(selected_date, '%Y-%m-%d')
-            # Get levels that existed on or before the selected date
-            levels = list(mongo_db.levels.find({
-                "date_added": {"$lte": target_date},
-                "is_legacy": False
-            }, max_time_ms=60000).sort("position", 1))
+            
+            # Load historical rankings data
+            historical_data = {}
+            try:
+                import json
+                with open('historical_rankings.json', 'r') as f:
+                    historical_data = json.load(f)
+            except Exception as e:
+                print(f"Error loading historical rankings: {e}")
+                flash('Historical data not available', 'warning')
+                return render_template('timemachine.html', levels=[], selected_date=selected_date)
+            
+            # Load base64 thumbnails
+            thumbnails_data = {}
+            try:
+                with open('thumbnails.json', 'r') as f:
+                    thumbnails_data = json.load(f)
+            except:
+                pass
+            
+            # Find the closest historical ranking to the selected date
+            weekly_rankings = historical_data.get('weekly_rankings', {})
+            closest_date = None
+            closest_rankings = None
+            
+            # Find the most recent ranking before or on the selected date
+            for date_str, ranking_data in weekly_rankings.items():
+                ranking_date = datetime.strptime(date_str, '%Y-%m-%d')
+                if ranking_date <= target_date:
+                    if closest_date is None or ranking_date > closest_date:
+                        closest_date = ranking_date
+                        closest_rankings = ranking_data['rankings']
+            
+            if closest_rankings:
+                # Get all levels from database to match with historical rankings
+                all_levels = {level['name']: level for level in mongo_db.levels.find({}, max_time_ms=60000)}
+                
+                def add_current_thumbnail(level_data, level_name):
+                    """Add current thumbnail data to a level - ONLY use current database images"""
+                    # Only use current thumbnail from database level (NO FALLBACK to old thumbnails.json)
+                    current_level = all_levels.get(level_name)
+                    if current_level:
+                        # Copy current thumbnail data (this ensures historical levels use current images)
+                        if current_level.get('thumbnail_url'):
+                            # Check if it's already a base64 data URL
+                            thumbnail_url = current_level['thumbnail_url']
+                            if thumbnail_url.startswith('data:image/'):
+                                # It's already a base64 data URL, use it directly
+                                level_data['thumbnail_base64'] = thumbnail_url
+                            else:
+                                # It's a regular URL
+                                level_data['thumbnail_url'] = thumbnail_url
+                            return
+                        
+                        if current_level.get('video_url'):
+                            level_data['video_url'] = current_level['video_url']
+                            return
+                        
+                        # Also copy other current data that might be useful
+                        if current_level.get('creator'):
+                            level_data['creator'] = current_level['creator']
+                        if current_level.get('verifier'):
+                            level_data['verifier'] = current_level['verifier']
+                        if current_level.get('difficulty'):
+                            level_data['difficulty'] = current_level['difficulty']
+                    
+                    # NO FALLBACK to thumbnails.json - only use current database images
+                
+                levels = []
+                for ranking in closest_rankings:
+                    level_name = ranking['name']
+                    historical_pos = ranking['position']
+                    
+                    # Find the level in the database
+                    level = all_levels.get(level_name)
+                    if level:
+                        # Create a copy to avoid modifying the original
+                        level_copy = dict(level)
+                        level_copy['historical_position'] = historical_pos
+                        level_copy['historical_points'] = calculate_level_points(historical_pos, False)
+                        
+                        # Always use current thumbnail data
+                        add_current_thumbnail(level_copy, level_name)
+                        
+                        levels.append(level_copy)
+                    else:
+                        # Level not found in database, create a placeholder with current thumbnail
+                        placeholder_level = {
+                            '_id': f"placeholder_{level_name}",
+                            'name': level_name,
+                            'creator': 'Unknown',
+                            'verifier': 'Unknown',
+                            'difficulty': 10,
+                            'historical_position': historical_pos,
+                            'historical_points': calculate_level_points(historical_pos, False),
+                            'is_placeholder': True
+                        }
+                        
+                        # Use current thumbnail data even for placeholder levels
+                        add_current_thumbnail(placeholder_level, level_name)
+                        
+                        levels.append(placeholder_level)
+                
+                # Add info about which week's data we're showing
+                if 'user_id' in session and session.get('is_admin'):
+                    week_num = None
+                    for date_str, ranking_data in weekly_rankings.items():
+                        if datetime.strptime(date_str, '%Y-%m-%d') == closest_date:
+                            week_num = ranking_data.get('week')
+                            break
+                    print(f"Time machine: Showing week {week_num} rankings from {closest_date.strftime('%Y-%m-%d')} for selected date {selected_date}")
+            
         except ValueError:
             flash('Invalid date format', 'danger')
+        except Exception as e:
+            print(f"Error in time machine: {e}")
+            flash('Error loading historical data', 'danger')
     
     return render_template('timemachine.html', levels=levels, selected_date=selected_date)
 
@@ -7170,6 +7278,46 @@ def admin_verifications():
         print(f"Error loading verification submissions: {e}")
         flash('Error loading verification submissions', 'danger')
         return redirect(url_for('admin'))
+
+@app.route('/admin/verification/<submission_id>')
+def admin_verification_detail(submission_id):
+    """Individual verification submission detail page"""
+    
+    if 'user_id' not in session:
+        flash('Please log in to access admin panel', 'warning')
+        return redirect(url_for('login'))
+    
+    if not session.get('is_admin'):
+        flash('Access denied. Admin privileges required.', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Get specific verification submission with user data
+        pipeline = [
+            {"$match": {"_id": ObjectId(submission_id)}},
+            {
+                "$lookup": {
+                    "from": "users",
+                    "localField": "user_id",
+                    "foreignField": "_id",
+                    "as": "user"
+                }
+            },
+            {"$unwind": "$user"}
+        ]
+        
+        submission = list(mongo_db.verification_submissions.aggregate(pipeline))
+        if not submission:
+            flash('Verification submission not found', 'danger')
+            return redirect(url_for('admin_verifications'))
+        
+        submission = submission[0]
+        
+        return render_template('admin/verification_detail.html', submission=submission)
+        
+    except Exception as e:
+        flash(f'Error loading verification submission: {e}', 'danger')
+        return redirect(url_for('admin_verifications'))
 
 @app.route('/admin/verification-details')
 def admin_verification_details():
@@ -10782,132 +10930,26 @@ def changelog():
 
 @app.route('/stats')
 def stats_viewer():
-    """Comprehensive statistics page like demon list stats"""
+    """Players leaderboard - Stats viewer"""
     try:
-        # Level Statistics
-        total_levels = mongo_db.levels.count_documents({})
-        main_levels = mongo_db.levels.count_documents({"is_legacy": False})
-        legacy_levels = mongo_db.levels.count_documents({"is_legacy": True})
-        
-        # User Statistics
-        total_users = mongo_db.users.count_documents({})
-        active_users = mongo_db.users.count_documents({"points": {"$gt": 0}})
-        admin_users = mongo_db.users.count_documents({"is_admin": True})
-        
-        # Record Statistics
-        total_records = mongo_db.records.count_documents({})
-        approved_records = mongo_db.records.count_documents({"status": "approved"})
-        pending_records = mongo_db.records.count_documents({"status": "pending"})
-        rejected_records = mongo_db.records.count_documents({"status": "rejected"})
-        
-        # Completion Statistics
-        completed_records = mongo_db.records.count_documents({"status": "approved", "progress": 100})
-        partial_records = mongo_db.records.count_documents({"status": "approved", "progress": {"$lt": 100}})
-        
-        # Top Players (by points)
+        # Top Players (by points) - Extended to show more players
         top_players = list(mongo_db.users.find(
             {"points": {"$gt": 0}},
-            {"username": 1, "points": 1, "nickname": 1}
-        ).sort("points", -1).limit(10))
+            {"username": 1, "points": 1, "nickname": 1, "country": 1, "discord_username": 1}
+        ).sort("points", -1).limit(50))  # Show top 50 players
         
-        # Most Active Levels (by record count)
-        most_active_levels = list(mongo_db.records.aggregate([
-            {"$match": {"status": "approved"}},
-            {"$group": {"_id": "$level_id", "record_count": {"$sum": 1}}},
-            {"$lookup": {
-                "from": "levels",
-                "localField": "_id",
-                "foreignField": "_id",
-                "as": "level"
-            }},
-            {"$unwind": "$level"},
-            {"$sort": {"record_count": -1}},
-            {"$limit": 10}
-        ]))
-        
-        # Recent Activity (last 10 approved records)
-        recent_activity = list(mongo_db.records.aggregate([
-            {"$match": {"status": "approved"}},
-            {"$lookup": {
-                "from": "users",
-                "localField": "user_id",
-                "foreignField": "_id",
-                "as": "user"
-            }},
-            {"$lookup": {
-                "from": "levels",
-                "localField": "level_id",
-                "foreignField": "_id",
-                "as": "level"
-            }},
-            {"$unwind": "$user"},
-            {"$unwind": "$level"},
-            {"$sort": {"date_submitted": -1}},
-            {"$limit": 10}
-        ]))
-        
-        # Difficulty Distribution
-        difficulty_distribution = list(mongo_db.levels.aggregate([
-            {"$group": {
-                "_id": {"$round": "$difficulty"},
-                "count": {"$sum": 1}
-            }},
-            {"$sort": {"_id": 1}}
-        ]))
-        
-        # Monthly Registration Stats (last 6 months)
-        from datetime import datetime, timedelta
-        six_months_ago = datetime.now() - timedelta(days=180)
-        monthly_registrations = list(mongo_db.users.aggregate([
-            {"$match": {"date_joined": {"$gte": six_months_ago}}},
-            {"$group": {
-                "_id": {
-                    "year": {"$year": "$date_joined"},
-                    "month": {"$month": "$date_joined"}
-                },
-                "count": {"$sum": 1}
-            }},
-            {"$sort": {"_id.year": 1, "_id.month": 1}}
-        ]))
-        
-        # Calculate percentages
-        approval_rate = (approved_records / total_records * 100) if total_records > 0 else 0
-        completion_rate = (completed_records / approved_records * 100) if approved_records > 0 else 0
-        active_user_rate = (active_users / total_users * 100) if total_users > 0 else 0
+        # Basic stats for context
+        total_players = mongo_db.users.count_documents({"points": {"$gt": 0}})
         
         stats_data = {
-            'levels': {
-                'total': total_levels,
-                'main': main_levels,
-                'legacy': legacy_levels
-            },
-            'users': {
-                'total': total_users,
-                'active': active_users,
-                'admins': admin_users,
-                'active_rate': round(active_user_rate, 1)
-            },
-            'records': {
-                'total': total_records,
-                'approved': approved_records,
-                'pending': pending_records,
-                'rejected': rejected_records,
-                'completed': completed_records,
-                'partial': partial_records,
-                'approval_rate': round(approval_rate, 1),
-                'completion_rate': round(completion_rate, 1)
-            },
             'top_players': top_players,
-            'most_active_levels': most_active_levels,
-            'recent_activity': recent_activity,
-            'difficulty_distribution': difficulty_distribution,
-            'monthly_registrations': monthly_registrations
+            'total_players': total_players
         }
         
         return render_template('stats.html', stats=stats_data)
         
     except Exception as e:
-        flash(f'Error loading statistics: {e}', 'danger')
+        flash(f'Error loading player statistics: {e}', 'danger')
         return redirect(url_for('index'))
 
 @app.route('/stats/overview')

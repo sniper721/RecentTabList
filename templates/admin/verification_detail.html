@@ -1,0 +1,396 @@
+{% extends "layout.html" %}
+
+{% block title %}Verification Details - {{ submission.level_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <!-- Navigation -->
+            <div class="mb-4">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{{ url_for('admin') }}">Admin Panel</a></li>
+                        <li class="breadcrumb-item"><a href="{{ url_for('admin_verifications') }}">Verification Submissions</a></li>
+                        <li class="breadcrumb-item active">{{ submission.level_name }}</li>
+                    </ol>
+                </nav>
+            </div>
+
+            <!-- Main Content -->
+            <div class="row">
+                <!-- Left Column - Main Details -->
+                <div class="col-lg-8">
+                    <div class="card border-0 shadow-lg mb-4">
+                        <div class="card-header bg-gradient-primary text-white">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h4 class="mb-0">
+                                    <i class="fas fa-gamepad me-2"></i>
+                                    {{ submission.level_name }}
+                                </h4>
+                                <span class="badge {% if submission.status == 'pending' %}bg-warning text-dark{% elif submission.status == 'approved' %}bg-success{% elif submission.status == 'rejected' %}bg-danger{% endif %} fs-6">
+                                    {% if submission.status == 'pending' %}
+                                        <i class="fas fa-clock me-1"></i>Pending Review
+                                    {% elif submission.status == 'approved' %}
+                                        <i class="fas fa-check me-1"></i>Approved
+                                    {% elif submission.status == 'rejected' %}
+                                        <i class="fas fa-times me-1"></i>Rejected
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <!-- Level Information -->
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <div class="info-item">
+                                        <i class="fas fa-user text-primary me-2"></i>
+                                        <strong>Creator:</strong>
+                                        <span class="ms-2">{{ submission.creator or 'N/A' }}</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="info-item">
+                                        <i class="fas fa-check-circle text-success me-2"></i>
+                                        <strong>Verifier:</strong>
+                                        <span class="ms-2">{{ submission.verifier or 'N/A' }}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <div class="info-item">
+                                        <i class="fas fa-star text-warning me-2"></i>
+                                        <strong>Difficulty:</strong>
+                                        <span class="badge bg-info ms-2">{{ submission.difficulty }}</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="info-item">
+                                        <i class="fas fa-trophy text-warning me-2"></i>
+                                        <strong>Placement:</strong>
+                                        <span class="badge bg-primary ms-2">#{{ submission.placement }}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Ratings -->
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <div class="rating-card">
+                                        <h6 class="text-muted mb-2">
+                                            <i class="fas fa-brain me-1"></i>
+                                            Experience Rating
+                                        </h6>
+                                        <div class="d-flex align-items-center">
+                                            <span class="badge bg-secondary me-3 fs-6">{{ submission.experience }}/10</span>
+                                            <div class="progress flex-grow-1" style="height: 12px;">
+                                                <div class="progress-bar bg-info progress-bar-striped progress-bar-animated" 
+                                                     style="width: {{ (submission.experience / 10) * 100 }}%"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="rating-card">
+                                        <h6 class="text-muted mb-2">
+                                            <i class="fas fa-heart me-1"></i>
+                                            Enjoyment Rating
+                                        </h6>
+                                        <div class="d-flex align-items-center">
+                                            <span class="badge bg-secondary me-3 fs-6">{{ submission.enjoyment }}/10</span>
+                                            <div class="progress flex-grow-1" style="height: 12px;">
+                                                <div class="progress-bar bg-success progress-bar-striped progress-bar-animated" 
+                                                     style="width: {{ (submission.enjoyment / 10) * 100 }}%"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Comments Section -->
+                            {% if submission.comments %}
+                            <div class="comments-section">
+                                <h6 class="text-muted mb-3">
+                                    <i class="fas fa-comment-alt me-2"></i>
+                                    Comments
+                                </h6>
+                                <div class="comment-box">
+                                    <p class="mb-0">{{ submission.comments }}</p>
+                                </div>
+                            </div>
+                            {% else %}
+                            <div class="comments-section">
+                                <h6 class="text-muted mb-3">
+                                    <i class="fas fa-comment-alt me-2"></i>
+                                    Comments
+                                </h6>
+                                <div class="comment-box text-center text-muted">
+                                    <i class="fas fa-comment-slash fa-2x mb-2"></i>
+                                    <p class="mb-0">No comments provided</p>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Video Section -->
+                    <div class="card border-0 shadow-lg">
+                        <div class="card-header bg-dark text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-play-circle me-2"></i>
+                                Verification Video
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            {% if submission.verification_url %}
+                                {% set video_info = get_video_embed_info(submission.verification_url) %}
+                                {% if video_info %}
+                                    <div class="video-container mb-3">
+                                        <iframe src="{{ video_info.embed_url }}" 
+                                                frameborder="0" 
+                                                allowfullscreen
+                                                class="w-100"
+                                                style="height: 400px; border-radius: 8px;"></iframe>
+                                    </div>
+                                {% endif %}
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <a href="{{ submission.verification_url }}" target="_blank" class="btn btn-primary">
+                                        <i class="fas fa-external-link-alt me-2"></i>
+                                        Open in New Tab
+                                    </a>
+                                    <small class="text-muted">
+                                        <i class="fas fa-link me-1"></i>
+                                        {{ submission.verification_url }}
+                                    </small>
+                                </div>
+                            {% else %}
+                                <div class="text-center text-muted py-4">
+                                    <i class="fas fa-video-slash fa-3x mb-3"></i>
+                                    <h6>No verification video provided</h6>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column - Sidebar -->
+                <div class="col-lg-4">
+                    <!-- Submitter Info -->
+                    <div class="card border-0 shadow-lg mb-4">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-user me-2"></i>
+                                Submitter Information
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="text-center mb-3">
+                                <div class="avatar-circle-large mx-auto mb-3">
+                                    {{ submission.user.username[0].upper() }}
+                                </div>
+                                <h5 class="mb-1">{{ submission.user.username }}</h5>
+                                {% if submission.user.discord_username %}
+                                <p class="text-muted mb-0">
+                                    <i class="fab fa-discord me-1"></i>
+                                    {{ submission.user.discord_username }}
+                                </p>
+                                {% endif %}
+                            </div>
+                            
+                            <hr>
+                            
+                            <div class="info-list">
+                                <div class="info-item mb-2">
+                                    <i class="fas fa-id-card text-muted me-2"></i>
+                                    <strong>User ID:</strong>
+                                    <code class="ms-2">{{ submission.user._id }}</code>
+                                </div>
+                                <div class="info-item mb-2">
+                                    <i class="fas fa-calendar text-muted me-2"></i>
+                                    <strong>Submitted:</strong>
+                                    <span class="ms-2">{{ submission.date_submitted.strftime('%B %d, %Y') }}</span>
+                                </div>
+                                <div class="info-item">
+                                    <i class="fas fa-clock text-muted me-2"></i>
+                                    <strong>Time:</strong>
+                                    <span class="ms-2">{{ submission.date_submitted.strftime('%H:%M UTC') }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submission Details -->
+                    <div class="card border-0 shadow-lg mb-4">
+                        <div class="card-header bg-secondary text-white">
+                            <h5 class="mb-0">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Submission Details
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="info-item mb-3">
+                                <i class="fas fa-fingerprint text-muted me-2"></i>
+                                <strong>Submission ID:</strong>
+                                <br>
+                                <code class="small">{{ submission._id }}</code>
+                            </div>
+                            
+                            {% if submission.status == 'approved' and submission.approved_by %}
+                            <div class="info-item mb-3">
+                                <i class="fas fa-user-check text-success me-2"></i>
+                                <strong>Approved by:</strong>
+                                <span class="ms-2">Admin ID: {{ submission.approved_by }}</span>
+                            </div>
+                            {% elif submission.status == 'rejected' and submission.rejected_by %}
+                            <div class="info-item mb-3">
+                                <i class="fas fa-user-times text-danger me-2"></i>
+                                <strong>Rejected by:</strong>
+                                <span class="ms-2">Admin ID: {{ submission.rejected_by }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="card border-0 shadow-lg">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0">
+                                <i class="fas fa-tools me-2"></i>
+                                Actions
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <a href="{{ url_for('admin_verifications') }}" class="btn btn-outline-primary">
+                                    <i class="fas fa-arrow-left me-2"></i>
+                                    Back to All Submissions
+                                </a>
+                                <a href="{{ url_for('admin_verification_details') }}" class="btn btn-outline-info">
+                                    <i class="fas fa-list-alt me-2"></i>
+                                    View Details Table
+                                </a>
+                                {% if submission.verification_url %}
+                                <a href="{{ submission.verification_url }}" target="_blank" class="btn btn-success">
+                                    <i class="fas fa-external-link-alt me-2"></i>
+                                    Open Video
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+}
+
+.info-item {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.info-item:last-child {
+    border-bottom: none;
+}
+
+.rating-card {
+    background: rgba(0,0,0,0.02);
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid rgba(0,0,0,0.05);
+}
+
+.comment-box {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 20px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.avatar-circle-large {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 32px;
+}
+
+.card {
+    border-radius: 12px;
+}
+
+.progress {
+    background-color: rgba(0,0,0,0.1);
+    border-radius: 10px;
+}
+
+.progress-bar {
+    border-radius: 10px;
+}
+
+.badge {
+    font-size: 0.85em;
+    padding: 0.5em 1em;
+}
+
+.btn {
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+code {
+    background-color: rgba(0,0,0,0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+
+.video-container {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.breadcrumb {
+    background: none;
+    padding: 0;
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+    content: "›";
+    color: #6c757d;
+}
+
+.info-list .info-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 0;
+}
+
+.comments-section {
+    background: rgba(0,0,0,0.02);
+    border-radius: 8px;
+    padding: 20px;
+    border: 1px solid rgba(0,0,0,0.05);
+}
+</style>
+
+{% endblock %}

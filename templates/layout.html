@@ -259,38 +259,10 @@
                         <a class="nav-link" href="{{ url_for('guidelines') }}">📖 Guide</a>
                     </li>
 
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="statsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            📊 Stats
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('stats_viewer') }}">
+                            🏆 Stats viewer
                         </a>
-                        <ul class="dropdown-menu" aria-labelledby="statsDropdown">
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('stats_overview') }}">
-                                    📈 Overview
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('stats_players') }}">
-                                    🏆 Players
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('stats_levels') }}">
-                                    🎮 Levels
-                                </a>
-                            </li>
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('stats_records') }}">
-                                    📋 Records
-                                </a>
-                            </li>
-
-                            <li>
-                                <a class="dropdown-item" href="{{ url_for('stats_activity') }}">
-                                    🕒 Activity
-                                </a>
-                            </li>
-                        </ul>
                     </li>
                     {% if session.get('is_admin') %}
                     <li class="nav-item">
