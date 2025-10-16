@@ -201,6 +201,12 @@
                                                 </form>
                                             {% endif %}
                                             
+                                            <!-- Chat/Discussion -->
+                                            <a href="{{ url_for('admin_record_discussion', record_id=record._id|string) }}" 
+                                               class="btn btn-sm btn-info" title="Discussion & Polls">
+                                                <i class="fas fa-comments"></i>
+                                            </a>
+                                            
                                             <!-- Edit Record -->
                                             <a href="{{ url_for('admin_edit_record', record_id=record._id|string) }}" 
                                                class="btn btn-sm btn-primary" title="Edit Record">

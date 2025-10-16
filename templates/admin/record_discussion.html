@@ -1,0 +1,212 @@
+{% extends "layout.html" %}
+
+{% block title %}Record Discussion - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>💬 Record Discussion</h1>
+                <a href="{{ url_for('admin_records') }}" class="btn btn-secondary">← Back to Records</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Record Info -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">📋 Record Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Record ID:</strong> {{ record._id }}</p>
+                            <p><strong>User:</strong> {{ record.user.username }}</p>
+                            <p><strong>Level:</strong> {{ record.level.name }} by {{ record.level.creator }}</p>
+                            <p><strong>Percentage:</strong> {{ record.percentage }}%</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Status:</strong> 
+                                {% if record.status == 'approved' %}
+                                    <span class="badge bg-success">✅ Approved</span>
+                                {% elif record.status == 'pending' %}
+                                    <span class="badge bg-warning">⏳ Pending</span>
+                                {% elif record.status == 'rejected' %}
+                                    <span class="badge bg-danger">❌ Rejected</span>
+                                {% endif %}
+                            </p>
+                            <p><strong>Submitted:</strong> {{ record.date_submitted.strftime('%Y-%m-%d %H:%M UTC') }}</p>
+                            {% if record.video_url %}
+                                <p><strong>Video:</strong> <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-outline-primary">🎥 Watch</a></p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Discussion Messages -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">💬 Admin Discussion</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Messages -->
+                    <div class="messages-container" style="max-height: 400px; overflow-y: auto;">
+                        {% if messages %}
+                            {% for message in messages %}
+                            <div class="message mb-3 p-3 border rounded">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <strong>{{ message.admin_username }}</strong>
+                                        <small class="text-muted">{{ message.timestamp.strftime('%Y-%m-%d %H:%M UTC') }}</small>
+                                    </div>
+                                </div>
+                                <div class="mt-2">{{ message.message }}</div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-comments fa-3x mb-3"></i>
+                                <p>No discussion messages yet. Start the conversation!</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Add Message Form -->
+                    <hr>
+                    <form method="POST" action="{{ url_for('admin_add_discussion_message', record_id=record._id|string) }}">
+                        <div class="mb-3">
+                            <label for="message" class="form-label">Add Message</label>
+                            <textarea class="form-control" name="message" id="message" rows="3" 
+                                      placeholder="Share your thoughts about this record..." required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-info">
+                            <i class="fas fa-paper-plane"></i> Send Message
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Polls Section -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">📊 Admin Polls</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Existing Polls -->
+                    {% if polls %}
+                        {% for poll in polls %}
+                        <div class="poll mb-4 p-3 border rounded {% if not poll.active %}bg-light{% endif %}">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <strong>{{ poll.question }}</strong>
+                                {% if poll.active %}
+                                    <form method="POST" action="{{ url_for('admin_close_record_poll', poll_id=poll._id|string) }}" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary" title="Close Poll">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <span class="badge bg-secondary">Closed</span>
+                                {% endif %}
+                            </div>
+                            
+                            <small class="text-muted d-block mb-3">
+                                By {{ poll.created_by_username }} • {{ poll.created_at.strftime('%Y-%m-%d %H:%M UTC') }}
+                            </small>
+                            
+                            {% if poll.active and not poll.user_has_voted %}
+                                <!-- Voting Form -->
+                                <form method="POST" action="{{ url_for('admin_vote_record_poll', poll_id=poll._id|string) }}">
+                                    {% for option in poll.options %}
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="radio" name="option" value="{{ loop.index0 }}" 
+                                               id="poll_{{ poll._id }}_option_{{ loop.index0 }}">
+                                        <label class="form-check-label" for="poll_{{ poll._id }}_option_{{ loop.index0 }}">
+                                            {{ option.text }}
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                    <button type="submit" class="btn btn-sm btn-success mt-2">Vote</button>
+                                </form>
+                            {% else %}
+                                <!-- Results -->
+                                {% if poll.user_has_voted %}
+                                    <div class="text-success mb-2"><small>✓ You voted in this poll</small></div>
+                                {% endif %}
+                                
+                                <div class="mb-2">
+                                    <small class="text-muted">Total votes: {{ poll.total_votes }}</small>
+                                </div>
+                                
+                                {% for option in poll.options %}
+                                <div class="mb-2">
+                                    <div class="d-flex justify-content-between">
+                                        <span>{{ option.text }}</span>
+                                        <span class="text-muted">{{ option.vote_count }}</span>
+                                    </div>
+                                    {% set percentage = (option.vote_count / poll.total_votes * 100) if poll.total_votes > 0 else 0 %}
+                                    <div class="progress" style="height: 6px;">
+                                        <div class="progress-bar bg-success" style="width: {{ percentage }}%"></div>
+                                    </div>
+                                    <small class="text-muted">{{ "%.1f" | format(percentage) }}%</small>
+                                </div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                    
+                    <!-- Create Poll Form -->
+                    <hr>
+                    <h6>Create New Poll</h6>
+                    <form method="POST" action="{{ url_for('admin_create_record_poll', record_id=record._id|string) }}">
+                        <div class="mb-3">
+                            <label for="question" class="form-label">Question</label>
+                            <input type="text" class="form-control" name="question" id="question" 
+                                   placeholder="Should we approve this record?" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="options" class="form-label">Options (one per line)</label>
+                            <textarea class="form-control" name="options" id="options" rows="4" 
+                                      placeholder="Yes, approve&#10;No, reject&#10;Needs more review" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-poll"></i> Create Poll
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Auto-scroll to bottom of messages
+    document.addEventListener('DOMContentLoaded', function() {
+        const messagesContainer = document.querySelector('.messages-container');
+        if (messagesContainer) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+    });
+    
+    // Auto-refresh every 30 seconds to get new messages
+    setInterval(function() {
+        // Only refresh if user hasn't typed in the message box
+        const messageBox = document.getElementById('message');
+        if (messageBox && messageBox.value.trim() === '') {
+            location.reload();
+        }
+    }, 30000);
+</script>
+{% endblock %}

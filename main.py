@@ -1851,6 +1851,248 @@ def admin_delete_record(record_id):
         flash(f'Error deleting record: {str(e)}', 'danger')
     
     return redirect(url_for('admin_records'))
+
+@app.route('/admin/record/<string:record_id>/discussion')
+def admin_record_discussion(record_id):
+    """Admin record discussion and polling system"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Get the record with user and level info
+        record_pipeline = [
+            {"$match": {"_id": ObjectId(record_id)}},
+            {"$lookup": {
+                "from": "users",
+                "localField": "user_id", 
+                "foreignField": "_id",
+                "as": "user"
+            }},
+            {"$lookup": {
+                "from": "levels",
+                "localField": "level_id",
+                "foreignField": "_id", 
+                "as": "level"
+            }},
+            {"$unwind": "$user"},
+            {"$unwind": "$level"}
+        ]
+        
+        record_result = list(mongo_db.records.aggregate(record_pipeline))
+        if not record_result:
+            flash('Record not found', 'danger')
+            return redirect(url_for('admin_records'))
+        
+        record = record_result[0]
+        
+        # Get discussion messages for this record
+        messages = list(mongo_db.record_discussions.find({
+            "record_id": ObjectId(record_id)
+        }).sort("timestamp", 1))
+        
+        # Get polls for this record
+        polls = list(mongo_db.record_polls.find({
+            "record_id": ObjectId(record_id)
+        }).sort("created_at", -1))
+        
+        # Add admin info to messages and polls
+        admin_ids = set()
+        for msg in messages:
+            admin_ids.add(msg['admin_id'])
+        for poll in polls:
+            admin_ids.add(poll['created_by'])
+            
+        admins = {admin['_id']: admin for admin in mongo_db.users.find({
+            "_id": {"$in": list(admin_ids)},
+            "is_admin": True
+        })}
+        
+        # Add admin usernames to messages
+        for msg in messages:
+            admin = admins.get(msg['admin_id'])
+            msg['admin_username'] = admin['username'] if admin else 'Unknown Admin'
+            
+        # Add admin usernames and vote counts to polls
+        for poll in polls:
+            admin = admins.get(poll['created_by'])
+            poll['created_by_username'] = admin['username'] if admin else 'Unknown Admin'
+            
+            # Calculate vote counts
+            total_votes = 0
+            for option in poll.get('options', []):
+                option['vote_count'] = len(option.get('votes', []))
+                total_votes += option['vote_count']
+            poll['total_votes'] = total_votes
+            
+            # Check if current admin has voted
+            current_admin_id = session['user_id']
+            poll['user_has_voted'] = False
+            for option in poll.get('options', []):
+                if current_admin_id in option.get('votes', []):
+                    poll['user_has_voted'] = True
+                    break
+        
+        return render_template('admin/record_discussion.html', 
+                             record=record, 
+                             messages=messages, 
+                             polls=polls)
+        
+    except Exception as e:
+        print(f"Error in admin_record_discussion: {e}")
+        flash('Error loading record discussion', 'danger')
+        return redirect(url_for('admin_records'))
+
+@app.route('/admin/record/<string:record_id>/discussion/message', methods=['POST'])
+def admin_add_discussion_message(record_id):
+    """Add a message to record discussion"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        message_text = request.form.get('message', '').strip()
+        if not message_text:
+            flash('Message cannot be empty', 'danger')
+            return redirect(url_for('admin_record_discussion', record_id=record_id))
+        
+        # Create discussion message
+        message = {
+            "_id": ObjectId(),
+            "record_id": ObjectId(record_id),
+            "admin_id": session['user_id'],
+            "message": message_text,
+            "timestamp": datetime.now(timezone.utc)
+        }
+        
+        mongo_db.record_discussions.insert_one(message)
+        flash('Message added successfully', 'success')
+        
+    except Exception as e:
+        print(f"Error adding discussion message: {e}")
+        flash('Error adding message', 'danger')
+    
+    return redirect(url_for('admin_record_discussion', record_id=record_id))
+
+@app.route('/admin/record/<string:record_id>/discussion/poll', methods=['POST'])
+def admin_create_record_poll(record_id):
+    """Create a poll for record discussion"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        question = request.form.get('question', '').strip()
+        options_text = request.form.get('options', '').strip()
+        
+        if not question or not options_text:
+            flash('Question and options are required', 'danger')
+            return redirect(url_for('admin_record_discussion', record_id=record_id))
+        
+        # Parse options (one per line)
+        options = []
+        for line in options_text.split('\n'):
+            line = line.strip()
+            if line:
+                options.append({
+                    "text": line,
+                    "votes": []
+                })
+        
+        if len(options) < 2:
+            flash('At least 2 options are required', 'danger')
+            return redirect(url_for('admin_record_discussion', record_id=record_id))
+        
+        # Create poll
+        poll = {
+            "_id": ObjectId(),
+            "record_id": ObjectId(record_id),
+            "question": question,
+            "options": options,
+            "created_by": session['user_id'],
+            "created_at": datetime.now(timezone.utc),
+            "active": True
+        }
+        
+        mongo_db.record_polls.insert_one(poll)
+        flash('Poll created successfully', 'success')
+        
+    except Exception as e:
+        print(f"Error creating record poll: {e}")
+        flash('Error creating poll', 'danger')
+    
+    return redirect(url_for('admin_record_discussion', record_id=record_id))
+
+@app.route('/admin/record/poll/<string:poll_id>/vote', methods=['POST'])
+def admin_vote_record_poll(poll_id):
+    """Vote in a record poll"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        option_index = int(request.form.get('option', -1))
+        
+        poll = mongo_db.record_polls.find_one({"_id": ObjectId(poll_id)})
+        if not poll:
+            flash('Poll not found', 'danger')
+            return redirect(url_for('admin_records'))
+        
+        if option_index < 0 or option_index >= len(poll['options']):
+            flash('Invalid option selected', 'danger')
+            return redirect(url_for('admin_record_discussion', record_id=str(poll['record_id'])))
+        
+        admin_id = session['user_id']
+        
+        # Remove previous votes by this admin
+        for option in poll['options']:
+            if admin_id in option.get('votes', []):
+                option['votes'].remove(admin_id)
+        
+        # Add new vote
+        poll['options'][option_index]['votes'].append(admin_id)
+        
+        # Update poll in database
+        mongo_db.record_polls.update_one(
+            {"_id": ObjectId(poll_id)},
+            {"$set": {"options": poll['options']}}
+        )
+        
+        flash('Vote recorded successfully', 'success')
+        
+    except Exception as e:
+        print(f"Error voting in record poll: {e}")
+        flash('Error recording vote', 'danger')
+    
+    return redirect(url_for('admin_record_discussion', record_id=str(poll['record_id'])))
+
+@app.route('/admin/record/poll/<string:poll_id>/close', methods=['POST'])
+def admin_close_record_poll(poll_id):
+    """Close a record poll"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        poll = mongo_db.record_polls.find_one({"_id": ObjectId(poll_id)})
+        if not poll:
+            flash('Poll not found', 'danger')
+            return redirect(url_for('admin_records'))
+        
+        # Close the poll
+        mongo_db.record_polls.update_one(
+            {"_id": ObjectId(poll_id)},
+            {"$set": {"active": False}}
+        )
+        
+        flash('Poll closed successfully', 'success')
+        
+    except Exception as e:
+        print(f"Error closing record poll: {e}")
+        flash('Error closing poll', 'danger')
+    
+    return redirect(url_for('admin_record_discussion', record_id=str(poll['record_id'])))
+
 def debug_thumbnails():
     """Debug thumbnail URLs in database"""
     if 'user_id' not in session or not session.get('is_admin'):
@@ -5454,6 +5696,9 @@ def timemachine():
     selected_date = request.args.get('date')
     levels = []
     
+    # Get today's date for max date limit
+    today_date = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    
     if selected_date:
         try:
             target_date = datetime.strptime(selected_date, '%Y-%m-%d')
@@ -5467,7 +5712,7 @@ def timemachine():
             except Exception as e:
                 print(f"Error loading historical rankings: {e}")
                 flash('Historical data not available', 'warning')
-                return render_template('timemachine.html', levels=[], selected_date=selected_date)
+                return render_template('timemachine.html', levels=[], selected_date=selected_date, today_date=today_date)
             
             # Load base64 thumbnails
             thumbnails_data = {}
@@ -5493,6 +5738,12 @@ def timemachine():
             if closest_rankings:
                 # Get all levels from database to match with historical rankings
                 all_levels = {level['name']: level for level in mongo_db.levels.find({}, max_time_ms=60000)}
+                
+                # Create a mapping of current level positions
+                current_positions = {}
+                for level in all_levels.values():
+                    if not level.get('is_legacy', False):
+                        current_positions[level['name']] = level.get('position')
                 
                 def add_current_thumbnail(level_data, level_name):
                     """Add current thumbnail data to a level - ONLY use current database images"""
@@ -5537,6 +5788,7 @@ def timemachine():
                         level_copy = dict(level)
                         level_copy['historical_position'] = historical_pos
                         level_copy['historical_points'] = calculate_level_points(historical_pos, False)
+                        level_copy['current_position'] = current_positions.get(level_name)
                         
                         # Always use current thumbnail data
                         add_current_thumbnail(level_copy, level_name)
@@ -5552,7 +5804,8 @@ def timemachine():
                             'difficulty': 10,
                             'historical_position': historical_pos,
                             'historical_points': calculate_level_points(historical_pos, False),
-                            'is_placeholder': True
+                            'is_placeholder': True,
+                            'current_position': None
                         }
                         
                         # Use current thumbnail data even for placeholder levels
@@ -5575,7 +5828,7 @@ def timemachine():
             print(f"Error in time machine: {e}")
             flash('Error loading historical data', 'danger')
     
-    return render_template('timemachine.html', levels=levels, selected_date=selected_date)
+    return render_template('timemachine.html', levels=levels, selected_date=selected_date, today_date=today_date)
 
 @app.route('/level/<level_id>')
 def level_detail(level_id):
