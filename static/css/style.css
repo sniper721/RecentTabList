@@ -1337,3 +1337,143 @@ body, .card, .navbar, .btn, .form-control, .form-select, .dropdown-menu, .alert,
 .levels-grid a.level-item:hover {
     text-decoration: none !important;
 }
+/* Credits Social Media Styles */
+.credit-name {
+    color: var(--primary-color);
+    cursor: pointer;
+    text-decoration: underline;
+    transition: color 0.2s ease;
+}
+
+.credit-name:hover {
+    color: var(--primary-hover);
+    text-decoration: none;
+}
+
+/* Social Media Modal */
+.social-modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.social-modal-content {
+    background-color: var(--card-color);
+    margin: 10% auto;
+    padding: 0;
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 400px;
+    box-shadow: var(--shadow-lg);
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.social-modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.social-modal-header h5 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.social-modal-close {
+    font-size: 1.5rem;
+    font-weight: bold;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: color 0.2s ease;
+}
+
+.social-modal-close:hover {
+    color: var(--text-primary);
+}
+
+.social-modal-body {
+    padding: 1.5rem;
+}
+
+.social-link {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    color: var(--text-primary);
+    transition: all 0.2s ease;
+    border: 1px solid var(--border-light);
+}
+
+.social-link:hover {
+    background-color: var(--surface-color);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+    text-decoration: none;
+    color: var(--text-primary);
+}
+
+.social-link img {
+    width: 24px;
+    height: 24px;
+    margin-right: 0.75rem;
+}
+
+.social-link-text {
+    font-weight: 500;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .social-modal-content {
+        margin: 20% auto;
+        width: 95%;
+    }
+}/
+* Copy functionality styles */
+.social-copy {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.copy-icon {
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+.social-copy:hover .copy-icon {
+    opacity: 1;
+}
+
+.social-copy:hover {
+    background-color: var(--surface-color);
+}
+
+/* Success feedback animation */
+.social-copy.copied {
+    background-color: var(--success-color) !important;
+    color: white !important;
+    transition: all 0.3s ease;
+}

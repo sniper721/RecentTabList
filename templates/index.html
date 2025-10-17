@@ -189,10 +189,28 @@
                 <h4 class="mb-0">Credits</h4>
             </div>
             <div class="card-body">
-                <p><strong>List Admin:</strong> Miifin</p>
-                <p><strong>List Moderators:</strong> Kye, Monika, ApplePi, DairyFarmer</p>
-                <p><strong>List Coder:</strong> ENGINE</p>
-                <p><strong>Server Moderator:</strong> Cesium</p>
+                <p><strong>List Admin:</strong> <span class="credit-name" data-person="miifin">Miifin</span></p>
+                <p><strong>List Moderators:</strong> 
+                    <span class="credit-name" data-person="kye">Kye</span>, 
+                    <span class="credit-name" data-person="monika">Monika</span>, 
+                    <span class="credit-name" data-person="applepi">ApplePi</span>, 
+                    <span class="credit-name" data-person="dairyfarmer">DairyFarmer</span>
+                </p>
+                <p><strong>List Coder:</strong> <span class="credit-name" data-person="engine">ENGINE</span></p>
+                <p><strong>Server Moderator:</strong> <span class="credit-name" data-person="cesium">Cesium</span></p>
+            </div>
+        </div>
+
+        <!-- Social Media Modal -->
+        <div id="socialModal" class="social-modal" style="display: none;">
+            <div class="social-modal-content">
+                <div class="social-modal-header">
+                    <h5 id="socialModalTitle">Social Media</h5>
+                    <span class="social-modal-close">&times;</span>
+                </div>
+                <div class="social-modal-body">
+                    <div id="socialLinks"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -208,9 +226,232 @@
             window.location = '/level/' + levelId;
         });
     });
-    
 
+    // Social media data for each person
+    const socialData = {
+        'miifin': {
+            name: 'Miifin',
+            socials: [
+                {
+                    platform: 'YouTube',
+                    url: 'https://www.youtube.com/@BowOwner',
+                    icon: '/static/images/youtube-icon.svg'
+                },
+                {
+                    platform: 'Discord',
+                    username: 'baiuri',
+                    icon: '/static/images/discord-icon.svg',
+                    copyable: true
+                }
+            ]
+        },
+        'monika': {
+            name: 'Monika',
+            socials: [
+                {
+                    platform: 'YouTube',
+                    url: 'https://www.youtube.com/@InsaneI',
+                    icon: '/static/images/youtube-icon.svg'
+                },
+                {
+                    platform: 'Discord',
+                    username: 'monika.golden',
+                    icon: '/static/images/discord-icon.svg',
+                    copyable: true
+                }
+            ]
+        },
+        'engine': {
+            name: 'ENGINE',
+            socials: [
+                {
+                    platform: 'YouTube',
+                    url: 'https://www.youtube.com/@ENGINE009',
+                    icon: '/static/images/youtube-icon.svg'
+                },
+                {
+                    platform: 'Twitter',
+                    url: 'https://x.com/ENGINE_009',
+                    icon: '/static/images/twitter-icon.svg'
+                },
+                {
+                    platform: 'Discord',
+                    username: 'engine009',
+                    icon: '/static/images/discord-icon.svg',
+                    copyable: true
+                }
+            ]
+        },
+        'kye': {
+            name: 'Kye',
+            socials: [
+                {
+                    platform: 'YouTube',
+                    url: 'https://www.youtube.com/@Kye0928',
+                    icon: '/static/images/youtube-icon.svg'
+                },
+                {
+                    platform: 'Twitter',
+                    url: 'https://x.com/Kye092802',
+                    icon: '/static/images/twitter-icon.svg'
+                },
+                {
+                    platform: 'Discord',
+                    username: 'kye0928',
+                    icon: '/static/images/discord-icon.svg',
+                    copyable: true
+                }
+            ]
+        },
+        'applepi': {
+            name: 'ApplePi',
+            socials: [
+                {
+                    platform: 'YouTube',
+                    url: 'https://www.youtube.com/@paulskino1234',
+                    icon: '/static/images/youtube-icon.svg'
+                },
+                {
+                    platform: 'Discord',
+                    username: 'ipodnicks',
+                    icon: '/static/images/discord-icon.svg',
+                    copyable: true
+                }
+            ]
+        },
+        'cesium': {
+            name: 'Cesium',
+            socials: [
+                {
+                    platform: 'Discord',
+                    username: '.cesium55.',
+                    icon: '/static/images/discord-icon.svg',
+                    copyable: true
+                }
+            ]
+        },
+        'dairyfarmer': {
+            name: 'DairyFarmer',
+            socials: [
+                {
+                    platform: 'Discord',
+                    username: 'dairyfarmer17_',
+                    icon: '/static/images/discord-icon.svg',
+                    copyable: true
+                }
+            ]
+        }
+    };
+
+    // Modal functionality
+    const modal = document.getElementById('socialModal');
+    const modalTitle = document.getElementById('socialModalTitle');
+    const socialLinks = document.getElementById('socialLinks');
+    const closeBtn = document.querySelector('.social-modal-close');
+
+    // Add click events to credit names
+    document.querySelectorAll('.credit-name').forEach(name => {
+        name.addEventListener('click', function() {
+            const person = this.getAttribute('data-person');
+            const data = socialData[person];
+            
+            if (data) {
+                showSocialModal(data);
+            }
+        });
+    });
+
+    function showSocialModal(data) {
+        modalTitle.textContent = data.name + "'s Social Media";
+        socialLinks.innerHTML = '';
+        
+        data.socials.forEach(social => {
+            if (social.copyable && social.username) {
+                // Create copyable Discord username element
+                const copyElement = document.createElement('div');
+                copyElement.className = 'social-link social-copy';
+                copyElement.style.cursor = 'pointer';
+                
+                copyElement.innerHTML = `
+                    <img src="${social.icon}" alt="${social.platform}">
+                    <span class="social-link-text">${social.platform}: ${social.username}</span>
+                    <img src="/static/images/copy-icon.svg" alt="Copy" class="copy-icon" style="width: 16px; height: 16px; margin-left: auto;">
+                `;
+                
+                copyElement.addEventListener('click', function() {
+                    navigator.clipboard.writeText(social.username).then(function() {
+                        // Show feedback
+                        const originalText = copyElement.querySelector('.social-link-text').textContent;
+                        copyElement.querySelector('.social-link-text').textContent = 'Copied!';
+                        copyElement.style.backgroundColor = 'var(--success-color)';
+                        copyElement.style.color = 'white';
+                        
+                        setTimeout(function() {
+                            copyElement.querySelector('.social-link-text').textContent = originalText;
+                            copyElement.style.backgroundColor = '';
+                            copyElement.style.color = '';
+                        }, 1500);
+                    }).catch(function() {
+                        // Fallback for older browsers
+                        const textArea = document.createElement('textarea');
+                        textArea.value = social.username;
+                        document.body.appendChild(textArea);
+                        textArea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textArea);
+                        
+                        // Show feedback
+                        const originalText = copyElement.querySelector('.social-link-text').textContent;
+                        copyElement.querySelector('.social-link-text').textContent = 'Copied!';
+                        copyElement.style.backgroundColor = 'var(--success-color)';
+                        copyElement.style.color = 'white';
+                        
+                        setTimeout(function() {
+                            copyElement.querySelector('.social-link-text').textContent = originalText;
+                            copyElement.style.backgroundColor = '';
+                            copyElement.style.color = '';
+                        }, 1500);
+                    });
+                });
+                
+                socialLinks.appendChild(copyElement);
+            } else {
+                // Create regular link element
+                const link = document.createElement('a');
+                link.href = social.url;
+                link.target = '_blank';
+                link.className = 'social-link';
+                
+                link.innerHTML = `
+                    <img src="${social.icon}" alt="${social.platform}">
+                    <span class="social-link-text">${social.platform}</span>
+                `;
+                
+                socialLinks.appendChild(link);
+            }
+        });
+        
+        modal.style.display = 'block';
+    }
+
+    // Close modal functionality
+    closeBtn.addEventListener('click', function() {
+        modal.style.display = 'none';
+    });
+
+    // Close modal when clicking outside
+    window.addEventListener('click', function(event) {
+        if (event.target === modal) {
+            modal.style.display = 'none';
+        }
+    });
+
+    // Close modal with Escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' && modal.style.display === 'block') {
+            modal.style.display = 'none';
+        }
+    });
 </script>
-
 
 {% endblock %}
