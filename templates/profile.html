@@ -11,19 +11,7 @@
             </div>
             <div class="card-body">
                 <div class="text-center mb-4">
-                    <div class="profile-avatar mb-3">
-                        {% if user.avatar_url %}
-                            <img src="{{ user.avatar_url }}" alt="Avatar" class="rounded-circle" width="120" height="120" style="object-fit: cover;"
-                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
-                            <div class="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center text-white" style="width: 120px; height: 120px; font-size: 48px; display: none;">
-                                {{ user.username[0].upper() }}
-                            </div>
-                        {% else %}
-                            <div class="bg-primary rounded-circle d-inline-flex align-items-center justify-content-center text-white" style="width: 120px; height: 120px; font-size: 48px;">
-                                {{ user.username[0].upper() }}
-                            </div>
-                        {% endif %}
-                    </div>
+                    <!-- Profile avatar removed -->
                     <h4>
                         {{ user.nickname or user.username }}
                         {% if user.nickname %}
@@ -251,7 +239,6 @@
                         <p class="mb-2">To submit verifications, you need to:</p>
                         <ol class="mb-2">
                             <li>Link your Discord account (button above)</li>
-                            <li>Have the "List Player" role in our Discord server</li>
                         </ol>
                         <div class="mt-2">
                             <a href="{{ url_for('discord_setup_help') }}" class="btn btn-sm btn-outline-info">

@@ -91,17 +91,7 @@
         color: #ffffff !important;
     }
     
-    .user-avatar-mini {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background: #007bff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-weight: bold;
-    }
+    /* User avatar mini CSS removed */
     
     /* Card styling for black background */
     .card {
@@ -236,13 +226,7 @@
                     <h6>Sample Users</h6>
                     {% for user in sample_users %}
                     <div class="mini-user-card">
-                        <div class="user-avatar-mini">
-                            {% if user.avatar_url %}
-                                <img src="{{ user.avatar_url }}" alt="{{ user.username }}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
-                            {% else %}
-                                {{ user.username[0].upper() }}
-                            {% endif %}
-                        </div>
+                        <!-- User avatar removed -->
                         <div class="flex-grow-1">
                             <strong>{{ user.nickname or user.username }}</strong>
                             <br>
@@ -259,7 +243,7 @@
                     <h6>Test Profile Features</h6>
                     <div class="row">
                         <div class="col-md-6">
-                            <button class="btn btn-sm btn-success w-100 mb-2" onclick="testProfilePictures()">🖼️ Test Profile Pictures</button>
+                            <!-- Profile picture testing removed -->
                             <button class="btn btn-sm btn-info w-100 mb-2" onclick="testUserStats()">📊 Test User Stats</button>
                         </div>
                         <div class="col-md-6">
@@ -470,39 +454,7 @@ function testRemoveLevel() {
     }, 1000);
 }
 
-function testProfilePictures() {
-    showResult('profile-test-result', '🧪 Testing profile picture display...');
-    
-    // Check if profile pictures are loading correctly
-    const profileImages = document.querySelectorAll('.user-avatar-mini img');
-    let loadedImages = 0;
-    let totalImages = profileImages.length;
-    
-    if (totalImages === 0) {
-        showResult('profile-test-result', '⚠️ No profile pictures found to test');
-        return;
-    }
-    
-    profileImages.forEach(img => {
-        if (img.complete) {
-            loadedImages++;
-        } else {
-            img.onload = () => {
-                loadedImages++;
-                if (loadedImages === totalImages) {
-                    showResult('profile-test-result', `✅ All ${totalImages} profile pictures loaded successfully`);
-                }
-            };
-            img.onerror = () => {
-                showResult('profile-test-result', `❌ Some profile pictures failed to load`, true);
-            };
-        }
-    });
-    
-    if (loadedImages === totalImages) {
-        showResult('profile-test-result', `✅ All ${totalImages} profile pictures loaded successfully`);
-    }
-}
+// Profile picture testing removed - no image functionality
 
 function testUserStats() {
     showResult('profile-test-result', '🧪 Testing user statistics calculation...');

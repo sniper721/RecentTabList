@@ -44,7 +44,7 @@ def test_discord_bot():
     print("   - Send Messages")
     print("   - Read Message History")
     print("   - View Channels")
-    print("   - Manage Roles (to check List Player role)")
+    print("   - Manage Roles (optional - for role management commands)")
     print("3. Run the main.py file to start both Flask and Discord bot")
     
     return True
@@ -68,9 +68,8 @@ def test_verification_flow():
     print("✅ Verification submission system ready")
     print("\n🎯 Verification Flow:")
     print("1. User must link Discord account in profile")
-    print("2. User must have 'List Player' role in Discord server")
-    print("3. User can submit verification with video, difficulty, ratings")
-    print("4. Admin gets notification in Discord channel")
+    print("2. User can submit verification with video, difficulty, ratings")
+    print("3. Admin gets notification in Discord channel")
     print("5. Admin can approve/reject in admin panel")
     print("6. User gets DM notification about decision")
     

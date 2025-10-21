@@ -45,7 +45,7 @@
         </div>
     </div>
 
-    <!-- Row 1: Profile Information and Profile Picture -->
+    <!-- Row 1: Profile Information -->
     <div class="row">
         <div class="col-lg-6 mb-3">
             <div class="card h-100">
@@ -360,53 +360,7 @@
             </div>
         </div>
 
-        <div class="col-lg-6 mb-3">
-            <div class="card h-100">
-                <div class="card-header bg-success text-white">
-                    <h5 class="mb-0">🖼️ Profile Picture</h5>
-                </div>
-                <div class="card-body text-center">
-                    <div class="mb-3">
-                        {% if user.avatar_url %}
-                            <img src="{{ user.avatar_url }}" alt="Current Avatar" 
-                                 class="rounded-circle" width="100" height="100" style="object-fit: cover;"
-                                 onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">
-                            <div class="bg-secondary rounded-circle d-inline-flex align-items-center justify-content-center text-white" 
-                                 style="width: 100px; height: 100px; font-size: 36px; display: none;">
-                                {{ user.username[0].upper() }}
-                            </div>
-                        {% else %}
-                            <div class="bg-secondary rounded-circle d-inline-flex align-items-center justify-content-center text-white" 
-                                 style="width: 100px; height: 100px; font-size: 36px;">
-                                {{ user.username[0].upper() }}
-                            </div>
-                        {% endif %}
-                    </div>
-                    
-                    <form method="POST" action="{{ url_for('update_user_settings') }}" enctype="multipart/form-data">
-                        <input type="hidden" name="action" value="avatar">
-                        
-                        <div class="mb-3">
-                            <label for="avatar" class="form-label">Upload Picture</label>
-                            <input type="file" class="form-control form-control-sm" id="avatar" name="avatar" accept="image/*">
-                            <div class="form-text">Max 5MB, JPG/PNG only</div>
-                        </div>
-                        
-                        <div class="text-center mb-2">
-                            <small class="text-muted">OR</small>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="avatar_url" class="form-label">Image URL</label>
-                            <input type="url" class="form-control form-control-sm" id="avatar_url" name="avatar_url" 
-                                   value="{{ user.avatar_url or '' }}" placeholder="https://example.com/image.jpg">
-                        </div>
-                        
-                        <button type="submit" class="btn btn-success btn-sm w-100">📷 Update Picture</button>
-                    </form>
-                </div>
-            </div>
-        </div>
+
     </div>
 
     <!-- Row 2: Preferences and Social Media -->
@@ -939,40 +893,7 @@ document.addEventListener('DOMContentLoaded', function() {
         confirmPassword.addEventListener('input', validatePasswords);
     }
     
-    // File upload validation
-    const avatarInput = document.getElementById('avatar');
-    const avatarUrlInput = document.getElementById('avatar_url');
-    
-    if (avatarInput && avatarUrlInput) {
-        avatarInput.addEventListener('change', function() {
-            if (this.files && this.files[0]) {
-                // Clear URL input when file is selected
-                avatarUrlInput.value = '';
-                
-                // Validate file size (5MB max)
-                const file = this.files[0];
-                if (file.size > 5 * 1024 * 1024) {
-                    alert('File size must be less than 5MB');
-                    this.value = '';
-                    return;
-                }
-                
-                // Validate file type
-                if (!file.type.startsWith('image/')) {
-                    alert('Please select an image file');
-                    this.value = '';
-                    return;
-                }
-            }
-        });
-        
-        avatarUrlInput.addEventListener('input', function() {
-            if (this.value) {
-                // Clear file input when URL is entered
-                avatarInput.value = '';
-            }
-        });
-    }
+    // Avatar functionality removed
 });
 </script>
 {% endblock %}

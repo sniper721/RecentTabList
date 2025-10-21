@@ -244,11 +244,7 @@
                     <div class="discord-members-list">
                         {% for member in discord_data.members[:8] %}
                         <div class="discord-member">
-                            {% if member.avatar %}
-                                <img src="{{ member.avatar }}" alt="{{ member.username }}" class="member-avatar">
-                            {% else %}
                                 <div class="member-avatar-placeholder">{{ member.username[0].upper() }}</div>
-                            {% endif %}
                             <div class="member-info">
                                 <span class="member-name">{{ member.username }}</span>
                                 {% if member.channel_name %}

@@ -67,7 +67,7 @@ class ChangelogDiscordNotifier:
             payload = {
                 "content": message.strip(),
                 "username": "Changelog Bot",
-                "avatar_url": "https://cdn.discordapp.com/embed/avatars/0.png"
+                # Avatar removed - using default Discord bot appearance
             }
             
             # Send via webhook - single request only

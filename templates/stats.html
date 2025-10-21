@@ -67,9 +67,7 @@
                                         </td>
                                         <td class="player-cell">
                                             <div class="d-flex align-items-center">
-                                                <div class="player-avatar me-3">
-                                                    {{ (player.nickname or player.username)[0].upper() }}
-                                                </div>
+                                                <!-- Player avatar removed -->
                                                 <div>
                                                     <a href="{{ url_for('public_profile', username=player.username) }}" 
                                                        class="player-name text-decoration-none fw-bold">
@@ -191,19 +189,7 @@
     color: white;
 }
 
-.player-avatar {
-    width: 45px;
-    height: 45px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-weight: bold;
-    font-size: 18px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
+/* Player avatar CSS removed */
 
 .player-name {
     color: #2c3e50;

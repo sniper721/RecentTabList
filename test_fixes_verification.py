@@ -9,36 +9,37 @@ import os
 # Add the current directory to Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-def test_profile_picture_consistency():
-    """Test that profile picture templates are consistent"""
-    print("🧪 Testing profile picture template consistency...")
+def test_profile_picture_removal():
+    """Test that profile pictures have been completely removed"""
+    print("🧪 Testing profile picture removal...")
     
     try:
-        # Check if templates use consistent field names
+        # Check if templates have any remaining avatar references
         templates_to_check = [
             'templates/profile.html',
             'templates/public_profile.html',
-            'templates/settings.html'
+            'templates/settings.html',
+            'templates/admin_test_environment.html'
         ]
         
-        consistent = True
+        removed = True
         for template_path in templates_to_check:
             if os.path.exists(template_path):
                 with open(template_path, 'r', encoding='utf-8') as f:
                     content = f.read()
-                    # Check if it uses avatar_url consistently
-                    if 'user.avatar_url' in content:
-                        print(f"✅ {template_path} uses avatar_url correctly")
+                    # Check if any avatar references remain
+                    if 'avatar_url' in content or 'avatar_base64' in content:
+                        print(f"❌ {template_path} still has avatar references")
+                        removed = False
                     else:
-                        print(f"❌ {template_path} may have inconsistent avatar field usage")
-                        consistent = False
+                        print(f"✅ {template_path} has no avatar references")
             else:
                 print(f"⚠️  {template_path} not found")
         
-        return consistent
+        return removed
         
     except Exception as e:
-        print(f"❌ Error testing profile pictures: {e}")
+        print(f"❌ Error testing profile picture removal: {e}")
         return False
 
 def test_changelog_enhancements():
@@ -165,7 +166,7 @@ def main():
     print("🚀 Starting comprehensive fixes verification...\n")
     
     tests = [
-        ("Profile Picture Consistency", test_profile_picture_consistency),
+        ("Profile Picture Removal", test_profile_picture_removal),
         ("Changelog Enhancements", test_changelog_enhancements),
         ("Legacy Position Shifting", test_legacy_position_shifting),
         ("Mobile Roulette Fixes", test_mobile_roulette_fixes),
@@ -190,7 +191,7 @@ def main():
     if passed == total:
         print("🎉 ALL FIXES VERIFIED SUCCESSFULLY!")
         print("\n📝 Summary of implemented fixes:")
-        print("1. ✅ Profile picture visibility fixed (standardized avatar_url usage)")
+        print("1. ✅ Profile pictures completely removed from system")
         print("2. ✅ Changelog bot now specifies list type (future/legacy vs main)")
         print("3. ✅ Top 10 push-out notifications implemented")
         print("4. ✅ Legacy list position shifting implemented")

@@ -557,6 +557,8 @@ def utility_processor():
             return get_unread_notification_count(session['user_id'])
         return 0
     
+
+    
     return dict(
         format_points=format_points, 
         get_video_embed_info=get_video_embed_info,
@@ -1252,88 +1254,7 @@ def log_admin_action(admin_username, action, details=""):
     except Exception as e:
         print(f"Error in log_admin_action: {e}")
 
-def convert_image_to_base64(file_stream, max_kb=50, target_size=(320, 180)):
-    """
-    Convert uploaded image to optimized Base64 within size limit
-    
-    Args:
-        file_stream: File stream from uploaded image
-        max_kb: Maximum size in KB (default 50KB)
-        target_size: Target dimensions as (width, height) tuple (default 320x180 for 16:9)
-    
-    Returns:
-        Base64 data URL string or None if conversion fails
-    """
-    try:
-        from PIL import Image
-        import base64
-        from io import BytesIO
-        
-        # Open image from stream
-        img = Image.open(file_stream)
-        
-        # Convert to RGB (removes alpha channel if present)
-        if img.mode in ('RGBA', 'P', 'LA'):
-            img = img.convert('RGB')
-        
-        # Force 16:9 aspect ratio by cropping/resizing
-        target_width, target_height = target_size
-        
-        # Calculate current aspect ratio
-        current_width, current_height = img.size
-        current_ratio = current_width / current_height
-        target_ratio = target_width / target_height
-        
-        if current_ratio > target_ratio:
-            # Image is wider than target ratio - crop width
-            new_width = int(current_height * target_ratio)
-            left = (current_width - new_width) // 2
-            img = img.crop((left, 0, left + new_width, current_height))
-        elif current_ratio < target_ratio:
-            # Image is taller than target ratio - crop height
-            new_height = int(current_width / target_ratio)
-            top = (current_height - new_height) // 2
-            img = img.crop((0, top, current_width, top + new_height))
-        
-        # Resize to exact target dimensions
-        img = img.resize(target_size, Image.Resampling.LANCZOS)
-        
-        # Try different quality levels to fit size limit (prefer better quality first)
-        max_bytes = max_kb * 1024
-        
-        for quality in [95, 85, 75, 65, 55, 45, 35]:  # Start with high quality
-            output = BytesIO()
-            img.save(output, 
-                    format='JPEG', 
-                    quality=quality, 
-                    optimize=True, 
-                    progressive=True)
-            
-            output.seek(0)
-            image_bytes = output.getvalue()
-            
-            # Check if within size limit
-            if len(image_bytes) <= max_bytes:
-                # Convert to Base64 data URL
-                base64_string = base64.b64encode(image_bytes).decode('utf-8')
-                data_url = f"data:image/jpeg;base64,{base64_string}"
-                
-                # Final size check (Base64 is ~33% larger)
-                final_size_kb = len(data_url.encode('utf-8')) / 1024
-                print(f"✅ Image optimized: {quality}% quality, {final_size_kb:.1f}KB")
-                
-                return data_url
-        
-        # If even lowest quality is too big, return None
-        print(f"❌ Could not compress image to under {max_kb}KB")
-        return None
-        
-    except ImportError:
-        print("❌ PIL/Pillow not available for image processing")
-        return None
-    except Exception as e:
-        print(f"❌ Error converting image to Base64: {e}")
-        return None
+# Image conversion function removed - profile pictures no longer supported
 
 def send_discord_notification_direct(username, level_name, progress, video_url):
     """Direct Discord notification without external file"""
@@ -1542,7 +1463,7 @@ def fix_missing_urls():
             {'<br>'.join(results)}
         </div>
         <p style="margin-top: 20px;">
-            <a href="/debug_images">🔍 Check Results</a> |
+            <!-- Image debug link removed --> |
             <a href="/">🏠 Main List</a>
         </p>
         """
@@ -1598,48 +1519,7 @@ def quick_fix_urls():
     except Exception as e:
         return f"<h2>❌ Error</h2><p>{str(e)}</p>"
 
-@app.route('/test_base64_display')
-def test_base64_display():
-    """Test Base64 image display directly"""
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied - Admin only', 'danger')
-        return redirect(url_for('index'))
-    
-    # Get the first level with a Base64 thumbnail
-    level = mongo_db.levels.find_one({
-        "thumbnail_url": {"$regex": "^data:image"}
-    })
-    
-    if not level:
-        return "<h2>No Base64 images found in database</h2><p><a href='/debug_thumbnails'>Debug Thumbnails</a></p>"
-    
-    thumbnail_url = level.get('thumbnail_url', '')
-    
-    return f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Base64 Image Test</title>
-    </head>
-    <body style="padding: 20px; font-family: Arial;">
-        <h2>Base64 Image Display Test</h2>
-        <p><strong>Level:</strong> {level.get('name', 'Unknown')}</p>
-        <p><strong>Thumbnail URL starts with:</strong> {thumbnail_url[:50] if thumbnail_url else 'None'}...</p>
-        <p><strong>Size:</strong> {len(thumbnail_url)} characters ({len(thumbnail_url.encode('utf-8'))//1024}KB)</p>
-        
-        <h3>Direct Image Display:</h3>
-        <img src="{thumbnail_url}" 
-             style="width: 320px; height: 180px; border: 2px solid red; object-fit: cover;"
-             alt="Base64 Test" 
-             onload="document.getElementById('status').innerHTML = '✅ Image loaded successfully!'"
-             onerror="document.getElementById('status').innerHTML = '❌ Image failed to load!'">
-        
-        <p id="status">⏳ Loading...</p>
-        
-        <p><a href="/debug_thumbnails">← Back to Debug</a> | <a href="/">Main List</a></p>
-    </body>
-    </html>
-    """
+# Base64 image testing removed - no image uploads supported
 
 @app.route('/admin/records')
 def admin_records():
@@ -2166,153 +2046,9 @@ def debug_thumbnails():
     except Exception as e:
         return f"<div style='padding:20px; color:red;'>Debug Error: {e}</div>"
 
-@app.route('/test_base64_upload', methods=['GET', 'POST'])
-def test_base64_upload():
-    """Test Base64 image conversion functionality"""
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied - Admin only', 'danger')
-        return redirect(url_for('index'))
-    
-    if request.method == 'POST':
-        try:
-            test_file = request.files.get('test_file')
-            if test_file and test_file.filename:
-                # Try converting to Base64
-                base64_data = convert_image_to_base64(
-                    test_file.stream,
-                    max_kb=50,
-                    target_size=(320, 180)
-                )
-                
-                if base64_data:
-                    # Calculate final size
-                    final_size_kb = len(base64_data.encode('utf-8')) / 1024
-                    
-                    return f"""
-                    <div style="padding: 20px; font-family: Arial;">
-                        <h2>✅ Base64 Conversion Successful!</h2>
-                        <p><strong>Original file:</strong> {test_file.filename}</p>
-                        <p><strong>Final size:</strong> {final_size_kb:.1f}KB (Base64)</p>
-                        <p><strong>Dimensions:</strong> 320x180 (16:9 aspect ratio)</p>
-                        
-                        <h3>Preview:</h3>
-                        <img src="{base64_data}" style="border: 1px solid #ddd; max-width: 320px;">
-                        
-                        <h3>Base64 Data (first 100 chars):</h3>
-                        <code style="background: #f5f5f5; padding: 10px; display: block; word-break: break-all;">
-                            {base64_data[:100]}...
-                        </code>
-                        
-                        <p><a href="/test_base64_upload">Test Another Image</a> | <a href="/admin/levels">Admin Levels</a></p>
-                    </div>
-                    """
-                else:
-                    return """
-                    <div style="padding: 20px; font-family: Arial; color: red;">
-                        <h2>❌ Base64 Conversion Failed</h2>
-                        <p>Could not compress image to under 50KB even at lowest quality.</p>
-                        <p>Try a smaller or simpler image.</p>
-                        <p><a href="/test_base64_upload">Try Again</a></p>
-                    </div>
-                    """
-            else:
-                return "No file uploaded"
-                
-        except Exception as e:
-            return f"<div style='padding:20px; color:red;'>Error: {e}</div>"
-    
-    # GET request - show upload form
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Test Base64 Image Conversion</title>
-        <style>
-            body { font-family: Arial; padding: 20px; max-width: 600px; margin: 0 auto; }
-            .form-group { margin: 15px 0; }
-            input[type=file], button { padding: 10px; margin: 5px 0; }
-            .info { background: #e3f2fd; padding: 15px; border-radius: 5px; margin: 15px 0; }
-        </style>
-    </head>
-    <body>
-        <h2>🖼️ Test Base64 Image Conversion</h2>
-        
-        <div class="info">
-            <h4>Conversion Settings:</h4>
-            <ul>
-                <li><strong>Max size:</strong> 50KB (Base64)</li>
-                <li><strong>Dimensions:</strong> 320x180 pixels (16:9 aspect ratio)</li>
-                <li><strong>Quality:</strong> Starts at 95%, reduces if needed</li>
-                <li><strong>Format:</strong> JPEG with optimization</li>
-                <li><strong>Cropping:</strong> Auto-crops to fit 16:9 ratio</li>
-            </ul>
-        </div>
-        
-        <form method="POST" enctype="multipart/form-data">
-            <div class="form-group">
-                <label>Select Image to Test:</label><br>
-                <input type="file" name="test_file" accept="image/*" required>
-            </div>
-            <button type="submit">🚀 Convert to Base64</button>
-        </form>
-        
-        <p><a href="/admin/levels">← Back to Admin Levels</a></p>
-    </body>
-    </html>
-    """
+# Base64 upload testing removed - no image uploads supported
 
-@app.route('/admin/set_thumbnail/<level_id>', methods=['GET', 'POST'])
-def set_thumbnail(level_id):
-    """Admin route to set custom thumbnail for a level"""
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied - Admin only', 'danger')
-        return redirect(url_for('index'))
-    
-    try:
-        from bson.objectid import ObjectId
-        level = mongo_db.levels.find_one({"_id": ObjectId(level_id)})
-        if not level:
-            flash('Level not found', 'danger')
-            return redirect(url_for('admin'))
-        
-        if request.method == 'POST':
-            thumbnail_url = request.form.get('thumbnail_url', '').strip()
-            
-            # Update the level with new thumbnail URL
-            mongo_db.levels.update_one(
-                {"_id": ObjectId(level_id)},
-                {"$set": {"thumbnail_url": thumbnail_url}}
-            )
-            
-            # Clear cache
-            levels_cache['main_list'] = None
-            levels_cache['legacy_list'] = None
-            
-            flash(f'Thumbnail updated for {level["name"]}', 'success')
-            return redirect(url_for('admin'))
-        
-        # GET request - show form
-        return f"""
-        <h2>Set Thumbnail for: {level['name']}</h2>
-        <form method="POST">
-            <div class="mb-3">
-                <label>Current Video URL:</label>
-                <input type="text" class="form-control" value="{level.get('video_url', '')}" readonly>
-            </div>
-            <div class="mb-3">
-                <label>Custom Thumbnail URL (leave empty to use YouTube thumbnail):</label>
-                <input type="url" name="thumbnail_url" class="form-control" 
-                       value="{level.get('thumbnail_url', '')}" 
-                       placeholder="https://example.com/image.jpg">
-            </div>
-            <button type="submit" class="btn btn-primary">Update Thumbnail</button>
-            <a href="/admin" class="btn btn-secondary">Cancel</a>
-        </form>
-        """
-        
-    except Exception as e:
-        flash(f'Error: {str(e)}', 'danger')
-        return redirect(url_for('admin'))
+# set_thumbnail route removed - no image functionality
 
 @app.route('/complete_fix')
 def complete_fix():
@@ -3606,216 +3342,11 @@ def admin_rebuild_image_system():
     except Exception as e:
         return f"❌ Error rebuilding image system: {str(e)}"
 
-@app.route('/test_new_images')
-def test_new_images():
-    """Test the new simplified image system"""
-    try:
-        levels = list(mongo_db.levels.find(
-            {"is_legacy": False},
-            {"name": 1, "video_url": 1, "position": 1, "thumbnail_url": 1}
-        ).sort("position", 1).limit(8))
-        
-        html = """
-        <h1>🧪 NEW IMAGE SYSTEM TEST</h1>
-        <p>Testing the completely rewritten image system...</p>
-        <div style="display: flex; flex-wrap: wrap; gap: 20px; margin: 20px 0;">
-        """
-        
-        for level in levels:
-            name = level.get('name', 'Unknown')
-            video_url = level.get('video_url', '')
-            thumbnail_url = level.get('thumbnail_url', '')
-            position = level.get('position', '?')
-            
-            # Apply the EXACT same logic as the template
-            img_html = ''
-            status = ''
-            
-            if thumbnail_url:
-                img_html = f'<img src="{thumbnail_url}" style="width: 150px; height: 84px; object-fit: cover; border-radius: 8px; border: 2px solid purple;">'
-                status = '🟣 Custom Image'
-            elif video_url:
-                if 'youtube.com/watch?v=' in video_url:
-                    video_id = video_url.split('watch?v=')[1].split('&')[0]
-                    img_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" style="width: 150px; height: 84px; object-fit: cover; border-radius: 8px; border: 2px solid green;">'
-                    status = f'🟢 YouTube: {video_id}'
-                elif 'youtu.be/' in video_url:
-                    video_id = video_url.split('youtu.be/')[1].split('?')[0]
-                    img_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" style="width: 150px; height: 84px; object-fit: cover; border-radius: 8px; border: 2px solid blue;">'
-                    status = f'🔵 YouTu.be: {video_id}'
-                else:
-                    domain = video_url.split('/')[2] if '/' in video_url else 'Video'
-                    img_html = f'<div style="width: 150px; height: 84px; background: #17a2b8; color: white; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 12px; border: 2px solid orange;">🎥 {domain}</div>'
-                    status = f'🟠 Platform: {domain}'
-            else:
-                img_html = '<div style="width: 150px; height: 84px; background: #f8f9fa; color: #6c757d; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 12px; border: 2px solid gray;">📷 No Preview</div>'
-                status = '⚪ No Preview'
-            
-            html += f"""
-            <div style="border: 1px solid #ddd; padding: 15px; border-radius: 8px; background: white; text-align: center;">
-                <h4>#{position} - {name[:15]}{'...' if len(name) > 15 else ''}</h4>
-                <div style="margin: 10px 0;">
-                    {img_html}
-                </div>
-                <p style="font-weight: bold; margin: 5px 0;">{status}</p>
-                <small style="color: #666; word-break: break-all;">{video_url[:30]}{'...' if len(video_url) > 30 else video_url or 'No URL'}</small>
-            </div>
-            """
-        
-        html += """
-        </div>
-        <div style="background: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h2>✅ New Image System Logic:</h2>
-            <ol>
-                <li><strong>🟣 Purple border:</strong> Custom uploaded image (highest priority)</li>
-                <li><strong>🟢 Green border:</strong> YouTube thumbnail from youtube.com/watch?v= URL</li>
-                <li><strong>🔵 Blue border:</strong> YouTube thumbnail from youtu.be/ URL</li>
-                <li><strong>🟠 Orange border:</strong> Non-YouTube video (shows platform name)</li>
-                <li><strong>⚪ Gray border:</strong> No video URL (shows "No Preview")</li>
-            </ol>
-        </div>
-        <p>
-            <a href="/">🏠 Check Main List</a> |
-            <a href="/debug_images">🔍 Debug Database</a> |
-            <a href="/fix_missing_urls">🔧 Fix URLs</a>
-        </p>
-        """
-        
-        return html
-        
-    except Exception as e:
-        return f"❌ Error: {str(e)}"
+# test_new_images route removed - no image functionality
 
-@app.route('/final_test')
-def final_test():
-    """Final test to make sure images work"""
-    try:
-        # Test the exact template logic
-        levels = list(mongo_db.levels.find(
-            {"is_legacy": False},
-            {"name": 1, "video_url": 1, "thumbnail_url": 1, "position": 1}
-        ).sort("position", 1).limit(6))
-        
-        html = """
-        <h1>🎯 FINAL IMAGE TEST</h1>
-        <p>Testing the exact same logic as the template...</p>
-        <div style="display: flex; flex-wrap: wrap; gap: 15px;">
-        """
-        
-        for level in levels:
-            name = level.get('name', 'Unknown')
-            video_url = level.get('video_url', '')
-            thumbnail_url = level.get('thumbnail_url', '')
-            position = level.get('position', '?')
-            
-            # EXACT template logic
-            img_html = ''
-            if thumbnail_url:
-                img_html = f'<img src="{thumbnail_url}" style="width: 150px; height: 84px; object-fit: cover; border-radius: 8px;">'
-                status = '🟣 Custom Image'
-            elif video_url:
-                if 'youtube.com/watch?v=' in video_url:
-                    video_id = video_url.split('watch?v=')[1].split('&')[0]
-                    img_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" style="width: 150px; height: 84px; object-fit: cover; border-radius: 8px;">'
-                    status = f'🟢 YouTube: {video_id}'
-                elif 'youtu.be/' in video_url:
-                    video_id = video_url.split('youtu.be/')[1].split('?')[0]
-                    img_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" style="width: 150px; height: 84px; object-fit: cover; border-radius: 8px;">'
-                    status = f'🔵 YouTu.be: {video_id}'
-                else:
-                    domain = video_url.split('/')[2] if '/' in video_url else 'Video'
-                    img_html = f'<div style="width: 150px; height: 84px; background: #17a2b8; color: white; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 11px;">🎥 {domain}</div>'
-                    status = f'🟠 {domain}'
-            else:
-                img_html = '<div style="width: 150px; height: 84px; background: #f8f9fa; color: #6c757d; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 11px;">📷 No Preview</div>'
-                status = '⚪ No Preview'
-            
-            html += f"""
-            <div style="border: 1px solid #ddd; padding: 10px; border-radius: 8px; text-align: center; background: white;">
-                <h4>#{position} {name[:12]}{'...' if len(name) > 12 else ''}</h4>
-                {img_html}
-                <p style="margin: 5px 0; font-weight: bold; font-size: 12px;">{status}</p>
-            </div>
-            """
-        
-        html += """
-        </div>
-        <div style="margin-top: 20px; background: #e8f5e8; padding: 15px; border-radius: 8px;">
-            <h2>✅ If images show above, the system works!</h2>
-            <p>The template uses the exact same logic as this test.</p>
-        </div>
-        <p>
-            <a href="/">🏠 Check Main List</a> |
-            <a href="/simple_image_fix">🔧 Fix Missing URLs</a>
-        </p>
-        """
-        
-        return html
-        
-    except Exception as e:
-        return f"❌ Error: {str(e)}"
+# final_test route removed - no image functionality
 
-@app.route('/image_test')
-def image_test():
-    """Simple test to verify images work"""
-    try:
-        # Test with known working YouTube URLs
-        test_data = [
-            {'name': '555', 'video_url': 'https://www.youtube.com/watch?v=KDjwz-Lt-Qo'},
-            {'name': 'deimonx', 'video_url': ''},  # Should show No Preview
-            {'name': 'test youtu.be', 'video_url': 'https://youtu.be/dQw4w9WgXcQ'},
-        ]
-        
-        html = """
-        <h1>🧪 IMAGE SYSTEM TEST</h1>
-        <p>Testing the template logic with sample data...</p>
-        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-        """
-        
-        for data in test_data:
-            name = data['name']
-            video_url = data['video_url']
-            
-            # Apply exact template logic
-            if video_url:
-                if 'youtube.com/watch?v=' in video_url:
-                    video_id = video_url.split('watch?v=')[1].split('&')[0]
-                    img_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" style="width: 150px; height: 84px; object-fit: cover; border-radius: 8px;">'
-                    status = f'✅ YouTube: {video_id}'
-                elif 'youtu.be/' in video_url:
-                    video_id = video_url.split('youtu.be/')[1].split('?')[0]
-                    img_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" style="width: 150px; height: 84px; object-fit: cover; border-radius: 8px;">'
-                    status = f'✅ YouTu.be: {video_id}'
-                else:
-                    img_html = '<div style="width: 150px; height: 84px; background: #17a2b8; color: white; display: flex; align-items: center; justify-content: center; border-radius: 8px;">🎥 Other</div>'
-                    status = '🟠 Other Platform'
-            else:
-                img_html = '<div style="width: 150px; height: 84px; background: #f8f9fa; color: #6c757d; display: flex; align-items: center; justify-content: center; border-radius: 8px;">📷 No Preview</div>'
-                status = '⚪ No Preview'
-            
-            html += f"""
-            <div style="border: 1px solid #ddd; padding: 15px; border-radius: 8px; text-align: center;">
-                <h4>{name}</h4>
-                {img_html}
-                <p style="margin: 10px 0; font-weight: bold;">{status}</p>
-                <small style="word-break: break-all;">{video_url or 'No URL'}</small>
-            </div>
-            """
-        
-        html += """
-        </div>
-        <div style="margin-top: 20px; background: #e8f5e8; padding: 15px; border-radius: 8px;">
-            <h2>✅ If you see images above, the system works!</h2>
-            <p>Now go fix the missing URLs in your database:</p>
-            <p><a href="/simple_image_fix" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🔧 Fix Missing URLs</a></p>
-        </div>
-        <p><a href="/">🏠 Check Main List</a></p>
-        """
-        
-        return html
-        
-    except Exception as e:
-        return f"❌ Error: {str(e)}"
+# image_test route removed - no image functionality
 
 @app.route('/restore_images')
 def restore_images():
@@ -3930,111 +3461,7 @@ def test():
     <p><a href="/">← Back to main list</a> | <a href="/admin">Admin Panel</a></p>
     """
 
-@app.route('/test_images_simple')
-def test_images_simple():
-    """Simple image test with YOUR actual YouTube videos"""
-    test_levels = [
-        {
-            'name': '555',
-            'video_url': 'https://www.youtube.com/watch?v=KDjwz-Lt-Qo',
-            'position': 1
-        },
-        {
-            'name': 'the light circles', 
-            'video_url': 'https://youtu.be/s82TlWCh-V4',
-            'position': 4
-        },
-        {
-            'name': 'old memories',
-            'video_url': 'https://youtu.be/vVDeEQuQ_pM',
-            'position': 5
-        },
-        {
-            'name': 'ochiru 2',
-            'video_url': 'https://www.youtube.com/watch?v=sImN3-3e5u0',
-            'position': 7
-        },
-        {
-            'name': 'Beans and Onion',
-            'video_url': 'https://youtu.be/K4EOvS8BXnA?si=W7Ks7Ih5_LNSej41',
-            'position': 8
-        },
-        {
-            'name': 'the ringer',
-            'video_url': 'https://www.youtube.com/watch?v=3CwTD5RtFDk',
-            'position': 9
-        }
-    ]
-    
-    html = """
-    <h2>🧪 Image Test - YOUR ACTUAL LEVELS</h2>
-    <p>Testing with your actual YouTube URLs from the database...</p>
-    <div style="display: flex; flex-wrap: wrap; gap: 20px;">
-    """
-    
-    for level in test_levels:
-        video_url = level['video_url']
-        level_name = level['name']
-        
-        # EXACT same logic as the fixed template
-        if video_url and video_url.strip():
-            if 'youtube.com/watch?v=' in video_url:
-                video_id = video_url.split('watch?v=')[1].split('&')[0]
-                img_html = f'''
-                <img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" 
-                     alt="{level_name}" 
-                     style="width: 206px; height: 116px; object-fit: cover; border-radius: 8px; border: 2px solid green;"
-                     loading="lazy">
-                '''
-            elif 'youtu.be/' in video_url:
-                video_id = video_url.split('youtu.be/')[1].split('?')[0]
-                img_html = f'''
-                <img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" 
-                     alt="{level_name}" 
-                     style="width: 206px; height: 116px; object-fit: cover; border-radius: 8px; border: 2px solid green;"
-                     loading="lazy">
-                '''
-            else:
-                # Non-YouTube video
-                domain = video_url.split('/')[2] if '/' in video_url else 'Video'
-                img_html = f'''
-                <div style="width: 206px; height: 116px; background: #17a2b8; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; border: 2px solid blue;">
-                    🎥 {domain}
-                </div>
-                '''
-        else:
-            img_html = '''
-            <div style="width: 206px; height: 116px; background: #f8f9fa; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #6c757d; border: 2px solid orange;">
-                📷 No Preview
-            </div>
-            '''
-        
-        html += f"""
-        <div style="border: 1px solid #ddd; padding: 15px; border-radius: 8px; background: white;">
-            <h4>#{level['position']} - {level_name}</h4>
-            <p><strong>Video URL:</strong> {video_url if video_url else 'None'}</p>
-            <div style="margin: 10px 0;">
-                {img_html}
-            </div>
-        </div>
-        """
-    
-    html += """
-    </div>
-    <p style="margin-top: 20px;">
-        <strong>Legend:</strong><br>
-        🟢 Green border = YouTube thumbnail loaded<br>
-        🔵 Blue border = Non-YouTube video (Streamable, etc.)<br>
-        🟠 Orange border = No video URL<br>
-    </p>
-    <p style="margin-top: 20px;">
-        <a href="/">← Back to main list</a> | 
-        <a href="/test_images_simple">🔄 Refresh test</a> |
-        <a href="/debug_levels">🔍 Debug levels</a>
-    </p>
-    """
-    
-    return html
+# test_images_simple route removed - no image functionality
 
 @app.route('/check_missing_levels')
 def check_missing_levels():
@@ -4094,94 +3521,7 @@ def check_missing_levels():
     except Exception as e:
         return f"❌ Error: {str(e)}"
 
-@app.route('/debug_images')
-def debug_images():
-    """Simple debug to see exactly what's in the database"""
-    try:
-        levels = list(mongo_db.levels.find(
-            {"is_legacy": False},
-            {"name": 1, "video_url": 1, "position": 1, "thumbnail_url": 1}
-        ).sort("position", 1).limit(10))
-        
-        html = """
-        <h1>🔍 SIMPLE IMAGE DEBUG</h1>
-        <p>Let's see exactly what's in the database...</p>
-        <table border="1" style="border-collapse: collapse; width: 100%; font-family: monospace;">
-            <tr style="background: #f0f0f0;">
-                <th style="padding: 10px;">#</th>
-                <th style="padding: 10px;">Level Name</th>
-                <th style="padding: 10px;">Video URL</th>
-                <th style="padding: 10px;">Thumbnail URL</th>
-                <th style="padding: 10px;">What Should Show</th>
-            </tr>
-        """
-        
-        for level in levels:
-            name = level.get('name', 'Unknown')
-            video_url = level.get('video_url', '')
-            thumbnail_url = level.get('thumbnail_url', '')
-            position = level.get('position', '?')
-            
-            # Determine what should show
-            what_shows = ''
-            if thumbnail_url and thumbnail_url.strip():
-                what_shows = f'🟣 CUSTOM IMAGE: {thumbnail_url[:50]}...'
-            elif video_url and video_url.strip():
-                if 'youtube.com' in video_url and 'watch?v=' in video_url:
-                    video_id = video_url.split('watch?v=')[1].split('&')[0]
-                    what_shows = f'🟢 YOUTUBE THUMB: {video_id}'
-                elif 'youtu.be/' in video_url:
-                    video_id = video_url.split('youtu.be/')[1].split('?')[0]
-                    what_shows = f'🔵 YOUTU.BE THUMB: {video_id}'
-                else:
-                    domain = video_url.split('/')[2] if '/' in video_url else 'Unknown'
-                    what_shows = f'🟠 PLATFORM: {domain}'
-            else:
-                what_shows = '⚪ NO PREVIEW'
-            
-            # Color code the row
-            if '🟢' in what_shows or '🔵' in what_shows:
-                row_color = 'background: #e8f5e8;'
-            elif '🟣' in what_shows:
-                row_color = 'background: #f3e5f5;'
-            elif '🟠' in what_shows:
-                row_color = 'background: #fff3e0;'
-            else:
-                row_color = 'background: #ffebee;'
-            
-            html += f"""
-            <tr style="{row_color}">
-                <td style="padding: 10px; font-weight: bold;">#{position}</td>
-                <td style="padding: 10px; font-weight: bold;">{name}</td>
-                <td style="padding: 10px; font-size: 11px; max-width: 200px; word-break: break-all;">{video_url or 'EMPTY'}</td>
-                <td style="padding: 10px; font-size: 11px; max-width: 200px; word-break: break-all;">{thumbnail_url or 'EMPTY'}</td>
-                <td style="padding: 10px; font-weight: bold;">{what_shows}</td>
-            </tr>
-            """
-        
-        html += """
-        </table>
-        <div style="margin-top: 20px;">
-            <h2>🎯 What This Means:</h2>
-            <ul>
-                <li><strong>🟢 Green:</strong> Should show YouTube thumbnail automatically</li>
-                <li><strong>🔵 Blue:</strong> Should show YouTu.be thumbnail automatically</li>
-                <li><strong>🟣 Purple:</strong> Should show custom uploaded image</li>
-                <li><strong>🟠 Orange:</strong> Should show platform name (Streamable, etc.)</li>
-                <li><strong>⚪ White:</strong> Should show "📷 No Preview"</li>
-            </ul>
-        </div>
-        <p>
-            <a href="/fix_missing_urls">🔧 Fix Missing URLs</a> |
-            <a href="/">🏠 Check Main List</a> |
-            <a href="/admin/levels">⚙️ Admin Panel</a>
-        </p>
-        """
-        
-        return html
-        
-    except Exception as e:
-        return f"❌ Error: {str(e)}"
+# debug_images route removed - no image functionality
 
 @app.route('/cleanup_broken_thumbnails')
 def cleanup_broken_thumbnails():
@@ -4219,7 +3559,7 @@ def cleanup_broken_thumbnails():
             <a href="/" style="background: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 18px;">🏠 CHECK MAIN LIST NOW</a>
         </p>
         <p>
-            <a href="/debug_images">🔍 Debug Images</a> | 
+            <!-- Image debug link removed --> | 
             <a href="/admin">⚙️ Admin Panel</a>
         </p>
         """
@@ -4328,92 +3668,7 @@ def debug_levels():
     except Exception as e:
         return f"<h2>❌ Database Error</h2><p>{str(e)}</p><p><a href='/'>← Back</a></p>"
 
-@app.route('/stress_test_images')
-def stress_test_images():
-    """Stress test images with multiple refreshes"""
-    import time
-    from datetime import datetime
-    
-    html = f"""
-    <h2>🔥 Image Stress Test</h2>
-    <p><strong>Test Time:</strong> {datetime.now().strftime('%H:%M:%S')}</p>
-    <p>This page will auto-refresh every 5 seconds to test image stability...</p>
-    
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin: 20px 0;">
-    """
-    
-    # Test with real levels from database
-    try:
-        levels = list(mongo_db.levels.find(
-            {"is_legacy": False, "video_url": {"$exists": True, "$ne": ""}},
-            {"name": 1, "video_url": 1, "position": 1}
-        ).limit(12))
-        
-        for level in levels:
-            video_url = level.get('video_url', '')
-            level_name = level.get('name', 'Unknown')
-            position = level.get('position', 0)
-            
-            if video_url and 'youtube.com' in video_url and 'v=' in video_url:
-                video_id = video_url.split('v=')[1].split('&')[0]
-                img_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" alt="{level_name}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px;" onload="this.style.border=\'2px solid green\'" onerror="this.style.border=\'2px solid red\'">'
-            elif video_url and 'youtu.be' in video_url:
-                video_id = video_url.split('youtu.be/')[1].split('?')[0]
-                img_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" alt="{level_name}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px;" onload="this.style.border=\'2px solid green\'" onerror="this.style.border=\'2px solid red\'">'
-            else:
-                img_html = '<div style="width: 100%; height: 120px; background: #f8f9fa; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #6c757d; border: 2px solid orange;">📷 No Preview</div>'
-            
-            html += f"""
-            <div style="border: 1px solid #ddd; padding: 10px; border-radius: 8px; background: white;">
-                <h5>#{position} - {level_name[:20]}{'...' if len(level_name) > 20 else ''}</h5>
-                <div style="margin: 10px 0;">
-                    {img_html}
-                </div>
-                <small style="color: #666; word-break: break-all;">{video_url[:50]}{'...' if len(video_url) > 50 else ''}</small>
-            </div>
-            """
-            
-    except Exception as e:
-        html += f'<p style="color: red;">Database error: {e}</p>'
-    
-    html += """
-    </div>
-    
-    <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-        <h4>🎯 Test Results:</h4>
-        <ul>
-            <li><strong>Green border:</strong> Image loaded successfully ✅</li>
-            <li><strong>Red border:</strong> Image failed to load ❌</li>
-            <li><strong>Orange border:</strong> No video URL provided ⚠️</li>
-        </ul>
-    </div>
-    
-    <p>
-        <a href="/">← Back to main list</a> | 
-        <a href="/stress_test_images">🔄 Manual refresh</a> |
-        <a href="/test_images_simple">Simple test</a>
-    </p>
-    
-    <script>
-        // Auto-refresh every 5 seconds for stress testing
-        setTimeout(function() {
-            window.location.reload();
-        }, 5000);
-        
-        // Count successful/failed images
-        setTimeout(function() {
-            const images = document.querySelectorAll('img');
-            let loaded = 0, failed = 0;
-            images.forEach(img => {
-                if (img.style.border.includes('green')) loaded++;
-                if (img.style.border.includes('red')) failed++;
-            });
-            console.log(`Images: ${loaded} loaded, ${failed} failed`);
-        }, 2000);
-    </script>
-    """
-    
-    return html
+# stress_test_images route removed - no image functionality
 
 @app.route('/fix_all_missing_images')
 def fix_all_missing_images():
@@ -4651,35 +3906,7 @@ def test_speed():
         query_time = end_time - start_time
         return f"Query failed after {query_time:.3f} seconds: {e}"
 
-@app.route('/fix_base64')
-def fix_base64():
-    """Remove Base64 images that are killing performance"""
-    try:
-        # Find all Base64 images
-        base64_levels = list(mongo_db.levels.find({"thumbnail_url": {"$regex": "^data:"}}))
-        
-        if not base64_levels:
-            return "No Base64 images found! ✅"
-        
-        # Remove Base64 thumbnails (they're too big)
-        result = mongo_db.levels.update_many(
-            {"thumbnail_url": {"$regex": "^data:"}},
-            {"$set": {"thumbnail_url": ""}}
-        )
-        
-        # Clear cache so it reloads
-        levels_cache['main_list'] = None
-        levels_cache['legacy_list'] = None
-        
-        return f"""
-        <h2>✅ Fixed Base64 Images!</h2>
-        <p>Removed {result.modified_count} Base64 images</p>
-        <p>These were causing massive slowdowns (each image was several MB in the database)</p>
-        <p><a href="/instant_load">Reload data</a> | <a href="/">Go to main list</a></p>
-        """
-        
-    except Exception as e:
-        return f"Error fixing Base64: {e}"
+# fix_base64 route removed - no image functionality
 
 @app.route('/fix_image_system')
 def fix_image_system():
@@ -5431,47 +4658,21 @@ def preload_cache():
 
 @app.route('/debug_db')
 def debug_db():
-    """Debug database contents and check for Base64 images"""
+    """Debug database contents"""
     try:
         # Count total documents
         total_count = mongo_db.levels.count_documents({})
         main_count = mongo_db.levels.count_documents({"is_legacy": False})
         legacy_count = mongo_db.levels.count_documents({"is_legacy": True})
         
-        # Check for Base64 images (huge performance killer)
-        base64_count = mongo_db.levels.count_documents({"thumbnail_url": {"$regex": "^data:"}})
-        
-        # Get sample thumbnail URLs to see what we're dealing with
-        sample_thumbs = list(mongo_db.levels.find(
-            {"thumbnail_url": {"$exists": True, "$ne": ""}}, 
-            {"name": 1, "thumbnail_url": 1}
-        ).limit(3))
-        
-        # Check thumbnail URL sizes
-        thumb_info = []
-        for level in sample_thumbs:
-            thumb_url = level.get('thumbnail_url', '')
-            if thumb_url:
-                size_info = f"Length: {len(thumb_url)}"
-                if thumb_url.startswith('data:'):
-                    size_info += " (BASE64 - HUGE!)"
-                elif 'youtube' in thumb_url:
-                    size_info += " (YouTube - OK)"
-                else:
-                    size_info += " (URL - OK)"
-                thumb_info.append(f"{level['name']}: {size_info}")
-        
         return f"""
         <h2>Database Debug Info</h2>
         <p>Total documents: {total_count}</p>
         <p>Main levels: {main_count}</p>
         <p>Legacy levels: {legacy_count}</p>
-        <p><strong>Base64 images: {base64_count}</strong> {'⚠️ PERFORMANCE KILLER!' if base64_count > 0 else '✅ Good'}</p>
+        <p>✅ Image functionality removed - no thumbnails stored</p>
         
-        <h3>Sample Thumbnail Info:</h3>
-        <pre>{'<br>'.join(thumb_info) if thumb_info else 'No thumbnails found'}</pre>
-        
-        <p><a href='/'>Back to main</a> | <a href='/fix_base64'>Fix Base64 Images</a></p>
+        <p><a href='/'>Back to main</a></p>
         """
     except Exception as e:
         return f"Database error: {e}"
@@ -6595,7 +5796,7 @@ def submit_record():
 
 @app.route('/submit_verification', methods=['GET', 'POST'])
 def submit_verification():
-    """Handle verification submissions - requires Discord authentication and List Player role"""
+    """Handle verification submissions - requires Discord authentication"""
     if 'user_id' not in session:
         flash('Please log in to submit a verification', 'warning')
         return redirect(url_for('login'))
@@ -6604,23 +5805,6 @@ def submit_verification():
     user = mongo_db.users.find_one({"_id": session['user_id']})
     if not user or not user.get('discord_id'):
         flash('You must connect your Discord account to submit verifications. Please link your Discord account in your profile.', 'warning')
-        return redirect(url_for('profile'))
-    
-    # Check if user has the List Player role
-    try:
-        # Import bot availability dynamically to get current status
-        from discord_bot import is_bot_available, check_user_role
-        if is_bot_available():
-            has_role = check_user_role(user['discord_id'])
-            if not has_role:
-                flash('You need the "List Player" role in the Discord server to submit verifications.', 'danger')
-                return redirect(url_for('profile'))
-        else:
-            flash('Discord bot is not available. Verification submissions are temporarily disabled.', 'warning')
-            return redirect(url_for('profile'))
-    except Exception as e:
-        print(f"Error checking Discord role: {e}")
-        flash('Error checking Discord permissions. Please try again later.', 'danger')
         return redirect(url_for('profile'))
     
     if request.method == 'POST':
@@ -8785,28 +7969,7 @@ def admin_levels():
         video_url = request.form.get('video_url')
         thumbnail_url = request.form.get('thumbnail_url')
         
-        # Handle file upload - Convert to Base64 instead of saving file
-        if 'thumbnail_file' in request.files:
-            file = request.files['thumbnail_file']
-            if file and file.filename:
-                print(f"🔄 Processing uploaded image: {file.filename}")
-                
-                # Validate file type
-                file_ext = file.filename.split('.')[-1].lower()
-                if file_ext not in ['png', 'jpg', 'jpeg', 'gif', 'webp']:
-                    flash('Invalid file type. Please use PNG, JPG, JPEG, GIF, or WebP.', 'danger')
-                    return redirect(url_for('admin_levels'))
-                
-                # Convert to Base64 with 50KB limit and 16:9 aspect ratio
-                base64_data = convert_image_to_base64(file.stream, max_kb=50, target_size=(320, 180))
-                
-                if base64_data:
-                    thumbnail_url = base64_data
-                    print(f"✅ Image converted to Base64 successfully")
-                    flash(f'Image uploaded and optimized successfully! ({len(base64_data)//1424}KB)', 'success')
-                else:
-                    flash('Failed to process image. Please try a smaller image or different format.', 'danger')
-                    return redirect(url_for('admin_levels'))
+        # Image upload functionality removed
         
         description = request.form.get('description')
         difficulty = float(request.form.get('difficulty'))
@@ -8951,29 +8114,7 @@ def admin_edit_level():
     if thumbnail_type == 'url':
         # Custom URL
         thumbnail_url = request.form.get('thumbnail_url', '').strip()
-    elif thumbnail_type == 'upload':
-        # File upload - Convert to Base64 instead of saving file
-        if 'thumbnail_file' in request.files:
-            file = request.files['thumbnail_file']
-            if file and file.filename:
-                print(f"🔄 Processing uploaded image for edit: {file.filename}")
-                
-                # Validate file type
-                file_ext = file.filename.split('.')[-1].lower()
-                if file_ext not in ['png', 'jpg', 'jpeg', 'gif', 'webp']:
-                    flash('Invalid file type. Please use PNG, JPG, JPEG, GIF, or WebP.', 'danger')
-                    return redirect(url_for('admin_levels'))
-                
-                # Convert to Base64 with 50KB limit and 16:9 aspect ratio
-                base64_data = convert_image_to_base64(file.stream, max_kb=50, target_size=(320, 180))
-                
-                if base64_data:
-                    thumbnail_url = base64_data
-                    print(f"✅ Image converted to Base64 successfully")
-                    flash(f'Thumbnail updated successfully! ({len(base64_data)//1024}KB)', 'success')
-                else:
-                    flash('Failed to process image. Please try a smaller image or different format.', 'danger')
-                    return redirect(url_for('admin_levels'))
+    # Image upload functionality removed
     # If thumbnail_type == 'auto', thumbnail_url stays empty (uses YouTube auto)
     
     # Handle position changes
@@ -11989,76 +11130,7 @@ def check_username():
         return {'available': True, 'message': 'Username available'}
 
 
-@app.route('/upload_avatar', methods=['POST'])
-def upload_avatar():
-    try:
-        user_id = session.get('user_id')
-        avatar_file = request.files.get('avatar_file')
-        avatar_url = request.form.get('avatar_url', '').strip()
-        
-        if avatar_file and avatar_file.filename:
-            # Validate file type
-            allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-            file_extension = avatar_file.filename.rsplit('.', 1)[1].lower() if '.' in avatar_file.filename else ''
-            
-            if file_extension not in allowed_extensions:
-                flash('Invalid file type. Please use PNG, JPG, JPEG, GIF, or WebP.', 'danger')
-                return redirect(url_for('user_settings'))
-            
-            # Create uploads directory
-            os.makedirs('static/avatars', exist_ok=True)
-            
-            # Save file with proper extension
-            filename = f"avatar_{user_id}_{int(datetime.now().timestamp())}.{file_extension}"
-            filepath = os.path.join('static/avatars', filename)
-            
-            try:
-                # Try to resize and optimize image
-                from PIL import Image
-                
-                img = Image.open(avatar_file.stream)
-                img = img.convert('RGB')
-                img.thumbnail((200, 200), Image.Resampling.LANCZOS)
-                img.save(filepath, 'JPEG', quality=85, optimize=True)
-                
-                avatar_url = f"/static/avatars/{filename}"
-                
-            except ImportError:
-                # Fallback without PIL - just save the file
-                avatar_file.seek(0)  # Reset file pointer
-                avatar_file.save(filepath)
-                avatar_url = f"/static/avatars/{filename}"
-                
-            except Exception as e:
-                flash(f'Error processing image: {e}', 'danger')
-                return redirect(url_for('user_settings'))
-        
-        # Check if user provided a URL instead
-        elif avatar_url:
-            # Validate URL format
-            if not (avatar_url.startswith('http://') or avatar_url.startswith('https://')):
-                flash('Please provide a valid URL starting with http:// or https://', 'warning')
-                return redirect(url_for('user_settings'))
-        
-        else:
-            flash('Please either upload a file or provide a URL', 'warning')
-            return redirect(url_for('user_settings'))
-        
-        # Update avatar URL in database
-        if avatar_url:
-            mongo_db.users.update_one(
-                {"_id": user_id},
-                {"$set": {"avatar_url": avatar_url}}
-            )
-            flash('Profile picture updated successfully!', 'success')
-        else:
-            flash('No avatar provided', 'warning')
-            
-    except Exception as e:
-        flash(f'Error updating avatar: {str(e)}', 'danger')
-        print(f"Avatar update error: {e}")
-    
-    return redirect(url_for('user_settings'))
+
 
 
 def handle_user_settings_action(action, user_id):

@@ -105,7 +105,7 @@ def format_discord_widget_data(data):
             'id': member.get('id'),
             'username': member.get('username'),
             'discriminator': member.get('discriminator', ''),
-            'avatar': member.get('avatar_url', ''),
+            'avatar': '',  # Avatar functionality removed
             'status': member.get('status', 'online'),
             'game': member.get('game', {}).get('name', '') if member.get('game') else '',
             'channel_id': member.get('channel_id'),

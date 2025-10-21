@@ -33,7 +33,7 @@ except ValueError as e:
     print(f"❌ Invalid DISCORD_ADMIN_CHANNEL_ID format: {e}")
     DISCORD_ADMIN_CHANNEL_ID = None
 
-LIST_PLAYER_ROLE_NAME = "List Player"  # Role required for verification submissions
+LIST_PLAYER_ROLE_NAME = "List Player"  # Role name for Discord commands (no longer required for verification submissions)
 
 # Global variables
 bot = None
@@ -326,7 +326,7 @@ if bot is not None:
 
     @bot.command(name='checkrole')
     async def check_role_command(ctx, member: discord.Member = None):
-        """Check if a user has the List Player role"""
+        """Check if a user has the List Player role (informational only)"""
         if not member:
             member = ctx.author
         

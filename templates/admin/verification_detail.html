@@ -187,9 +187,7 @@
                         </div>
                         <div class="card-body">
                             <div class="text-center mb-3">
-                                <div class="avatar-circle-large mx-auto mb-3">
-                                    {{ submission.user.username[0].upper() }}
-                                </div>
+                                <!-- Large avatar circle removed -->
                                 <h5 class="mb-1">{{ submission.user.username }}</h5>
                                 {% if submission.user.discord_username %}
                                 <p class="text-muted mb-0">
@@ -319,18 +317,7 @@
     overflow-y: auto;
 }
 
-.avatar-circle-large {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-weight: bold;
-    font-size: 32px;
-}
+/* Large avatar circle CSS removed */
 
 .card {
     border-radius: 12px;
