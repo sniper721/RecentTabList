@@ -129,7 +129,14 @@ class RealTimePointsManager:
         try:
             # Use aggregation to join records with levels
             pipeline = [
-                {"$match": {"user_id": user_id, "status": "approved"}},
+                {"$match": {
+                    "user_id": user_id, 
+                    "status": "approved",
+                    "$or": [
+                        {"hidden": {"$exists": False}},
+                        {"hidden": False}
+                    ]
+                }},
                 {"$lookup": {
                     "from": "levels",
                     "localField": "level_id", 

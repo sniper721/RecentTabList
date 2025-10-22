@@ -23,7 +23,7 @@
                 <div class="card-body">
                     <form method="GET" action="{{ url_for('admin_records') }}">
                         <div class="row g-3">
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <label for="status" class="form-label">Status</label>
                                 <select class="form-select" name="status" id="status">
                                     <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Status</option>
@@ -32,7 +32,15 @@
                                     <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejected</option>
                                 </select>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
+                                <label for="visibility" class="form-label">Visibility</label>
+                                <select class="form-select" name="visibility" id="visibility">
+                                    <option value="all" {% if visibility_filter == 'all' %}selected{% endif %}>All Records</option>
+                                    <option value="visible" {% if visibility_filter == 'visible' %}selected{% endif %}>Visible Only</option>
+                                    <option value="hidden" {% if visibility_filter == 'hidden' %}selected{% endif %}>Hidden Only</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
                                 <label for="username" class="form-label">Username</label>
                                 <input type="text" class="form-control" name="username" id="username" 
                                        value="{{ username_filter }}" placeholder="Search by username">
@@ -96,6 +104,12 @@
                                     <button type="button" class="btn btn-danger" id="bulkReject" disabled>
                                         <i class="fas fa-times"></i> Bulk Reject
                                     </button>
+                                    <button type="button" class="btn btn-warning" id="bulkHide" disabled>
+                                        <i class="fas fa-eye-slash"></i> Bulk Hide
+                                    </button>
+                                    <button type="button" class="btn btn-info" id="bulkShow" disabled>
+                                        <i class="fas fa-eye"></i> Bulk Show
+                                    </button>
                                     <button type="button" class="btn btn-outline-danger" id="bulkDelete" disabled>
                                         <i class="fas fa-trash"></i> Bulk Delete
                                     </button>
@@ -116,6 +130,7 @@
                                     <th>Level</th>
                                     <th>Percentage</th>
                                     <th>Status</th>
+                                    <th>Visibility</th>
                                     <th>Video</th>
                                     <th>Submitted</th>
                                     <th>Actions</th>
@@ -123,10 +138,10 @@
                             </thead>
                             <tbody>
                                 {% for record in records %}
-                                <tr>
+                                <tr {% if record.get('hidden', False) %}class="table-secondary opacity-75"{% endif %}>
                                     <td>
                                         <input type="checkbox" class="form-check-input record-checkbox" 
-                                               value="{{ record._id }}" data-status="{{ record.status }}">
+                                               value="{{ record._id }}" data-status="{{ record.status }}" data-hidden="{{ record.get('hidden', False) }}">
                                     </td>
                                     <td>
                                         <strong>#{{ record._id }}</strong>
@@ -162,6 +177,16 @@
                                             <span class="badge bg-danger">❌ Rejected</span>
                                         {% else %}
                                             <span class="badge bg-secondary">{{ record.status|title }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if record.get('hidden', False) %}
+                                            <span class="badge bg-secondary">👁️‍🗨️ Hidden</span>
+                                            {% if record.get('hidden_by') %}
+                                                <br><small class="text-muted">by {{ record.hidden_by }}</small>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge bg-success">👁️ Visible</span>
                                         {% endif %}
                                     </td>
                                     <td>
@@ -212,6 +237,23 @@
                                                class="btn btn-sm btn-primary" title="Edit Record">
                                                 <i class="fas fa-edit"></i>
                                             </a>
+                                            
+                                            <!-- Hide/Show Record -->
+                                            {% if record.get('hidden', False) %}
+                                                <form method="POST" action="{{ url_for('admin_show_record', record_id=record._id|string) }}" class="d-inline">
+                                                    <button type="submit" class="btn btn-sm btn-success" title="Show Record" 
+                                                            onclick="return confirm('Show this record?')">
+                                                        <i class="fas fa-eye"></i>
+                                                    </button>
+                                                </form>
+                                            {% else %}
+                                                <form method="POST" action="{{ url_for('admin_hide_record', record_id=record._id|string) }}" class="d-inline">
+                                                    <button type="submit" class="btn btn-sm btn-warning" title="Hide Record" 
+                                                            onclick="return confirm('Hide this record? It will not affect the player\'s points but will be hidden from public view.')">
+                                                        <i class="fas fa-eye-slash"></i>
+                                                    </button>
+                                                </form>
+                                            {% endif %}
                                             
                                             <!-- Delete Record -->
                                             <form method="POST" action="{{ url_for('admin_delete_record', record_id=record._id|string) }}" 
@@ -365,6 +407,8 @@
     const recordCheckboxes = document.querySelectorAll('.record-checkbox');
     const bulkApproveBtn = document.getElementById('bulkApprove');
     const bulkRejectBtn = document.getElementById('bulkReject');
+    const bulkHideBtn = document.getElementById('bulkHide');
+    const bulkShowBtn = document.getElementById('bulkShow');
     const bulkDeleteBtn = document.getElementById('bulkDelete');
 
     // Sync select all checkboxes
@@ -432,6 +476,34 @@
             if (confirm(`Are you sure you want to reject ${selectedRecords.length} record(s)?`)) {
                 performBulkAction('reject', selectedRecords, reason);
             }
+        }
+    });
+
+    // Bulk hide
+    bulkHideBtn.addEventListener('click', function() {
+        const selectedRecords = Array.from(document.querySelectorAll('.record-checkbox:checked')).map(cb => cb.value);
+        
+        if (selectedRecords.length === 0) {
+            alert('Please select records to hide');
+            return;
+        }
+
+        if (confirm(`Are you sure you want to hide ${selectedRecords.length} record(s)?\n\nThey will be hidden from public view but won't affect player points.`)) {
+            performBulkAction('hide', selectedRecords);
+        }
+    });
+
+    // Bulk show
+    bulkShowBtn.addEventListener('click', function() {
+        const selectedRecords = Array.from(document.querySelectorAll('.record-checkbox:checked')).map(cb => cb.value);
+        
+        if (selectedRecords.length === 0) {
+            alert('Please select records to show');
+            return;
+        }
+
+        if (confirm(`Are you sure you want to show ${selectedRecords.length} record(s)?`)) {
+            performBulkAction('show', selectedRecords);
         }
     });
 

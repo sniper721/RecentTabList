@@ -78,6 +78,8 @@ from bson.objectid import ObjectId
 from bson.errors import InvalidId
 import functools
 import requests
+import base64
+from io import BytesIO
 
 # Import profanity filter
 from profanity_filter import check_username_profanity, check_level_name_profanity, check_comment_profanity, profanity_filter
@@ -384,6 +386,37 @@ def retry_db_operation(max_retries=3, delay=1):
             return None
         return wrapper
     return decorator
+
+def convert_image_to_base64(file):
+    """Convert uploaded image file to base64 data URL"""
+    try:
+        # Check file size (max 5MB)
+        file.seek(0, 2)  # Seek to end
+        file_size = file.tell()
+        file.seek(0)  # Reset to beginning
+        
+        if file_size > 5 * 1024 * 1024:  # 5MB limit
+            return None
+        
+        # Check file type
+        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+        content_type = file.content_type
+        
+        if content_type not in allowed_types:
+            return None
+        
+        # Read and encode file
+        file_data = file.read()
+        encoded_data = base64.b64encode(file_data).decode('utf-8')
+        
+        # Create data URL
+        data_url = f"data:{content_type};base64,{encoded_data}"
+        
+        return data_url
+        
+    except Exception as e:
+        print(f"Error converting image to base64: {e}")
+        return None
 
 def get_video_embed_info(video_url):
     """Extract video platform and embed information from URL"""
@@ -1530,6 +1563,7 @@ def admin_records():
     
     # Get filter parameters
     status_filter = request.args.get('status', 'all')
+    visibility_filter = request.args.get('visibility', 'all')
     username_filter = request.args.get('username', '').strip()
     level_filter = request.args.get('level', '').strip()
     page = int(request.args.get('page', 1))
@@ -1540,6 +1574,15 @@ def admin_records():
     
     if status_filter != 'all':
         match_conditions['status'] = status_filter
+    
+    # Add visibility filter
+    if visibility_filter == 'visible':
+        match_conditions['$or'] = [
+            {'hidden': {'$exists': False}},
+            {'hidden': False}
+        ]
+    elif visibility_filter == 'hidden':
+        match_conditions['hidden'] = True
     
     # Aggregation pipeline
     pipeline = [
@@ -1607,6 +1650,7 @@ def admin_records():
                          has_prev=has_prev,
                          has_next=has_next,
                          status_filter=status_filter,
+                         visibility_filter=visibility_filter,
                          username_filter=username_filter,
                          level_filter=level_filter)
 
@@ -1972,6 +2016,86 @@ def admin_close_record_poll(poll_id):
         flash('Error closing poll', 'danger')
     
     return redirect(url_for('admin_record_discussion', record_id=str(poll['record_id'])))
+
+@app.route('/admin/record/<string:record_id>/hide', methods=['POST'])
+def admin_hide_record(record_id):
+    """Hide a record from public view (admin only)"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        record = mongo_db.records.find_one({"_id": ObjectId(record_id)})
+        if not record:
+            flash('Record not found', 'danger')
+            return redirect(url_for('admin_records'))
+        
+        # Hide the record
+        mongo_db.records.update_one(
+            {"_id": ObjectId(record_id)},
+            {"$set": {"hidden": True, "hidden_by": session['user_id'], "hidden_at": datetime.now(timezone.utc)}}
+        )
+        
+        # Recalculate user points since hidden records don't count
+        if REAL_TIME_POINTS_AVAILABLE:
+            try:
+                from real_time_points_system import RealTimePointsManager
+                manager = RealTimePointsManager(mongo_db)
+                manager.recalculate_user_points(record['user_id'])
+            except Exception as e:
+                print(f"Error recalculating points after hiding record: {e}")
+        
+        flash('Record hidden successfully', 'success')
+        
+    except Exception as e:
+        print(f"Error hiding record: {e}")
+        flash('Error hiding record', 'danger')
+    
+    # Redirect back to level detail if we have level_id, otherwise admin records
+    level_id = request.form.get('level_id')
+    if level_id:
+        return redirect(url_for('level_detail', level_id=level_id))
+    return redirect(url_for('admin_records'))
+
+@app.route('/admin/record/<string:record_id>/show', methods=['POST'])
+def admin_show_record(record_id):
+    """Show a previously hidden record (admin only)"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        record = mongo_db.records.find_one({"_id": ObjectId(record_id)})
+        if not record:
+            flash('Record not found', 'danger')
+            return redirect(url_for('admin_records'))
+        
+        # Show the record
+        mongo_db.records.update_one(
+            {"_id": ObjectId(record_id)},
+            {"$unset": {"hidden": "", "hidden_by": "", "hidden_at": ""}}
+        )
+        
+        # Recalculate user points since the record is now visible again
+        if REAL_TIME_POINTS_AVAILABLE:
+            try:
+                from real_time_points_system import RealTimePointsManager
+                manager = RealTimePointsManager(mongo_db)
+                manager.recalculate_user_points(record['user_id'])
+            except Exception as e:
+                print(f"Error recalculating points after showing record: {e}")
+        
+        flash('Record shown successfully', 'success')
+        
+    except Exception as e:
+        print(f"Error showing record: {e}")
+        flash('Error showing record', 'danger')
+    
+    # Redirect back to level detail if we have level_id, otherwise admin records
+    level_id = request.form.get('level_id')
+    if level_id:
+        return redirect(url_for('level_detail', level_id=level_id))
+    return redirect(url_for('admin_records'))
 
 def debug_thumbnails():
     """Debug thumbnail URLs in database"""
@@ -5039,9 +5163,20 @@ def level_detail(level_id):
             flash('Level not found', 'danger')
             return redirect(url_for('index'))
         
+        # Check if user is admin to show hidden records
+        is_admin = 'user_id' in session and session.get('is_admin', False)
+        
+        # Build match criteria - exclude hidden records for non-admins
+        match_criteria = {"level_id": int(level_id), "status": "approved"}
+        if not is_admin:
+            match_criteria["$or"] = [
+                {"hidden": {"$exists": False}},
+                {"hidden": False}
+            ]
+        
         # Get approved records with user info - optimized with timeout and limit
         records = list(mongo_db.records.aggregate([
-            {"$match": {"level_id": int(level_id), "status": "approved"}},
+            {"$match": match_criteria},
             {"$lookup": {
                 "from": "users",
                 "localField": "user_id",
@@ -5049,6 +5184,7 @@ def level_detail(level_id):
                 "as": "user"
             }},
             {"$unwind": "$user"},
+            {"$sort": {"date_submitted": 1}},  # Sort by submission date for proper numbering
             {"$limit": 100}  # Limit to first 100 records for performance
         ], maxTimeMS=5000))
         
@@ -5057,7 +5193,7 @@ def level_detail(level_id):
             {"level_id": int(level_id)}
         ).sort("change_date", -1).limit(20))
         
-        return render_template('level_detail.html', level=level, records=records, position_history=position_history)
+        return render_template('level_detail.html', level=level, records=records, position_history=position_history, is_admin=is_admin)
     except (ValueError, InvalidId):
         flash('Invalid level ID', 'danger')
         return redirect(url_for('index'))
@@ -6300,6 +6436,50 @@ def admin_bulk_record_action():
                             {"_id": record_id},
                             {"$set": update_data}
                         )
+                        success_count += 1
+                        
+                elif action == 'hide':
+                    # Hide the record
+                    record = mongo_db.records.find_one({"_id": record_id})
+                    if record and not record.get('hidden', False):
+                        mongo_db.records.update_one(
+                            {"_id": record_id},
+                            {"$set": {
+                                "hidden": True,
+                                "hidden_by": admin_username,
+                                "hidden_at": datetime.now(timezone.utc)
+                            }}
+                        )
+                        
+                        # Recalculate user points since hidden records don't count
+                        if REAL_TIME_POINTS_AVAILABLE:
+                            try:
+                                from real_time_points_system import RealTimePointsManager
+                                manager = RealTimePointsManager(mongo_db)
+                                manager.recalculate_user_points(record['user_id'])
+                            except Exception as e:
+                                print(f"Error recalculating points after hiding record: {e}")
+                        
+                        success_count += 1
+                        
+                elif action == 'show':
+                    # Show the record
+                    record = mongo_db.records.find_one({"_id": record_id})
+                    if record and record.get('hidden', False):
+                        mongo_db.records.update_one(
+                            {"_id": record_id},
+                            {"$unset": {"hidden": "", "hidden_by": "", "hidden_at": ""}}
+                        )
+                        
+                        # Recalculate user points since the record is now visible again
+                        if REAL_TIME_POINTS_AVAILABLE:
+                            try:
+                                from real_time_points_system import RealTimePointsManager
+                                manager = RealTimePointsManager(mongo_db)
+                                manager.recalculate_user_points(record['user_id'])
+                            except Exception as e:
+                                print(f"Error recalculating points after showing record: {e}")
+                        
                         success_count += 1
                         
                 elif action == 'delete':
@@ -7967,9 +8147,33 @@ def admin_levels():
         verifier = request.form.get('verifier')
         level_id = request.form.get('level_id')
         video_url = request.form.get('video_url')
-        thumbnail_url = request.form.get('thumbnail_url')
         
-        # Image upload functionality removed
+        # Handle thumbnail options
+        thumbnail_type = request.form.get('thumbnail_type', 'auto')
+        thumbnail_url = ''
+        
+        if thumbnail_type == 'url':
+            # Custom URL
+            thumbnail_url = request.form.get('thumbnail_url', '').strip()
+        elif thumbnail_type == 'upload':
+            # Handle file upload
+            if 'thumbnail_file' in request.files:
+                file = request.files['thumbnail_file']
+                if file and file.filename:
+                    try:
+                        # Convert uploaded image to base64
+                        thumbnail_url = convert_image_to_base64(file)
+                        if not thumbnail_url:
+                            flash('Failed to process uploaded image. Please try a different image.', 'warning')
+                            thumbnail_url = ''
+                    except Exception as e:
+                        print(f"Image upload error: {e}")
+                        flash('Error processing uploaded image. Please try again.', 'danger')
+                        thumbnail_url = ''
+                else:
+                    flash('No file selected for upload.', 'warning')
+                    thumbnail_url = ''
+        # If thumbnail_type == 'auto', thumbnail_url stays empty (uses YouTube auto)
         
         description = request.form.get('description')
         difficulty = float(request.form.get('difficulty'))
@@ -8107,14 +8311,34 @@ def admin_edit_level():
     
     level = mongo_db.levels.find_one({"_id": db_level_id})
     
-    # Handle thumbnail options
+    # Handle thumbnail options with improved logic
     thumbnail_type = request.form.get('thumbnail_type', 'auto')
     thumbnail_url = ''
     
     if thumbnail_type == 'url':
         # Custom URL
         thumbnail_url = request.form.get('thumbnail_url', '').strip()
-    # Image upload functionality removed
+    elif thumbnail_type == 'keep_existing':
+        # Keep existing thumbnail (for base64 images or existing URLs)
+        thumbnail_url = level.get('thumbnail_url', '')
+    elif thumbnail_type == 'upload':
+        # Handle file upload
+        if 'thumbnail_file' in request.files:
+            file = request.files['thumbnail_file']
+            if file and file.filename:
+                try:
+                    # Convert uploaded image to base64
+                    thumbnail_url = convert_image_to_base64(file)
+                    if not thumbnail_url:
+                        flash('Failed to process uploaded image. Please try a different image.', 'warning')
+                        thumbnail_url = level.get('thumbnail_url', '')  # Keep existing
+                except Exception as e:
+                    print(f"Image upload error: {e}")
+                    flash('Error processing uploaded image. Please try again.', 'danger')
+                    thumbnail_url = level.get('thumbnail_url', '')  # Keep existing
+            else:
+                flash('No file selected for upload.', 'warning')
+                thumbnail_url = level.get('thumbnail_url', '')  # Keep existing
     # If thumbnail_type == 'auto', thumbnail_url stays empty (uses YouTube auto)
     
     # Handle position changes
@@ -8255,8 +8479,9 @@ def admin_edit_level():
     levels_cache['main_list'] = None
     levels_cache['legacy_list'] = None
     
-    # Recalculate points for all levels after position changes
-    recalculate_all_points()
+    # Only recalculate points if position or legacy status changed (performance optimization)
+    if position != old_position or is_legacy != old_is_legacy:
+        recalculate_all_points()
     
     flash('Level updated successfully!', 'success')
     return redirect(url_for('admin_levels') + '?updated=' + str(db_level_id))
