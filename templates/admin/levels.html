@@ -151,7 +151,7 @@
                 <h5 class="modal-title" id="addLevelModalLabel">Add New Level</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form method="POST" action="{{ url_for('admin_levels') }}" enctype="multipart/form-data">
+            <form method="POST" action="{{ url_for('admin_add_level') }}" enctype="multipart/form-data">
                 <input type="hidden" name="level_type" value="Level">
                 <div class="modal-body">
                     <div class="row">
@@ -330,7 +330,13 @@
                                 <div class="card">
                                     <div class="card-body">
                                         <div class="form-check mb-2">
-                                            <input class="form-check-input" type="radio" name="thumbnail_type" id="edit_thumb_auto" value="auto" checked>
+                                            <input class="form-check-input" type="radio" name="thumbnail_type" id="edit_thumb_keep" value="keep">
+                                            <label class="form-check-label" for="edit_thumb_keep">
+                                                <strong>Keep Current Image</strong> - Don't change existing image
+                                            </label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="radio" name="thumbnail_type" id="edit_thumb_auto" value="auto">
                                             <label class="form-check-label" for="edit_thumb_auto">
                                                 <strong>Auto YouTube Thumbnail</strong> - Extract from video URL
                                             </label>
@@ -477,6 +483,25 @@
         toggleDemonDifficulty(this, document.getElementById('demon_type_group'));
     });
     
+    // Handle thumbnail option changes for edit modal
+    document.querySelectorAll('input[name="thumbnail_type"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const urlInput = document.getElementById('edit_url_input');
+            const uploadInput = document.getElementById('edit_upload_input');
+            
+            // Hide all inputs first
+            urlInput.style.display = 'none';
+            uploadInput.style.display = 'none';
+            
+            // Show relevant input based on selection
+            if (this.value === 'url') {
+                urlInput.style.display = 'block';
+            } else if (this.value === 'upload') {
+                uploadInput.style.display = 'block';
+            }
+        });
+    });
+    
     // Edit level difficulty change handler
     document.getElementById('edit_difficulty').addEventListener('input', function() {
         toggleDemonDifficulty(this, document.getElementById('edit_demon_type_group'));
@@ -510,6 +535,25 @@
             document.getElementById('edit_thumbnail_url').value = this.getAttribute('data-level-thumbnail') || '';
             document.getElementById('edit_points').value = levelPoints ? parseFloat(levelPoints).toFixed(2) : '';
             document.getElementById('edit_min_percentage').value = levelMinPercentage || '100';
+            
+            // Handle thumbnail selection - automatically choose "keep image" for base64 images
+            const thumbnailUrl = this.getAttribute('data-level-thumbnail') || '';
+            if (thumbnailUrl.startsWith('data:')) {
+                // Base64 image - automatically select "keep image"
+                document.getElementById('edit_thumb_keep').checked = true;
+                document.getElementById('edit_url_input').style.display = 'none';
+                document.getElementById('edit_upload_input').style.display = 'none';
+            } else if (thumbnailUrl) {
+                // URL image - select URL option and populate field
+                document.getElementById('edit_thumb_url').checked = true;
+                document.getElementById('edit_url_input').style.display = 'block';
+                document.getElementById('edit_upload_input').style.display = 'none';
+            } else {
+                // No image - select auto
+                document.getElementById('edit_thumb_auto').checked = true;
+                document.getElementById('edit_url_input').style.display = 'none';
+                document.getElementById('edit_upload_input').style.display = 'none';
+            }
             
             // Handle demon type
             if (demonType) {

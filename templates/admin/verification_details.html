@@ -30,6 +30,7 @@
                                     <th>ID</th>
                                     <th>Status</th>
                                     <th>Level Name</th>
+                                    <th>Level ID</th>
                                     <th>Creator</th>
                                     <th>Verifier</th>
                                     <th>Submitter</th>
@@ -67,6 +68,10 @@
                                             <span class="badge bg-info">{{ submission.difficulty }}</span>
                                             <span class="badge bg-primary">#{{ submission.placement }}</span>
                                         </small>
+                                    </td>
+                                    <td>
+                                        <strong class="text-primary">{{ submission.level_id or 'N/A' }}</strong>
+                                        <br><small class="text-muted">GD Level ID</small>
                                     </td>
                                     <td>
                                         <strong>{{ submission.creator or 'N/A' }}</strong>

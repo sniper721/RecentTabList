@@ -209,7 +209,7 @@ async def send_admin_notification(message):
         print(f"Error sending admin notification: {e}")
         return False
 
-async def send_verification_embed(username, level_name, creator, verifier, difficulty, placement, experience, enjoyment, video_url, comments):
+async def send_verification_embed(username, level_name, creator, verifier, difficulty, placement, experience, enjoyment, video_url, comments, level_id=None):
     """Send verification submission as Discord embed"""
     if not admin_channel:
         return False
@@ -230,6 +230,12 @@ async def send_verification_embed(username, level_name, creator, verifier, diffi
         embed.add_field(name="🎨 Creator", value=creator, inline=True)
         embed.add_field(name="✅ Verifier", value=verifier, inline=True)
         embed.add_field(name="⭐ Difficulty", value=difficulty, inline=True)
+        
+        # Add Level ID if provided - make it more prominent
+        if level_id:
+            embed.add_field(name="🆔 Level ID", value=f"**{level_id}**", inline=True)
+        else:
+            embed.add_field(name="🆔 Level ID", value="**Not provided**", inline=True)
         
         embed.add_field(name="🎯 Experience", value=f"{experience}/10", inline=True)
         embed.add_field(name="😊 Enjoyment", value=f"{enjoyment}/10", inline=True)
@@ -284,7 +290,7 @@ def send_dm_to_user(discord_id, message):
         print(f"Error in send_dm_to_user: {e}")
     return False
 
-def notify_verification_submission(username, level_name, creator, verifier, difficulty, placement, experience, enjoyment, video_url, comments):
+def notify_verification_submission(username, level_name, creator, verifier, difficulty, placement, experience, enjoyment, video_url, comments, level_id=None):
     """Send notification about new verification submission with embed"""
     if not bot or not DISCORD_BOT_AVAILABLE:
         return False
@@ -293,7 +299,7 @@ def notify_verification_submission(username, level_name, creator, verifier, diff
         loop = bot.loop
         if loop and not loop.is_closed():
             future = asyncio.run_coroutine_threadsafe(
-                send_verification_embed(username, level_name, creator, verifier, difficulty, placement, experience, enjoyment, video_url, comments), loop
+                send_verification_embed(username, level_name, creator, verifier, difficulty, placement, experience, enjoyment, video_url, comments, level_id), loop
             )
             return future.result(timeout=10)
     except Exception as e:

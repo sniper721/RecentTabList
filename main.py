@@ -891,7 +891,14 @@ def update_user_points(user_id):
     """Recalculate and update user's total points - FIXED aggregation handling"""
     # Use aggregation to join records with levels in a single query
     pipeline = [
-        {"$match": {"user_id": user_id, "status": "approved"}},
+        {"$match": {
+            "user_id": user_id, 
+            "status": "approved",
+            "$or": [
+                {"hidden": {"$exists": False}},  # Records without hidden field
+                {"hidden": False}  # Records explicitly not hidden
+            ]
+        }},
         {"$lookup": {
             "from": "levels",
             "localField": "level_id", 
@@ -3013,6 +3020,7 @@ def admin_add_level():
         video_url = request.form.get('video_url', '').strip()
         level_id = request.form.get('level_id', '').strip()
         min_percentage = int(request.form.get('min_percentage', 100))
+        is_legacy = 'is_legacy' in request.form
         
         # Check level name for profanity
         is_name_clean, profanity_reason = check_level_name_profanity(name)
@@ -3023,9 +3031,9 @@ def admin_add_level():
         # Get admin username
         admin_username = session.get('username', 'Unknown Admin')
         
-        # Check if this placement will push something to legacy
+        # Check if this placement will push something to legacy (only for main list additions)
         pushed_to_legacy = None
-        if position <= 100:
+        if not is_legacy and position <= 100:
             # Count current main list levels
             main_list_count = mongo_db.levels.count_documents({"is_legacy": {"$ne": True}})
             
@@ -3041,11 +3049,11 @@ def admin_add_level():
                     pushed_to_legacy = level_at_100["name"]
         
         # Get levels that will be above and below the new level
-        above_level, below_level = get_level_neighbors(position, False)
+        above_level, below_level = get_level_neighbors(position, is_legacy)
         
-        # Special handling for #1 placement
+        # Special handling for #1 placement (only for main list)
         dethroned_level = None
-        if position == 1:
+        if not is_legacy and position == 1:
             current_first = mongo_db.levels.find_one({
                 "position": 1,
                 "is_legacy": {"$ne": True}
@@ -3053,9 +3061,34 @@ def admin_add_level():
             if current_first:
                 dethroned_level = current_first["name"]
         
+        # Handle legacy list positioning
+        if is_legacy:
+            # For legacy levels, find the next available position starting from 101
+            highest_legacy = mongo_db.levels.find_one(
+                {"is_legacy": True}, 
+                sort=[("position", -1)]
+            )
+            if highest_legacy:
+                # If position is specified and available, use it; otherwise use next available
+                if position >= 101:
+                    # Check if position is already taken
+                    existing_at_position = mongo_db.levels.find_one({
+                        "position": position,
+                        "is_legacy": True
+                    })
+                    if existing_at_position:
+                        # Position taken, use next available
+                        position = highest_legacy['position'] + 1
+                else:
+                    # Position too low for legacy, use next available
+                    position = highest_legacy['position'] + 1
+            else:
+                # First legacy level
+                position = 101
+        
         # Create new level first
         new_level_id = ObjectId()
-        points = calculate_level_points(position, False)
+        points = calculate_level_points(position, is_legacy)
         
         new_level = {
             "_id": new_level_id,
@@ -3069,15 +3102,23 @@ def admin_add_level():
             "video_url": video_url,
             "level_id": int(level_id) if level_id and level_id.strip() else None,
             "min_percentage": min_percentage,
-            "is_legacy": False,
+            "is_legacy": is_legacy,
             "date_added": datetime.now(timezone.utc)
         }
         
-        # Shift existing levels down
-        mongo_db.levels.update_many(
-            {"position": {"$gte": position}, "is_legacy": {"$ne": True}},
-            {"$inc": {"position": 1}}
-        )
+        # Shift existing levels down based on list type
+        if is_legacy:
+            # Shift legacy levels down
+            mongo_db.levels.update_many(
+                {"position": {"$gte": position}, "is_legacy": True},
+                {"$inc": {"position": 1}}
+            )
+        else:
+            # Shift main list levels down
+            mongo_db.levels.update_many(
+                {"position": {"$gte": position}, "is_legacy": {"$ne": True}},
+                {"$inc": {"position": 1}}
+            )
         
         # Insert the new level
         mongo_db.levels.insert_one(new_level)
@@ -3099,16 +3140,17 @@ def admin_add_level():
             except Exception as e:
                 print(f"⚠️ Warning: Real-time points recalculation failed after level addition: {e}")
         
-        # Handle automatic legacy management
-        auto_manage_legacy_list()
+        # Handle automatic legacy management (only for main list additions)
+        if not is_legacy:
+            auto_manage_legacy_list()
         
         # Clear cache
         levels_cache['main_list'] = None
         levels_cache['legacy_list'] = None
         
-        # Check if this placement pushes something out of top 10
+        # Check if this placement pushes something out of top 10 (only for main list)
         pushed_out_of_top10 = None
-        if position <= 10:
+        if not is_legacy and position <= 10:
             pushed_out_of_top10 = get_top10_pushout_info(position)
         
         # Log enhanced changelog
@@ -3116,7 +3158,7 @@ def admin_add_level():
             'position': position,
             'above_level': above_level,
             'below_level': below_level,
-            'list_type': 'main'  # This is a main list placement
+            'list_type': 'legacy' if is_legacy else 'main'
         }
         
         if position == 1 and dethroned_level:
@@ -5040,6 +5082,7 @@ def level_detail(level_id):
             return redirect(url_for('index'))
         
         # Get approved records with user info - optimized with timeout and limit
+        # Sort by progress (100% first) then by date submitted
         records = list(mongo_db.records.aggregate([
             {"$match": {"level_id": int(level_id), "status": "approved"}},
             {"$lookup": {
@@ -5049,6 +5092,10 @@ def level_detail(level_id):
                 "as": "user"
             }},
             {"$unwind": "$user"},
+            {"$sort": {
+                "progress": -1,  # 100% first, then lower percentages
+                "date_submitted": 1  # Earlier submissions first within same progress
+            }},
             {"$limit": 100}  # Limit to first 100 records for performance
         ], maxTimeMS=5000))
         
@@ -5938,7 +5985,7 @@ def handle_verification_submission():
             if is_bot_available():
                 notify_verification_submission(
                     username, level_name, creator, verifier, difficulty, placement_num, 
-                    experience_num, enjoyment_num, verification_url, comments
+                    experience_num, enjoyment_num, verification_url, comments, level_id
                 )
                 print(f"✅ Discord notification sent for verification submission by {username}")
             else:
@@ -8114,7 +8161,22 @@ def admin_edit_level():
     if thumbnail_type == 'url':
         # Custom URL
         thumbnail_url = request.form.get('thumbnail_url', '').strip()
-    # Image upload functionality removed
+    elif thumbnail_type == 'upload':
+        # Handle file upload
+        thumbnail_file = request.files.get('thumbnail_file')
+        if thumbnail_file and thumbnail_file.filename:
+            # Save uploaded file and get URL
+            import base64
+            file_data = thumbnail_file.read()
+            if len(file_data) > 5 * 1024 * 1024:  # 5MB limit
+                flash('Image file too large (max 5MB)', 'danger')
+                return redirect(url_for('admin_levels'))
+            
+            # Convert to base64 for storage
+            thumbnail_url = f"data:{thumbnail_file.content_type};base64,{base64.b64encode(file_data).decode('utf-8')}"
+    elif thumbnail_type == 'keep':
+        # Keep existing image
+        thumbnail_url = level.get('thumbnail_url', '')
     # If thumbnail_type == 'auto', thumbnail_url stays empty (uses YouTube auto)
     
     # Handle position changes
@@ -8558,6 +8620,120 @@ def admin_approve_record(record_id):
         traceback.print_exc()
     
     return redirect(url_for('admin'))
+
+@app.route('/admin/hide_record/<record_id>', methods=['POST'])
+def admin_hide_record(record_id):
+    """Hide a record from public view without deleting it"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Convert string record_id to ObjectId
+        try:
+            record_object_id = ObjectId(record_id)
+        except InvalidId:
+            flash('Invalid record ID', 'danger')
+            return redirect(request.referrer or url_for('admin'))
+        
+        # Get record info
+        record = mongo_db.records.find_one({"_id": record_object_id})
+        if not record:
+            flash('Record not found', 'danger')
+            return redirect(request.referrer or url_for('admin'))
+        
+        # Get admin info for logging
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        
+        # Hide the record
+        mongo_db.records.update_one(
+            {"_id": record_object_id},
+            {"$set": {
+                "hidden": True,
+                "hidden_by": admin_username,
+                "hidden_at": datetime.now(timezone.utc)
+            }}
+        )
+        
+        # Update user points since hidden records don't count
+        update_user_points(record['user_id'])
+        
+        # Get user and level info for logging
+        user = mongo_db.users.find_one({"_id": record['user_id']})
+        level = mongo_db.levels.find_one({"_id": record['level_id']})
+        
+        # Log admin action
+        log_admin_action(
+            admin_username,
+            "Record Hidden",
+            f"Hidden {user['username'] if user else 'Unknown'}'s {record['progress']}% record on {level['name'] if level else 'Unknown Level'}"
+        )
+        
+        flash('Record hidden successfully', 'success')
+        
+    except Exception as e:
+        flash(f'Error hiding record: {str(e)}', 'danger')
+        print(f"Admin hide record error: {e}")
+    
+    return redirect(request.referrer or url_for('admin'))
+
+@app.route('/admin/show_record/<record_id>', methods=['POST'])
+def admin_show_record(record_id):
+    """Show a previously hidden record"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Convert string record_id to ObjectId
+        try:
+            record_object_id = ObjectId(record_id)
+        except InvalidId:
+            flash('Invalid record ID', 'danger')
+            return redirect(request.referrer or url_for('admin'))
+        
+        # Get record info
+        record = mongo_db.records.find_one({"_id": record_object_id})
+        if not record:
+            flash('Record not found', 'danger')
+            return redirect(request.referrer or url_for('admin'))
+        
+        # Get admin info for logging
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        
+        # Show the record
+        mongo_db.records.update_one(
+            {"_id": record_object_id},
+            {"$unset": {
+                "hidden": "",
+                "hidden_by": "",
+                "hidden_at": ""
+            }}
+        )
+        
+        # Update user points since shown records now count
+        update_user_points(record['user_id'])
+        
+        # Get user and level info for logging
+        user = mongo_db.users.find_one({"_id": record['user_id']})
+        level = mongo_db.levels.find_one({"_id": record['level_id']})
+        
+        # Log admin action
+        log_admin_action(
+            admin_username,
+            "Record Shown",
+            f"Made visible {user['username'] if user else 'Unknown'}'s {record['progress']}% record on {level['name'] if level else 'Unknown Level'}"
+        )
+        
+        flash('Record is now visible', 'success')
+        
+    except Exception as e:
+        flash(f'Error showing record: {str(e)}', 'danger')
+        print(f"Admin show record error: {e}")
+    
+    return redirect(request.referrer or url_for('admin'))
 
 @app.route('/admin/reject_record/<record_id>', methods=['POST'])
 def admin_reject_record(record_id):

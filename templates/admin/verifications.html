@@ -64,11 +64,15 @@
                                     </div>
                                     
                                     <div class="row mb-3">
-                                        <div class="col-6">
+                                        <div class="col-4">
+                                            <small class="text-muted d-block">Level ID</small>
+                                            <span class="badge bg-secondary">{{ submission.level_id or 'N/A' }}</span>
+                                        </div>
+                                        <div class="col-4">
                                             <small class="text-muted d-block">Difficulty</small>
                                             <span class="badge bg-info">{{ submission.difficulty }}</span>
                                         </div>
-                                        <div class="col-6">
+                                        <div class="col-4">
                                             <small class="text-muted d-block">Placement</small>
                                             <span class="badge bg-primary">#{{ submission.placement }}</span>
                                         </div>

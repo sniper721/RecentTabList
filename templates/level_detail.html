@@ -87,10 +87,14 @@
                                 <th>Progress</th>
                                 <th>Video</th>
                                 <th>Date</th>
+                                {% if session.get('is_admin') %}
+                                <th>Admin</th>
+                                {% endif %}
                             </tr>
                         </thead>
                         <tbody>
-                            {% for record in records %}
+                            {% set visible_records = records|selectattr('hidden', 'undefined')|list + records|selectattr('hidden', 'equalto', false)|list %}
+                            {% for record in visible_records %}
                             <tr>
                                 <td>{{ loop.index }}</td>
                                 {% if record is not mapping %}
@@ -133,8 +137,80 @@
                                 </td>
                                 {% set date_submitted = record.date_submitted if record is not mapping else record['date_submitted'] %}
                                 <td>{{ date_submitted.strftime('%Y-%m-%d') if date_submitted is not string else date_submitted }}</td>
+                                {% if session.get('is_admin') %}
+                                <td>
+                                    <form method="POST" action="{{ url_for('admin_hide_record', record_id=record._id if record is not mapping else record['_id']) }}" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-warning" title="Hide Record" onclick="return confirm('Hide this record? It will still exist but won\'t be visible to users.')">
+                                            <i class="fas fa-eye-slash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                                {% endif %}
                             </tr>
                             {% endfor %}
+                            
+                            {% if session.get('is_admin') %}
+                                {% set hidden_records = records|selectattr('hidden', 'equalto', true)|list %}
+                                {% if hidden_records %}
+                                    <tr class="table-secondary">
+                                        <td colspan="{% if session.get('is_admin') %}6{% else %}5{% endif %}" class="text-center">
+                                            <strong>Hidden Records (Admin Only)</strong>
+                                        </td>
+                                    </tr>
+                                    {% for record in hidden_records %}
+                                    <tr class="table-secondary opacity-75">
+                                        <td><em>Hidden</em></td>
+                                        {% if record is not mapping %}
+                                        <td>{{ record.user.username }}</td>
+                                        {% else %}
+                                        <td>{{ record['user']['username'] if record['user'] is mapping else record.user.username }}</td>
+                                        {% endif %}
+                                        <td>
+                                            {% set progress = record.progress if record is not mapping else record['progress'] %}
+                                            {% if progress == 100 %}
+                                            <span class="badge bg-success">100%</span>
+                                            {% else %}
+                                            <span class="badge bg-warning">{{ progress }}%</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% set video_url = record.video_url if record is not mapping else record['video_url'] %}
+                                            {% if video_url %}
+                                                {% set video_info = get_video_embed_info(video_url) %}
+                                                {% if video_info %}
+                                                    {% if video_info.platform == 'youtube' %}
+                                                        <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-danger" title="YouTube">
+                                                            <i class="fab fa-youtube"></i>
+                                                        </a>
+                                                    {% elif video_info.platform == 'streamable' %}
+                                                        <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-primary" title="Streamable">
+                                                            <i class="fas fa-play"></i>
+                                                        </a>
+                                                    {% elif video_info.platform == 'tiktok' %}
+                                                        <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-dark" title="TikTok">
+                                                            <i class="fab fa-tiktok"></i>
+                                                        </a>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-secondary" title="Video">
+                                                        <i class="fas fa-external-link-alt"></i>
+                                                    </a>
+                                                {% endif %}
+                                            {% endif %}
+                                        </td>
+                                        {% set date_submitted = record.date_submitted if record is not mapping else record['date_submitted'] %}
+                                        <td>{{ date_submitted.strftime('%Y-%m-%d') if date_submitted is not string else date_submitted }}</td>
+                                        <td>
+                                            <form method="POST" action="{{ url_for('admin_show_record', record_id=record._id if record is not mapping else record['_id']) }}" class="d-inline">
+                                                <button type="submit" class="btn btn-sm btn-success" title="Show Record" onclick="return confirm('Make this record visible again?')">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% endif %}
+                            {% endif %}
                             
                             {% if not records %}
                             <tr>

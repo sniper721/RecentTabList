@@ -59,14 +59,21 @@
                             </div>
 
                             <div class="row mb-4">
-                                <div class="col-md-6">
+                                <div class="col-md-4">
+                                    <div class="info-item">
+                                        <i class="fas fa-hashtag text-info me-2"></i>
+                                        <strong>Level ID:</strong>
+                                        <span class="badge bg-secondary ms-2">{{ submission.level_id or 'N/A' }}</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
                                     <div class="info-item">
                                         <i class="fas fa-star text-warning me-2"></i>
                                         <strong>Difficulty:</strong>
                                         <span class="badge bg-info ms-2">{{ submission.difficulty }}</span>
                                     </div>
                                 </div>
-                                <div class="col-md-6">
+                                <div class="col-md-4">
                                     <div class="info-item">
                                         <i class="fas fa-trophy text-warning me-2"></i>
                                         <strong>Placement:</strong>
