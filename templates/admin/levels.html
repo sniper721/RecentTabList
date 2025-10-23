@@ -233,12 +233,15 @@
                                         
                                         <div id="upload_input" style="display: none;">
                                             <input type="file" class="form-control" id="thumbnail_file" name="thumbnail_file" accept="image/*">
+                                            <small class="form-text text-muted">
+                                                Supported formats: JPG, PNG, GIF, WebP (max 5MB)
+                                            </small>
                                         </div>
                                         
                                         <small class="form-text text-muted">
                                             Auto: Uses YouTube thumbnail if video URL is provided<br>
                                             Custom URL: Uses your specified image URL<br>
-                                            Upload: Upload image file (max 5MB)
+                                            Upload: Upload image file (JPG, PNG, GIF, WebP - max 5MB)
                                         </small>
                                     </div>
                                 </div>
@@ -347,6 +350,12 @@
                                                 <strong>Custom Image URL</strong> - Use specific image
                                             </label>
                                         </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="radio" name="thumbnail_type" id="edit_thumb_keep" value="keep_existing">
+                                            <label class="form-check-label" for="edit_thumb_keep">
+                                                <strong>Keep Current Image</strong> - Don't change existing thumbnail
+                                            </label>
+                                        </div>
                                         <div class="form-check mb-3">
                                             <input class="form-check-input" type="radio" name="thumbnail_type" id="edit_thumb_upload" value="upload">
                                             <label class="form-check-label" for="edit_thumb_upload">
@@ -358,14 +367,24 @@
                                             <input type="text" class="form-control mb-2" id="edit_thumbnail_url" name="thumbnail_url" placeholder="https://example.com/image.jpg">
                                         </div>
                                         
+                                        <div id="edit_keep_input" style="display: none;">
+                                            <div class="alert alert-info mb-2">
+                                                <i class="fas fa-info-circle"></i> Current image will be preserved (recommended for uploaded images)
+                                            </div>
+                                        </div>
+                                        
                                         <div id="edit_upload_input" style="display: none;">
                                             <input type="file" class="form-control" id="edit_thumbnail_file" name="thumbnail_file" accept="image/*">
+                                            <small class="form-text text-muted">
+                                                Supported formats: JPG, PNG, GIF, WebP (max 5MB)
+                                            </small>
                                         </div>
                                         
                                         <small class="form-text text-muted">
                                             Auto: Uses YouTube thumbnail if video URL is provided<br>
                                             Custom URL: Uses your specified image URL<br>
-                                            Upload: Upload image file (max 5MB)
+                                            Keep Current: Preserves existing image (recommended for base64 images)<br>
+                                            Upload: Upload image file (JPG, PNG, GIF, WebP - max 5MB)
                                         </small>
                                     </div>
                                 </div>
@@ -379,7 +398,12 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <button type="submit" class="btn btn-primary" id="edit_save_btn">
+                        <span class="btn-text">Save Changes</span>
+                        <span class="btn-loading" style="display: none;">
+                            <i class="fas fa-spinner fa-spin"></i> Saving...
+                        </span>
+                    </button>
                 </div>
             </form>
         </div>
@@ -522,6 +546,7 @@
             const levelPoints = this.getAttribute('data-level-points');
             const levelMinPercentage = this.getAttribute('data-level-min-percentage');
             const demonType = this.getAttribute('data-demon-type');
+            const levelThumbnail = this.getAttribute('data-level-thumbnail') || '';
             
             document.getElementById('edit_level_id').value = levelId;
             document.getElementById('edit_name').value = levelName;
@@ -532,27 +557,43 @@
             document.getElementById('edit_video_url').value = levelVideo || '';
             document.getElementById('edit_description').value = levelDescription || '';
             document.getElementById('edit_game_level_id').value = levelGameId || '';
-            document.getElementById('edit_thumbnail_url').value = this.getAttribute('data-level-thumbnail') || '';
+            document.getElementById('edit_thumbnail_url').value = levelThumbnail;
             document.getElementById('edit_points').value = levelPoints ? parseFloat(levelPoints).toFixed(2) : '';
             document.getElementById('edit_min_percentage').value = levelMinPercentage || '100';
             
-            // Handle thumbnail selection - automatically choose "keep image" for base64 images
-            const thumbnailUrl = this.getAttribute('data-level-thumbnail') || '';
-            if (thumbnailUrl.startsWith('data:')) {
-                // Base64 image - automatically select "keep image"
-                document.getElementById('edit_thumb_keep').checked = true;
-                document.getElementById('edit_url_input').style.display = 'none';
-                document.getElementById('edit_upload_input').style.display = 'none';
-            } else if (thumbnailUrl) {
-                // URL image - select URL option and populate field
-                document.getElementById('edit_thumb_url').checked = true;
-                document.getElementById('edit_url_input').style.display = 'block';
-                document.getElementById('edit_upload_input').style.display = 'none';
-            } else {
-                // No image - select auto
-                document.getElementById('edit_thumb_auto').checked = true;
-                document.getElementById('edit_url_input').style.display = 'none';
-                document.getElementById('edit_upload_input').style.display = 'none';
+            // Smart thumbnail type detection and selection
+            let selectedThumbnailType = 'auto'; // default
+            
+            if (levelThumbnail && levelThumbnail.trim()) {
+                if (levelThumbnail.startsWith('data:image')) {
+                    // Base64 image - select "Keep Current"
+                    selectedThumbnailType = 'keep_existing';
+                } else if (levelThumbnail.startsWith('http')) {
+                    // URL image - select "Custom URL" and populate field
+                    selectedThumbnailType = 'url';
+                }
+            }
+            
+            // Set the appropriate radio button
+            document.getElementById('edit_thumb_auto').checked = (selectedThumbnailType === 'auto');
+            document.getElementById('edit_thumb_url').checked = (selectedThumbnailType === 'url');
+            document.getElementById('edit_thumb_keep').checked = (selectedThumbnailType === 'keep_existing');
+            
+            // Show/hide appropriate input sections
+            const urlInput = document.getElementById('edit_url_input');
+            const keepInput = document.getElementById('edit_keep_input');
+            const uploadInput = document.getElementById('edit_upload_input');
+            
+            // Hide all first
+            urlInput.style.display = 'none';
+            keepInput.style.display = 'none';
+            uploadInput.style.display = 'none';
+            
+            // Show the appropriate one
+            if (selectedThumbnailType === 'url') {
+                urlInput.style.display = 'block';
+            } else if (selectedThumbnailType === 'keep_existing') {
+                keepInput.style.display = 'block';
             }
             
             // Handle demon type
@@ -613,20 +654,43 @@
         if (radio.id.startsWith('edit_')) {
             radio.addEventListener('change', function() {
                 const urlInput = document.getElementById('edit_url_input');
+                const keepInput = document.getElementById('edit_keep_input');
                 const uploadInput = document.getElementById('edit_upload_input');
                 
                 // Hide all inputs first
                 urlInput.style.display = 'none';
+                keepInput.style.display = 'none';
                 uploadInput.style.display = 'none';
                 
                 // Show relevant input
                 if (this.value === 'url') {
                     urlInput.style.display = 'block';
+                } else if (this.value === 'keep_existing') {
+                    keepInput.style.display = 'block';
                 } else if (this.value === 'upload') {
                     uploadInput.style.display = 'block';
                 }
             });
         }
+    });
+    
+    // Add loading indicator for form submission
+    document.querySelector('#editLevelModal form').addEventListener('submit', function() {
+        const saveBtn = document.getElementById('edit_save_btn');
+        const btnText = saveBtn.querySelector('.btn-text');
+        const btnLoading = saveBtn.querySelector('.btn-loading');
+        
+        // Show loading state
+        btnText.style.display = 'none';
+        btnLoading.style.display = 'inline';
+        saveBtn.disabled = true;
+        
+        // Prevent double submission
+        setTimeout(() => {
+            saveBtn.disabled = false;
+            btnText.style.display = 'inline';
+            btnLoading.style.display = 'none';
+        }, 5000); // Reset after 5 seconds as fallback
     });
 </script>
 {% endblock %}
