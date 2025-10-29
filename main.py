@@ -5200,7 +5200,17 @@ def timemachine():
 @app.route('/level/<level_id>')
 def level_detail(level_id):
     try:
-        level = mongo_db.levels.find_one({"_id": int(level_id)}, max_time_ms=5000)
+        # Try to convert to ObjectId first (for new levels), then fall back to int (for old levels)
+        try:
+            level_object_id = ObjectId(level_id)
+            level = mongo_db.levels.find_one({"_id": level_object_id}, max_time_ms=5000)
+            level_id_for_records = level_object_id
+        except (ValueError, InvalidId):
+            # Fall back to integer ID for legacy levels
+            level_object_id = int(level_id)
+            level = mongo_db.levels.find_one({"_id": level_object_id}, max_time_ms=5000)
+            level_id_for_records = level_object_id
+        
         if not level:
             flash('Level not found', 'danger')
             return redirect(url_for('index'))
@@ -5209,7 +5219,7 @@ def level_detail(level_id):
         is_admin = 'user_id' in session and session.get('is_admin', False)
         
         # Build match criteria - exclude hidden records for non-admins
-        match_criteria = {"level_id": int(level_id), "status": "approved"}
+        match_criteria = {"level_id": level_id_for_records, "status": "approved"}
         if not is_admin:
             match_criteria["$or"] = [
                 {"hidden": {"$exists": False}},
@@ -5232,7 +5242,7 @@ def level_detail(level_id):
         
         # Get position history for this level
         position_history = list(mongo_db.position_history.find(
-            {"level_id": int(level_id)}
+            {"level_id": level_id_for_records}
         ).sort("change_date", -1).limit(20))
         
         return render_template('level_detail.html', level=level, records=records, position_history=position_history, is_admin=is_admin)
@@ -6045,7 +6055,12 @@ def handle_verification_submission():
     
     # Validate numeric fields
     try:
-        level_id_num = int(level_id)
+        # Handle both ObjectId and integer level IDs
+        try:
+            level_id_num = ObjectId(level_id)
+        except (ValueError, InvalidId):
+            level_id_num = int(level_id)
+        
         placement_num = int(placement)
         experience_num = int(experience)
         enjoyment_num = int(enjoyment)
@@ -6167,9 +6182,14 @@ def handle_single_record_submission():
         levels = get_cached_levels(is_legacy=False)
         return render_template('submit_record.html', levels=levels)
     
-    # Convert to integers
+    # Convert level_id and progress
     try:
-        level_id = int(level_id_str)
+        # Handle both ObjectId and integer level IDs
+        try:
+            level_id = ObjectId(level_id_str)
+        except (ValueError, InvalidId):
+            level_id = int(level_id_str)
+        
         progress = int(progress_str)
     except ValueError:
         flash('Invalid level ID or progress value', 'danger')
@@ -6262,7 +6282,12 @@ def handle_multiple_record_submission():
                 continue
             
             try:
-                level_id = int(level_id_str)
+                # Handle both ObjectId and integer level IDs
+                try:
+                    level_id = ObjectId(level_id_str)
+                except (ValueError, InvalidId):
+                    level_id = int(level_id_str)
+                
                 progress = int(progress_str)
                 
                 # Validate progress range
@@ -8343,7 +8368,18 @@ def admin_edit_level():
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
     
-    db_level_id = int(request.form.get('level_id'))
+    level_id_str = request.form.get('level_id')
+    
+    # Handle both ObjectId and integer level IDs
+    try:
+        db_level_id = ObjectId(level_id_str)
+    except (ValueError, InvalidId):
+        try:
+            db_level_id = int(level_id_str)
+        except ValueError:
+            flash('Invalid level ID format', 'danger')
+            return redirect(url_for('admin_levels'))
+    
     game_level_id = request.form.get('game_level_id')
     difficulty = float(request.form.get('difficulty'))
     # Note: Demon type requirement removed - now using text-based difficulties
@@ -8514,7 +8550,18 @@ def admin_delete_level():
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
     
-    level_id = int(request.form.get('level_id'))
+    level_id_str = request.form.get('level_id')
+    
+    # Handle both ObjectId and integer level IDs
+    try:
+        level_id = ObjectId(level_id_str)
+    except (ValueError, InvalidId):
+        try:
+            level_id = int(level_id_str)
+        except ValueError:
+            flash('Invalid level ID format', 'danger')
+            return redirect(url_for('admin_levels'))
+    
     removal_reason = request.form.get('removal_reason', '').strip()  # Get optional removal reason
     
     # Get level info before deletion
@@ -8580,7 +8627,17 @@ def admin_move_to_legacy():
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
     
-    level_id = int(request.form.get('level_id'))
+    level_id_str = request.form.get('level_id')
+    
+    # Handle both ObjectId and integer level IDs
+    try:
+        level_id = ObjectId(level_id_str)
+    except (ValueError, InvalidId):
+        try:
+            level_id = int(level_id_str)
+        except ValueError:
+            flash('Invalid level ID format', 'danger')
+            return redirect(url_for('admin_levels'))
     
     # Get level info before moving
     level = mongo_db.levels.find_one({"_id": level_id})
@@ -8621,7 +8678,18 @@ def admin_move_to_main():
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
     
-    level_id = int(request.form.get('level_id'))
+    level_id_str = request.form.get('level_id')
+    
+    # Handle both ObjectId and integer level IDs
+    try:
+        level_id = ObjectId(level_id_str)
+    except (ValueError, InvalidId):
+        try:
+            level_id = int(level_id_str)
+        except ValueError:
+            flash('Invalid level ID format', 'danger')
+            return redirect(url_for('admin_levels'))
+    
     position = int(request.form.get('position'))
     
     # Get level info before moving
@@ -9666,7 +9734,17 @@ def admin_edit_future_level():
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
     
-    level_id = int(request.form.get('level_id'))
+    level_id_str = request.form.get('level_id')
+    
+    # Handle both ObjectId and integer level IDs
+    try:
+        level_id = ObjectId(level_id_str)
+    except (ValueError, InvalidId):
+        try:
+            level_id = int(level_id_str)
+        except ValueError:
+            flash('Invalid level ID format', 'danger')
+            return redirect(url_for('admin_future_levels'))
     
     # Get current level
     level = mongo_db.future_levels.find_one({"_id": level_id})
@@ -9740,7 +9818,17 @@ def admin_delete_future_level():
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
     
-    level_id = int(request.form.get('level_id'))
+    level_id_str = request.form.get('level_id')
+    
+    # Handle both ObjectId and integer level IDs
+    try:
+        level_id = ObjectId(level_id_str)
+    except (ValueError, InvalidId):
+        try:
+            level_id = int(level_id_str)
+        except ValueError:
+            flash('Invalid level ID format', 'danger')
+            return redirect(url_for('admin_future_levels'))
     
     # Get level info before deletion
     level = mongo_db.future_levels.find_one({"_id": level_id})

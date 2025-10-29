@@ -76,36 +76,99 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Add YouTube video preview on hover if available
+    // YouTube video preview with proper tooltip system - Fixed spasm issue
+    let globalTooltip = null;
+    let tooltipTimeout = null;
+    
+    // Create global tooltip container
+    function createGlobalTooltip() {
+        if (globalTooltip) return globalTooltip;
+        
+        globalTooltip = document.createElement('div');
+        globalTooltip.id = 'youtube-tooltip';
+        globalTooltip.style.cssText = `
+            position: fixed;
+            z-index: 10000;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            max-width: 200px;
+        `;
+        document.body.appendChild(globalTooltip);
+        return globalTooltip;
+    }
+    
+    // Show tooltip
+    function showTooltip(element, videoId) {
+        const tooltip = createGlobalTooltip();
+        const rect = element.getBoundingClientRect();
+        
+        tooltip.innerHTML = `
+            <img src="https://img.youtube.com/vi/${videoId}/mqdefault.jpg" 
+                 alt="Video Preview" 
+                 style="width: 160px; height: 90px; border-radius: 4px; display: block;">
+            <div style="text-align: center; margin-top: 8px; color: #666; font-size: 12px;">
+                <i class="fab fa-youtube" style="color: #ff0000;"></i> YouTube Preview
+            </div>
+        `;
+        
+        // Position tooltip
+        const tooltipRect = tooltip.getBoundingClientRect();
+        let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+        let top = rect.bottom + 10;
+        
+        // Keep tooltip on screen
+        if (left < 10) left = 10;
+        if (left + tooltipRect.width > window.innerWidth - 10) {
+            left = window.innerWidth - tooltipRect.width - 10;
+        }
+        if (top + tooltipRect.height > window.innerHeight - 10) {
+            top = rect.top - tooltipRect.height - 10;
+        }
+        
+        tooltip.style.left = left + 'px';
+        tooltip.style.top = top + 'px';
+        tooltip.style.opacity = '1';
+    }
+    
+    // Hide tooltip
+    function hideTooltip() {
+        if (globalTooltip) {
+            globalTooltip.style.opacity = '0';
+        }
+    }
+    
+    // Apply to YouTube links
     const videoLinks = document.querySelectorAll('a[href*="youtube.com"], a[href*="youtu.be"]');
     videoLinks.forEach(link => {
-        link.addEventListener('mouseenter', function() {
+        link.addEventListener('mouseenter', function(e) {
+            clearTimeout(tooltipTimeout);
+            
             const url = this.getAttribute('href');
             let videoId = '';
             
             if (url.includes('youtube.com')) {
-                videoId = url.split('v=')[1].split('&')[0];
+                const match = url.match(/[?&]v=([^&]+)/);
+                videoId = match ? match[1] : '';
             } else if (url.includes('youtu.be')) {
-                videoId = url.split('/').pop();
+                videoId = url.split('/').pop().split('?')[0];
             }
             
             if (videoId) {
-                const preview = document.createElement('div');
-                preview.classList.add('video-preview');
-                preview.innerHTML = `
-                    <img src="https://img.youtube.com/vi/${videoId}/mqdefault.jpg" alt="Video Preview">
-                    <div class="play-button"><i class="fas fa-play"></i></div>
-                `;
-                
-                this.appendChild(preview);
+                tooltipTimeout = setTimeout(() => {
+                    showTooltip(this, videoId);
+                }, 500); // 500ms delay to prevent accidental triggers
             }
         });
         
         link.addEventListener('mouseleave', function() {
-            const preview = this.querySelector('.video-preview');
-            if (preview) {
-                preview.remove();
-            }
+            clearTimeout(tooltipTimeout);
+            hideTooltip();
         });
     });
     
