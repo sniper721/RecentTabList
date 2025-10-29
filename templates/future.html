@@ -35,30 +35,32 @@
                                 {% set thumbnail_url = level.thumbnail_url %}
                                 {% set video_url = level.video_url %}
                                 
-                                <!-- SIMPLE THUMBNAIL - NO DOUBLE IMAGES -->
-                                {% if thumbnail_url and thumbnail_url != '' and not thumbnail_url.startswith('https://img.youtube.com') %}
-                                    <!-- Custom thumbnail -->
-                                    <img src="/thumb/{{ thumbnail_url | urlencode }}" alt="{{ level.name }}" 
-                                         class="img-fluid rounded" width="206" height="116" 
-                                         style="object-fit: cover; filter: brightness(1.1) saturate(1.2);">
-                                {% elif video_url and ('youtube.com' in video_url or 'youtu.be' in video_url) %}
-                                    <!-- YouTube thumbnail -->
-                                    {% if 'watch?v=' in video_url %}
-                                        {% set video_id = video_url.split('watch?v=')[1].split('&')[0] %}
-                                    {% elif 'youtu.be/' in video_url %}
-                                        {% set video_id = video_url.split('youtu.be/')[1].split('?')[0] %}
+                                <!-- MOBILE-RESPONSIVE THUMBNAIL SYSTEM -->
+                                <div class="level-thumbnail-container">
+                                    {% if thumbnail_url and thumbnail_url != '' and not thumbnail_url.startswith('https://img.youtube.com') %}
+                                        <!-- Custom thumbnail -->
+                                        <img src="/thumb/{{ thumbnail_url | urlencode }}" alt="{{ level.name }}" 
+                                             class="level-thumbnail img-fluid rounded" 
+                                             style="filter: brightness(1.1) saturate(1.2);">
+                                    {% elif video_url and ('youtube.com' in video_url or 'youtu.be' in video_url) %}
+                                        <!-- YouTube thumbnail -->
+                                        {% if 'watch?v=' in video_url %}
+                                            {% set video_id = video_url.split('watch?v=')[1].split('&')[0] %}
+                                        {% elif 'youtu.be/' in video_url %}
+                                            {% set video_id = video_url.split('youtu.be/')[1].split('?')[0] %}
+                                        {% endif %}
+                                        <img src="https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg" 
+                                             alt="{{ level.name }}" 
+                                             class="level-thumbnail img-fluid rounded" 
+                                             style="filter: brightness(1.1) saturate(1.2);">
+                                    {% else %}
+                                        <!-- No thumbnail -->
+                                        <div class="level-thumbnail-placeholder bg-gradient rounded d-flex align-items-center justify-content-center text-white" 
+                                             style="background: linear-gradient(45deg, #667eea, #764ba2); font-size: 14px;">
+                                            🎮 {{ level.name }}
+                                        </div>
                                     {% endif %}
-                                    <img src="https://img.youtube.com/vi/{{ video_id }}/mqdefault.jpg" 
-                                         alt="{{ level.name }}" 
-                                         class="img-fluid rounded" width="206" height="116" 
-                                         style="object-fit: cover; filter: brightness(1.1) saturate(1.2);">
-                                {% else %}
-                                    <!-- No thumbnail -->
-                                    <div class="bg-gradient rounded d-flex align-items-center justify-content-center text-white" 
-                                         style="width: 206px; height: 116px; background: linear-gradient(45deg, #667eea, #764ba2); font-size: 14px;">
-                                        🎮 {{ level.name }}
-                                    </div>
-                                {% endif %}
+                                </div>
                                 <div class="position-absolute top-0 start-0 bg-primary text-white px-2 py-1 rounded">
                                     #{{ level.position }}
                                 </div>
