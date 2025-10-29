@@ -61,185 +61,263 @@
         </div>
     </div>
 
-    <!-- Admin Categories -->
+    <!-- Admin Categories - Cube Layout (4x4 Grid) -->
     <div class="row">
-        <!-- Records Management -->
-        <div class="col-lg-4 mb-4">
-            <div class="card h-100">
-                <div class="card-header bg-warning text-dark">
-                    <h5 class="mb-0">📝 Records Management</h5>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted">Manage user submissions and records</p>
-                    <div class="d-grid gap-2">
-                        <a href="{{ url_for('admin') }}" class="btn btn-warning">
-                            📋 Review Pending Records
-                        </a>
-                        <a href="{{ url_for('admin_records') }}" class="btn btn-outline-warning">
-                            🔍 All Records
-                        </a>
-                        <a href="{{ url_for('admin_bulk_records') }}" class="btn btn-outline-warning">
-                            📦 Bulk Actions
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Level Management -->
-        <div class="col-lg-4 mb-4">
-            <div class="card h-100">
-                <div class="card-header bg-success text-white">
+        <!-- Level Management Group -->
+        <div class="col-lg-6 col-xl-3 mb-4">
+            <div class="card h-100 border-success">
+                <div class="card-header bg-success text-white text-center">
                     <h5 class="mb-0">🎮 Level Management</h5>
                 </div>
-                <div class="card-body">
-                    <p class="text-muted">Manage levels, positions, and points</p>
-                    <div class="d-grid gap-2">
-                        <a href="{{ url_for('admin_levels_enhanced') }}" class="btn btn-success">
-                            📊 Enhanced Levels
-                        </a>
-                        <a href="{{ url_for('admin_levels') }}" class="btn btn-outline-success">
-                            📋 Classic Levels
-                        </a>
-                        <a href="{{ url_for('admin_rebuild_image_system') }}" class="btn btn-outline-success">
-                            🖼️ Rebuild Images
-                        </a>
+                <div class="card-body p-2">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <a href="{{ url_for('admin_levels_enhanced') }}" class="btn btn-success btn-sm w-100 d-flex flex-column align-items-center p-2">
+                                <i class="fas fa-chart-bar mb-1"></i>
+                                <small>Enhanced Levels</small>
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{{ url_for('admin_levels') }}" class="btn btn-outline-success btn-sm w-100 d-flex flex-column align-items-center p-2">
+                                <i class="fas fa-list mb-1"></i>
+                                <small>Classic Levels</small>
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{{ url_for('admin_rebuild_image_system') }}" class="btn btn-outline-success btn-sm w-100 d-flex flex-column align-items-center p-2">
+                                <i class="fas fa-images mb-1"></i>
+                                <small>Rebuild Images</small>
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <button class="btn btn-outline-success btn-sm w-100 d-flex flex-column align-items-center p-2" onclick="addLevel()">
+                                <i class="fas fa-plus mb-1"></i>
+                                <small>Add Level</small>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- User Management -->
-        <div class="col-lg-4 mb-4">
-            <div class="card h-100">
-                <div class="card-header bg-primary text-white">
+        <!-- Records Management Group -->
+        <div class="col-lg-6 col-xl-3 mb-4">
+            <div class="card h-100 border-warning">
+                <div class="card-header bg-warning text-dark text-center">
+                    <h5 class="mb-0">📝 Records Management</h5>
+                </div>
+                <div class="card-body p-2">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <a href="{{ url_for('admin') }}" class="btn btn-warning btn-sm w-100 d-flex flex-column align-items-center p-2">
+                                <i class="fas fa-clipboard-list mb-1"></i>
+                                <small>Pending Records</small>
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{{ url_for('admin_records') }}" class="btn btn-outline-warning btn-sm w-100 d-flex flex-column align-items-center p-2">
+                                <i class="fas fa-search mb-1"></i>
+                                <small>All Records</small>
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{{ url_for('admin_bulk_records') }}" class="btn btn-outline-warning btn-sm w-100 d-flex flex-column align-items-center p-2">
+                                <i class="fas fa-boxes mb-1"></i>
+                                <small>Bulk Actions</small>
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <button class="btn btn-outline-warning btn-sm w-100 d-flex flex-column align-items-center p-2" onclick="bulkApprove()">
+                                <i class="fas fa-check-double mb-1"></i>
+                                <small>Quick Approve</small>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Management Group -->
+        <div class="col-lg-6 col-xl-3 mb-4">
+            <div class="card h-100 border-primary">
+                <div class="card-header bg-primary text-white text-center">
                     <h5 class="mb-0">👥 User Management</h5>
                 </div>
-                <div class="card-body">
-                    <p class="text-muted">Manage users, permissions, and bans</p>
-                    <div class="d-grid gap-2">
-                        <a href="{{ url_for('admin_users') }}" class="btn btn-primary">
-                            👤 All Users
-                        </a>
-                        <a href="{{ url_for('admin_tools') }}" class="btn btn-outline-primary">
-                            🔨 User Tools
-                        </a>
-                        <a href="{{ url_for('admin_profanity') }}" class="btn btn-outline-primary">
-                            🚫 Profanity Filter
-                        </a>
+                <div class="card-body p-2">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <a href="{{ url_for('admin_users') }}" class="btn btn-primary btn-sm w-100 d-flex flex-column align-items-center p-2">
+                                <i class="fas fa-users mb-1"></i>
+                                <small>All Users</small>
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{{ url_for('admin_tools') }}" class="btn btn-outline-primary btn-sm w-100 d-flex flex-column align-items-center p-2">
+                                <i class="fas fa-tools mb-1"></i>
+                                <small>User Tools</small>
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{{ url_for('admin_profanity') }}" class="btn btn-outline-primary btn-sm w-100 d-flex flex-column align-items-center p-2">
+                                <i class="fas fa-ban mb-1"></i>
+                                <small>Profanity Filter</small>
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <button class="btn btn-outline-primary btn-sm w-100 d-flex flex-column align-items-center p-2" onclick="findUser()">
+                                <i class="fas fa-user-search mb-1"></i>
+                                <small>Find User</small>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Content Management -->
-        <div class="col-lg-4 mb-4">
-            <div class="card h-100">
-                <div class="card-header bg-info text-white">
-                    <h5 class="mb-0">📰 Content Management</h5>
+        <!-- System & Content Group -->
+        <div class="col-lg-6 col-xl-3 mb-4">
+            <div class="card h-100 border-info">
+                <div class="card-header bg-info text-white text-center">
+                    <h5 class="mb-0">⚙️ System & Content</h5>
                 </div>
-                <div class="card-body">
-                    <p class="text-muted">Manage news, announcements, and content</p>
-                    <div class="d-grid gap-2">
-                        <a href="{{ url_for('admin_news') }}" class="btn btn-info">
-                            📰 News Articles
-                        </a>
-                        <a href="{{ url_for('admin_create_news') }}" class="btn btn-outline-info">
-                            ➕ Create News
-                        </a>
-                        <a href="#" class="btn btn-outline-info" onclick="alert('Coming soon!')">
-                            📢 Announcements
-                        </a>
+                <div class="card-body p-2">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <a href="{{ url_for('admin_settings') }}" class="btn btn-info btn-sm w-100 d-flex flex-column align-items-center p-2">
+                                <i class="fas fa-cog mb-1"></i>
+                                <small>Settings</small>
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{{ url_for('admin_news') }}" class="btn btn-outline-info btn-sm w-100 d-flex flex-column align-items-center p-2">
+                                <i class="fas fa-newspaper mb-1"></i>
+                                <small>News</small>
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{{ url_for('admin_webhook_settings') }}" class="btn btn-outline-info btn-sm w-100 d-flex flex-column align-items-center p-2">
+                                <i class="fas fa-link mb-1"></i>
+                                <small>Webhooks</small>
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{{ url_for('admin_console') }}" class="btn btn-outline-info btn-sm w-100 d-flex flex-column align-items-center p-2">
+                                <i class="fas fa-terminal mb-1"></i>
+                                <small>Console</small>
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- System Settings -->
-        <div class="col-lg-4 mb-4">
-            <div class="card h-100">
-                <div class="card-header bg-secondary text-white">
-                    <h5 class="mb-0">⚙️ System Settings</h5>
-                </div>
-                <div class="card-body">
-                    <p class="text-muted">Configure system settings and features</p>
-                    <div class="d-grid gap-2">
-                        <a href="{{ url_for('admin_settings') }}" class="btn btn-secondary">
-                            ⚙️ General Settings
-                        </a>
-                        <a href="{{ url_for('admin_webhook_settings') }}" class="btn btn-outline-secondary">
-                            🔗 Webhook Settings
-                        </a>
-                        <a href="{{ url_for('admin_console') }}" class="btn btn-outline-secondary">
-                            💻 Admin Console
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Advanced Tools -->
-        <div class="col-lg-4 mb-4">
-            <div class="card h-100">
-                <div class="card-header bg-danger text-white">
+    <!-- Advanced Tools Row -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white text-center">
                     <h5 class="mb-0">🔧 Advanced Tools</h5>
                 </div>
-                <div class="card-body">
-                    <p class="text-muted">Advanced administrative tools</p>
-                    <div class="d-grid gap-2">
-                        <a href="{{ url_for('admin_console') }}" class="btn btn-danger">
-                            💻 Console Access
-                        </a>
-                        <button class="btn btn-outline-danger" onclick="recalculateAllPoints()">
-                            🔄 Recalculate Points
-                        </button>
-                        <button class="btn btn-outline-danger" onclick="clearCache()">
-                            🗑️ Clear Cache
-                        </button>
-                        <a href="{{ url_for('admin_test_environment') }}" class="btn btn-outline-warning">
-                            🧪 Test Environment
-                        </a>
+                <div class="card-body p-3">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <button class="btn btn-danger w-100 d-flex flex-column align-items-center p-3" onclick="recalculateAllPoints()">
+                                <i class="fas fa-calculator fa-2x mb-2"></i>
+                                <strong>Recalculate Points</strong>
+                                <small class="text-muted">Recalculate all user points</small>
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-danger w-100 d-flex flex-column align-items-center p-3" onclick="clearCache()">
+                                <i class="fas fa-trash fa-2x mb-2"></i>
+                                <strong>Clear Cache</strong>
+                                <small class="text-muted">Clear all cached data</small>
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-danger w-100 d-flex flex-column align-items-center p-3" onclick="systemStatus()">
+                                <i class="fas fa-heartbeat fa-2x mb-2"></i>
+                                <strong>System Status</strong>
+                                <small class="text-muted">Check system health</small>
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="{{ url_for('admin_test_environment') }}" class="btn btn-outline-warning w-100 d-flex flex-column align-items-center p-3">
+                                <i class="fas fa-flask fa-2x mb-2"></i>
+                                <strong>Test Environment</strong>
+                                <small class="text-muted">Testing tools</small>
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Quick Actions -->
-    <div class="row mt-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">⚡ Quick Actions</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-3">
-                            <button class="btn btn-outline-primary w-100" onclick="findUser()">
-                                🔍 Find User
-                            </button>
-                        </div>
-                        <div class="col-md-3">
-                            <button class="btn btn-outline-success w-100" onclick="addLevel()">
-                                ➕ Add Level
-                            </button>
-                        </div>
-                        <div class="col-md-3">
-                            <button class="btn btn-outline-warning w-100" onclick="bulkApprove()">
-                                ✅ Bulk Approve
-                            </button>
-                        </div>
-                        <div class="col-md-3">
-                            <button class="btn btn-outline-info w-100" onclick="systemStatus()">
-                                📊 System Status
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+
 </div>
+
+<style>
+/* Cube Layout Enhancements */
+.card {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.btn-sm {
+    font-size: 0.75rem;
+    min-height: 60px;
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-sm:hover {
+    transform: scale(1.05);
+}
+
+.card-body .row.g-2 {
+    --bs-gutter-x: 0.5rem;
+    --bs-gutter-y: 0.5rem;
+}
+
+/* Advanced Tools Section */
+.bg-danger .btn {
+    transition: all 0.3s ease-in-out;
+}
+
+.bg-danger .btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+}
+
+/* Icon styling */
+.fas {
+    font-size: 1.2em;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .col-xl-3 {
+        margin-bottom: 1rem;
+    }
+    
+    .btn-sm {
+        min-height: 50px;
+        font-size: 0.7rem;
+    }
+}
+
+/* Color-coded borders for better visual grouping */
+.border-success { border-width: 2px !important; }
+.border-warning { border-width: 2px !important; }
+.border-primary { border-width: 2px !important; }
+.border-info { border-width: 2px !important; }
+.border-danger { border-width: 2px !important; }
+</style>
 
 <script>
 function recalculateAllPoints() {
