@@ -1205,14 +1205,8 @@ def auto_manage_legacy_list():
             old_points = level_at_101.get('points', 0)
             recalculate_user_points_after_level_move(level_at_101["_id"], old_points, 0.0)
             
-            # Log the automatic legacy move
-            log_level_change(
-                action="legacy",
-                level_name=level_at_101["name"],
-                admin_username="System",
-                old_position=101,
-                legacy_position=101
-            )
+            # Note: We don't log this as a separate changelog entry since 
+            # the placement message already mentions "This pushes X to the legacy list"
             
             print(f"🔄 Automatically moved {level_at_101['name']} to legacy list at position #101")
             print(f"🔄 Shifted all other legacy levels down by 1 position")
