@@ -2894,36 +2894,7 @@ def admin_find_user():
     except Exception as e:
         return {'error': str(e)}, 500
 
-@app.route('/admin/levels_enhanced')
-def admin_levels_enhanced():
-    """Enhanced admin levels page with demon difficulty support"""
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied - Admin only', 'danger')
-        return redirect(url_for('index'))
-    
-    try:
-        # Get all levels with record counts
-        pipeline = [
-            {"$match": {"is_legacy": {"$ne": True}}},
-            {"$lookup": {
-                "from": "records",
-                "localField": "_id",
-                "foreignField": "level_id",
-                "as": "records"
-            }},
-            {"$addFields": {
-                "record_count": {"$size": "$records"}
-            }},
-            {"$sort": {"position": 1}}
-        ]
-        
-        levels = list(mongo_db.levels.aggregate(pipeline))
-        
-        return render_template('admin/levels_enhanced.html', levels=levels)
-        
-    except Exception as e:
-        flash(f'Error loading levels: {str(e)}', 'danger')
-        return redirect(url_for('admin'))
+
 
 @app.route('/admin/move_level/<level_id>', methods=['POST'])
 def admin_move_level(level_id):
