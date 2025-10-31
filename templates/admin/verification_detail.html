@@ -282,6 +282,36 @@
                                     Open Video
                                 </a>
                                 {% endif %}
+                                
+                                {% if submission.status == 'pending' %}
+                                <hr class="my-3">
+                                <h6 class="text-muted mb-3">
+                                    <i class="fas fa-gavel me-2"></i>
+                                    Admin Decision
+                                </h6>
+                                
+                                <!-- Accept Form -->
+                                <form method="POST" action="{{ url_for('admin_accept_verification', submission_id=submission._id) }}" class="mb-2">
+                                    <div class="input-group mb-2">
+                                        <span class="input-group-text bg-success text-white">
+                                            <i class="fas fa-trophy"></i>
+                                        </span>
+                                        <input type="number" name="placement" class="form-control" placeholder="Position on list" min="1" max="150" value="{{ submission.placement }}" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-success w-100" onclick="return confirm('Accept this verification and place the level at position #' + this.form.placement.value + '?\\n\\nThis will:\\n- Add the level to the main list\\n- Give the submitter the record and points\\n- Send Discord notification')">
+                                        <i class="fas fa-check me-2"></i>
+                                        Accept & Place Level
+                                    </button>
+                                </form>
+                                
+                                <!-- Deny Form -->
+                                <form method="POST" action="{{ url_for('admin_deny_verification', submission_id=submission._id) }}">
+                                    <button type="submit" class="btn btn-danger w-100" onclick="return confirm('Deny this verification?\\n\\nThis will:\\n- Permanently delete the submission\\n- Notify the submitter\\n- No level will be added to the list')">
+                                        <i class="fas fa-times me-2"></i>
+                                        Deny & Delete Submission
+                                    </button>
+                                </form>
+                                {% endif %}
                             </div>
                         </div>
                     </div>

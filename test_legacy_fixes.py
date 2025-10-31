@@ -154,14 +154,14 @@ def test_auto_legacy_management():
         else:
             print("✅ No main list levels at position 101 (correct)")
         
-        # Check main list doesn't exceed 100 levels
+        # Check main list doesn't exceed 150 levels
         main_count = mongo_db.levels.count_documents({"is_legacy": {"$ne": True}})
         print(f"Main list has {main_count} levels")
         
-        if main_count <= 100:
-            print("✅ Main list has 100 or fewer levels")
+        if main_count <= 150:
+            print("✅ Main list has 150 or fewer levels")
         else:
-            print(f"⚠️  Main list has {main_count} levels (should be max 100)")
+            print(f"⚠️  Main list has {main_count} levels (should be max 150)")
         
     except Exception as e:
         print(f"❌ Error testing auto legacy management: {e}")

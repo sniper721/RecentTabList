@@ -28,7 +28,8 @@ class RealTimePointsManager:
         """Calculate points based on position using exponential formula"""
         if is_legacy:
             return 0.0
-        # p = 250(0.9475)^(position-1)
+        # p = 250(0.9475)^(x-1) where x is the placement of the level on the list
+        # Position 1 = 250(0.9475)^0 = 250 points
         return round(250 * (0.9475 ** (position - 1)), 2)
     
     def calculate_record_points(self, record, level):
