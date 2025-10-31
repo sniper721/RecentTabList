@@ -22,14 +22,14 @@
             <div class="card-body p-0">
                 <ul class="nav nav-tabs" id="levelTabs" role="tablist">
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="main-tab" data-bs-toggle="tab" data-bs-target="#main" type="button" role="tab" aria-controls="main" aria-selected="true">Main List</button>
+                        <a class="nav-link {% if not is_legacy_filter %}active{% endif %}" href="{{ url_for('admin_levels') }}" role="tab">Main List</a>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="legacy-tab" data-bs-toggle="tab" data-bs-target="#legacy" type="button" role="tab" aria-controls="legacy" aria-selected="false">Legacy List</button>
+                        <a class="nav-link {% if is_legacy_filter %}active{% endif %}" href="{{ url_for('admin_levels', filter='legacy') }}" role="tab">Legacy List</a>
                     </li>
                 </ul>
                 <div class="tab-content" id="levelTabsContent">
-                    <div class="tab-pane fade show active" id="main" role="tabpanel" aria-labelledby="main-tab">
+                    <div class="tab-pane fade {% if not is_legacy_filter %}show active{% endif %}" id="main" role="tabpanel" aria-labelledby="main-tab">
                         <div class="table-responsive">
                             <table class="table table-striped table-hover mb-0">
                                 <thead class="table-dark">
@@ -83,7 +83,7 @@
                             </table>
                         </div>
                     </div>
-                    <div class="tab-pane fade" id="legacy" role="tabpanel" aria-labelledby="legacy-tab">
+                    <div class="tab-pane fade {% if is_legacy_filter %}show active{% endif %}" id="legacy" role="tabpanel" aria-labelledby="legacy-tab">
                         <div class="table-responsive">
                             <table class="table table-striped table-hover mb-0">
                                 <thead class="table-dark">
@@ -99,40 +99,52 @@
                                     </tr>
                                 </thead>
                                 <tbody id="legacyListBody">
-                                    {% for level in levels if level.is_legacy %}
-                                    <tr>
-                                        <td>{{ level.position }}</td>
-                                        <td>{{ level.name }}</td>
-                                        <td>{{ level.creator }}</td>
-                                        <td>{{ level.verifier }}</td>
-                                        <td>{{ get_demon_difficulty_display(level.difficulty, level.demon_type) }}</td>
-                                        <td>{{ level.points or 0 }}</td>
-                                        <td>{{ level.min_percentage }}%</td>
-                                        <td>
-                                            <div class="btn-group" role="group">
-                                                <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editLevelModal"
-                                                        data-level-id="{{ level._id }}" data-level-name="{{ level.name }}"
-                                                        data-level-creator="{{ level.creator }}" data-level-verifier="{{ level.verifier }}"
-                                                        data-level-difficulty="{{ level.difficulty }}" data-level-position="{{ level.position }}"
-                                                        data-level-video="{{ level.video_url }}" data-level-description="{{ level.description }}"
-                                                        data-level-game-id="{{ level.level_id or '' }}" data-level-points="{{ level.points }}" data-level-thumbnail="{{ level.thumbnail_url or '' }}"
-                                                        data-level-min-percentage="{{ level.min_percentage }}" data-demon-type="{{ level.demon_type or '' }}">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-info ms-1" data-bs-toggle="modal" data-bs-target="#moveMainModal" data-level-game-id="{{ level._id }}">
-                                                    <i class="fas fa-arrow-up"></i>
-                                                </button>
-                                                <button class="btn btn-sm btn-danger ms-1" data-bs-toggle="modal" data-bs-target="#deleteLevelModal" data-level-game-id="{{ level._id }}">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                    {% if is_legacy_filter %}
+                                        {% for level in levels %}
+                                        <tr>
+                                            <td>{{ level.position }}</td>
+                                            <td>{{ level.name }}</td>
+                                            <td>{{ level.creator }}</td>
+                                            <td>{{ level.verifier }}</td>
+                                            <td>{{ get_demon_difficulty_display(level.difficulty, level.demon_type) }}</td>
+                                            <td>{{ level.points or 0 }}</td>
+                                            <td>{{ level.min_percentage }}%</td>
+                                            <td>
+                                                <div class="btn-group" role="group">
+                                                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editLevelModal"
+                                                            data-level-id="{{ level._id }}" data-level-name="{{ level.name }}"
+                                                            data-level-creator="{{ level.creator }}" data-level-verifier="{{ level.verifier }}"
+                                                            data-level-difficulty="{{ level.difficulty }}" data-level-position="{{ level.position }}"
+                                                            data-level-video="{{ level.video_url }}" data-level-description="{{ level.description }}"
+                                                            data-level-game-id="{{ level.level_id or '' }}" data-level-points="{{ level.points }}" data-level-thumbnail="{{ level.thumbnail_url or '' }}"
+                                                            data-level-min-percentage="{{ level.min_percentage }}" data-demon-type="{{ level.demon_type or '' }}">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-info ms-1" data-bs-toggle="modal" data-bs-target="#moveMainModal" data-level-game-id="{{ level._id }}">
+                                                        <i class="fas fa-arrow-up"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-danger ms-1" data-bs-toggle="modal" data-bs-target="#deleteLevelModal" data-level-game-id="{{ level._id }}">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% else %}
+                                        <tr>
+                                            <td colspan="8" class="text-center py-3">No levels in the legacy list.</td>
+                                        </tr>
+                                        {% endfor %}
                                     {% else %}
-                                    <tr>
-                                        <td colspan="6" class="text-center py-3">No levels in the legacy list.</td>
-                                    </tr>
-                                    {% endfor %}
+                                        <!-- Legacy levels will be loaded when the tab is clicked -->
+                                        <tr id="legacy-placeholder">
+                                            <td colspan="8" class="text-center py-3">
+                                                <button class="btn btn-outline-primary" onclick="loadLegacyLevels()">
+                                                    <i class="fas fa-list"></i> Load Legacy Levels
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                </tbody>
                                 </tbody>
                             </table>
                         </div>
@@ -691,6 +703,23 @@
             btnText.style.display = 'inline';
             btnLoading.style.display = 'none';
         }, 5000); // Reset after 5 seconds as fallback
+    });
+    
+    // Load legacy levels function
+    function loadLegacyLevels() {
+        const legacyBody = document.getElementById('legacyListBody');
+        legacyBody.innerHTML = '<tr><td colspan="8" class="text-center py-3"><i class="fas fa-spinner fa-spin"></i> Loading legacy levels...</td></tr>';
+        
+        // Redirect to load legacy levels
+        window.location.href = '/admin/levels?filter=legacy';
+    }
+    
+    // Auto-load legacy levels when legacy tab is clicked
+    document.getElementById('legacy-tab').addEventListener('click', function() {
+        const placeholder = document.getElementById('legacy-placeholder');
+        if (placeholder) {
+            loadLegacyLevels();
+        }
     });
 </script>
 {% endblock %}

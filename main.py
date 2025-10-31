@@ -613,8 +613,8 @@ def calculate_level_points(position, is_legacy=False, level_type="Level"):
     """Calculate points based on position using exponential formula"""
     if is_legacy:
         return 0.0
-    # p = 250(0.9475)^(position-1)
-    # Position 1 = exponent 0, Position 2 = exponent 1, etc.
+    # p = 250(0.9475)^(x-1) where x is the placement of the level on the list
+    # Position 1 = 250(0.9475)^0 = 250 points
     return round(250 * (0.9475 ** (position - 1)), 2)
 
 def get_demon_difficulty_display(difficulty, demon_type=None):
@@ -1175,15 +1175,15 @@ def send_enhanced_changelog_notification(action, level_name, admin_username, **k
         print(f"Error sending changelog notification: {e}")
 
 def auto_manage_legacy_list():
-    """Automatically manage legacy list - move level at position 101 to legacy and shift positions"""
+    """Automatically manage legacy list - move level at position 151 to legacy and shift positions"""
     try:
-        # Find level at position 101 (should be moved to legacy)
-        level_at_101 = mongo_db.levels.find_one({
-            "position": 101,
+        # Find level at position 151 (should be moved to legacy)
+        level_at_151 = mongo_db.levels.find_one({
+            "position": 151,
             "is_legacy": {"$ne": True}
         })
         
-        if level_at_101:
+        if level_at_151:
             # IMPORTANT: Shift all existing legacy levels down by 1 position
             # This ensures proper ordering when a new level enters legacy
             mongo_db.levels.update_many(
@@ -1191,26 +1191,26 @@ def auto_manage_legacy_list():
                 {"$inc": {"position": 1}}
             )
             
-            # Move the level to legacy at position 101 (legacy position 1 = main position 101)
+            # Move the level to legacy at position 151 (legacy position 1 = main position 151)
             mongo_db.levels.update_one(
-                {"_id": level_at_101["_id"]},
+                {"_id": level_at_151["_id"]},
                 {"$set": {
                     "is_legacy": True,
-                    "position": 101,  # Position 101 is the first legacy position
+                    "position": 151,  # Position 151 is the first legacy position
                     "points": 0  # Legacy levels have 0 points
                 }}
             )
             
             # Recalculate user points for this level (remove points since it's now legacy)
-            old_points = level_at_101.get('points', 0)
-            recalculate_user_points_after_level_move(level_at_101["_id"], old_points, 0.0)
+            old_points = level_at_151.get('points', 0)
+            recalculate_user_points_after_level_move(level_at_151["_id"], old_points, 0.0)
             
             # Note: We don't log this as a separate changelog entry since 
             # the placement message already mentions "This pushes X to the legacy list"
             
-            print(f"🔄 Automatically moved {level_at_101['name']} to legacy list at position #101")
+            print(f"🔄 Automatically moved {level_at_151['name']} to legacy list at position #151")
             print(f"🔄 Shifted all other legacy levels down by 1 position")
-            return level_at_101["name"]
+            return level_at_151["name"]
         
         return None
         
@@ -2950,7 +2950,7 @@ def admin_move_level(level_id):
             return {'error': 'Failed to update points system'}, 500
         
         # Handle automatic legacy management if needed
-        if new_position <= 100:
+        if new_position <= 150:
             auto_manage_legacy_list()
         
         # Clear cache
@@ -2959,9 +2959,9 @@ def admin_move_level(level_id):
         
         # Check if this move will push something to legacy
         pushed_to_legacy = None
-        if new_position <= 100 and current_position > 100:
-            level_at_100 = mongo_db.levels.find_one({
-                "position": 100,
+        if new_position <= 150 and current_position > 150:
+            level_at_150 = mongo_db.levels.find_one({
+                "position": 150,
                 "is_legacy": {"$ne": True}
             })
             if level_at_100:
@@ -3030,55 +3030,95 @@ def admin_move_level(level_id):
 
 @app.route('/admin/recalculate_all_points', methods=['POST'])
 def admin_recalculate_all_points():
-    """Recalculate all level points and user points using the real-time system"""
+    """Recalculate all level points and user points using verified calculation method"""
     if 'user_id' not in session or not session.get('is_admin'):
         return {'error': 'Access denied'}, 403
     
     try:
-        if REAL_TIME_POINTS_AVAILABLE:
-            # Use the new real-time points system
-            from real_time_points_system import RealTimePointsManager
-            manager = RealTimePointsManager(mongo_db)
+        # Step 1: Recalculate all level points
+        print("🔄 Admin recalculate: Starting level points recalculation...")
+        levels = list(mongo_db.levels.find({}))
+        levels_updated = 0
+        
+        for level in levels:
+            position = level.get("position", 0)
+            is_legacy = level.get("is_legacy", False)
+            current_points = level.get("points", 0)
+            correct_points = calculate_level_points(position, is_legacy)
             
-            # Recalculate all level points
-            levels_updated = manager.recalculate_all_level_points()
-            
-            # Recalculate all user points
-            users_updated = manager.recalculate_all_user_points()
-            
-            # Clear cache
-            levels_cache['main_list'] = None
-            levels_cache['legacy_list'] = None
-            
-        else:
-            # Fallback to old system
-            levels = list(mongo_db.levels.find({"is_legacy": {"$ne": True}}, {"_id": 1, "position": 1}))
-            levels_updated = 0
-            
-            for level in levels:
-                new_points = calculate_level_points(level['position'], False)
+            if abs(current_points - correct_points) > 0.01:
                 result = mongo_db.levels.update_one(
                     {"_id": level["_id"]},
-                    {"$set": {"points": new_points}}
+                    {"$set": {"points": correct_points}}
                 )
                 if result.modified_count > 0:
                     levels_updated += 1
+        
+        # Step 2: Recalculate all user points using verified method
+        print("🔄 Admin recalculate: Starting user points recalculation...")
+        
+        # Reload levels with correct points
+        levels = list(mongo_db.levels.find({}))
+        level_lookup = {str(level['_id']): level for level in levels}
+        
+        users = list(mongo_db.users.find({}))
+        users_updated = 0
+        
+        for user in users:
+            user_id = user['_id']
+            current_points = user.get('points', 0.0)
             
-            # Recalculate user points
-            users = list(mongo_db.users.find({"points": {"$exists": True}}, {"_id": 1}))
-            users_updated = 0
+            # Get all approved records for this user
+            records = list(mongo_db.records.find({
+                "user_id": user_id,
+                "status": "approved"
+            }))
             
-            for user in users:
-                try:
-                    update_user_points(user["_id"])
+            # Calculate correct total points
+            correct_total_points = 0.0
+            
+            for record in records:
+                level_id = str(record['level_id'])
+                level = level_lookup.get(level_id)
+                
+                if level:
+                    # Calculate points for this record
+                    if level.get('is_legacy', False):
+                        points = 0.0
+                    elif record['progress'] == 100:
+                        points = float(level['points'])
+                    else:
+                        # Partial completion - 10% of full points when reaching minimum percentage
+                        min_percentage = level.get('min_percentage', 100)
+                        if record['progress'] >= min_percentage and min_percentage < 100:
+                            points = round(float(level['points']) * 0.1, 2)
+                        else:
+                            points = 0.0
+                    
+                    correct_total_points += points
+            
+            # Round to 2 decimal places
+            correct_total_points = round(correct_total_points, 2)
+            
+            # Update user if points changed
+            if abs(correct_total_points - current_points) > 0.01:
+                result = mongo_db.users.update_one(
+                    {"_id": user_id},
+                    {"$set": {"points": correct_total_points}}
+                )
+                if result.modified_count > 0:
                     users_updated += 1
-                except:
-                    continue
+        
+        # Clear cache
+        levels_cache['main_list'] = None
+        levels_cache['legacy_list'] = None
         
         # Log the action
         admin_user = mongo_db.users.find_one({"_id": session['user_id']})
         admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
         log_admin_action(admin_username, "RECALCULATED ALL POINTS", f"Updated {levels_updated} levels and {users_updated} users")
+        
+        print(f"✅ Admin recalculate completed: {levels_updated} levels, {users_updated} users updated")
         
         return {
             'success': True, 
@@ -3122,20 +3162,20 @@ def admin_add_level():
         
         # Check if this placement will push something to legacy (only for main list additions)
         pushed_to_legacy = None
-        if not is_legacy and position <= 100:
+        if not is_legacy and position <= 150:
             # Count current main list levels
             main_list_count = mongo_db.levels.count_documents({"is_legacy": {"$ne": True}})
             
-            # If we already have 100 levels, adding one more will push the last one to legacy
-            if main_list_count >= 100:
-                # Find what's currently at position 100 (will be pushed to 101, then to legacy)
-                level_at_100 = mongo_db.levels.find_one({
-                    "position": 100,
+            # If we already have 150 levels, adding one more will push the last one to legacy
+            if main_list_count >= 150:
+                # Find what's currently at position 150 (will be pushed to 151, then to legacy)
+                level_at_150 = mongo_db.levels.find_one({
+                    "position": 150,
                     "is_legacy": {"$ne": True}
                 })
                 
-                if level_at_100:
-                    pushed_to_legacy = level_at_100["name"]
+                if level_at_150:
+                    pushed_to_legacy = level_at_150["name"]
         
         # Get levels that will be above and below the new level
         above_level, below_level = get_level_neighbors(position, is_legacy)
@@ -3575,9 +3615,10 @@ def test():
     
     <h2>🎯 Key Examples:</h2>
     <ul>
-        <li><strong>Position #1:</strong> 250 * (0.9475^0) = 250 * 1 = <strong>250.00 points</strong></li>
-        <li><strong>Position #20:</strong> 250 * (0.9475^19) = <strong>{calculate_level_points(20)} points</strong></li>
-        <li><strong>Position #100:</strong> 250 * (0.9475^99) = <strong>{calculate_level_points(100)} points</strong></li>
+        <li><strong>Position #1:</strong> 250 * (0.965^0) = <strong>{calculate_level_points(1)} points</strong></li>
+        <li><strong>Position #50:</strong> 250 * (0.965^49) = <strong>{calculate_level_points(50)} points</strong></li>
+        <li><strong>Position #100:</strong> 250 * (0.965^99) = <strong>{calculate_level_points(100)} points</strong></li>
+        <li><strong>Position #150:</strong> 250 * (0.965^149) = <strong>{calculate_level_points(150)} points</strong></li>
     </ul>
     
     <h2>✅ All Systems Working:</h2>
@@ -6906,6 +6947,11 @@ def admin_verifications():
         return redirect(url_for('index'))
     
     try:
+        # Automatically check for and remove duplicate submissions
+        duplicates_removed = check_for_duplicate_levels()
+        if duplicates_removed > 0:
+            flash(f'🧹 Automatically removed {duplicates_removed} duplicate verification submissions for levels already on the list.', 'info')
+        
         # Get all verification submissions with user info
         pipeline = [
             {"$lookup": {
@@ -7022,6 +7068,448 @@ def admin_verification_details():
         print(f"Error loading verification details: {e}")
         flash('Error loading verification details', 'danger')
         return redirect(url_for('admin'))
+
+@app.route('/admin/verification/accept/<submission_id>', methods=['POST'])
+def admin_accept_verification(submission_id):
+    """Accept a verification submission and add level to the list"""
+    
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('admin_verifications'))
+    
+    try:
+        # Get the placement position from the form
+        placement = int(request.form.get('placement', 1))
+        
+        # Get the verification submission
+        submission = mongo_db.verification_submissions.find_one({"_id": ObjectId(submission_id)})
+        if not submission:
+            flash('Verification submission not found', 'danger')
+            return redirect(url_for('admin_verifications'))
+        
+        # Check if already processed
+        if submission.get('status') != 'pending':
+            flash('Verification submission has already been processed', 'warning')
+            return redirect(url_for('admin_verifications'))
+        
+        # Get admin info
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        
+        # Get submitter info
+        submitter = mongo_db.users.find_one({"_id": submission['user_id']})
+        if not submitter:
+            flash('Submitter not found', 'danger')
+            return redirect(url_for('admin_verifications'))
+        
+        # Check if level already exists
+        existing_level = mongo_db.levels.find_one({
+            "$or": [
+                {"name": submission['level_name']},
+                {"level_id": submission.get('level_id')} if submission.get('level_id') else {}
+            ]
+        })
+        
+        if existing_level:
+            flash(f'Level "{submission["level_name"]}" already exists on the list', 'warning')
+            return redirect(url_for('admin_verifications'))
+        
+        # Get levels that will be above and below the new level
+        above_level, below_level = get_level_neighbors(placement, False)
+        
+        # Special handling for #1 placement
+        dethroned_level = None
+        if placement == 1:
+            current_first = mongo_db.levels.find_one({
+                "position": 1,
+                "is_legacy": {"$ne": True}
+            })
+            if current_first:
+                dethroned_level = current_first["name"]
+        
+        # Check if this placement will push something to legacy
+        pushed_to_legacy = None
+        main_list_count = mongo_db.levels.count_documents({"is_legacy": {"$ne": True}})
+        if main_list_count >= 150:
+            level_at_150 = mongo_db.levels.find_one({
+                "position": 150,
+                "is_legacy": {"$ne": True}
+            })
+            if level_at_150:
+                pushed_to_legacy = level_at_150["name"]
+        
+        # Create new level
+        new_level_id = ObjectId()
+        points = calculate_level_points(placement, False)
+        
+        new_level = {
+            "_id": new_level_id,
+            "name": submission['level_name'],
+            "creator": submission['creator'],
+            "verifier": submission['verifier'],
+            "position": placement,
+            "difficulty": submission['difficulty'],
+            "demon_type": None,
+            "points": points,
+            "video_url": submission.get('verification_url', ''),
+            "level_id": int(submission['level_id']) if submission.get('level_id') and str(submission['level_id']).strip() else None,
+            "min_percentage": 100,  # Default to 100% for verification submissions
+            "is_legacy": False,
+            "date_added": datetime.now(timezone.utc)
+        }
+        
+        # Shift existing levels down
+        mongo_db.levels.update_many(
+            {"position": {"$gte": placement}, "is_legacy": {"$ne": True}},
+            {"$inc": {"position": 1}}
+        )
+        
+        # Insert the new level
+        mongo_db.levels.insert_one(new_level)
+        
+        # Use real-time points system to recalculate points
+        if REAL_TIME_POINTS_AVAILABLE:
+            try:
+                from real_time_points_system import RealTimePointsManager
+                manager = RealTimePointsManager(mongo_db)
+                levels_updated = manager.recalculate_all_level_points()
+                users_updated = manager.recalculate_all_user_points()
+                print(f"✅ Verification acceptance triggered recalculation: {levels_updated} levels, {users_updated} users updated")
+            except Exception as e:
+                print(f"⚠️ Warning: Real-time points recalculation failed: {e}")
+        
+        # Handle automatic legacy management
+        auto_manage_legacy_list()
+        
+        # Clear cache
+        levels_cache['main_list'] = None
+        levels_cache['legacy_list'] = None
+        
+        # Create a record for the verifier automatically
+        verifier_record_id = ObjectId()
+        verifier_record = {
+            "_id": verifier_record_id,
+            "user_id": submission['user_id'],
+            "level_id": new_level_id,
+            "progress": 100,
+            "video_url": submission.get('verification_url', ''),
+            "status": "approved",
+            "date_submitted": datetime.now(timezone.utc),
+            "approved_by": admin_username,
+            "approved_at": datetime.now(timezone.utc),
+            "is_verifier": True,
+            "comments": f"Automatic record created from verification submission acceptance"
+        }
+        
+        # Insert the verifier record
+        mongo_db.records.insert_one(verifier_record)
+        
+        # Update user points to include the new record
+        update_user_points(submission['user_id'])
+        
+        # Update verification submission status
+        mongo_db.verification_submissions.update_one(
+            {"_id": ObjectId(submission_id)},
+            {"$set": {
+                "status": "accepted",
+                "accepted_by": admin_username,
+                "accepted_at": datetime.now(timezone.utc),
+                "placed_at_position": placement,
+                "level_id_created": new_level_id
+            }}
+        )
+        
+        # Log changelog
+        changelog_kwargs = {
+            'position': placement,
+            'above_level': above_level,
+            'below_level': below_level,
+            'list_type': 'main'
+        }
+        
+        if placement == 1 and dethroned_level:
+            changelog_kwargs['dethroned_level'] = dethroned_level
+        
+        if pushed_to_legacy:
+            changelog_kwargs['pushed_to_legacy'] = pushed_to_legacy
+        
+        log_level_change(
+            action="placed",
+            level_name=submission['level_name'],
+            admin_username=admin_username,
+            **changelog_kwargs
+        )
+        
+        # Log admin action
+        log_admin_action(
+            admin_username, 
+            f"ACCEPTED VERIFICATION: {submission['level_name']}", 
+            f"Placed at position {placement}, submitted by {submitter['username']}"
+        )
+        
+        # Create notification for submitter
+        create_notification(
+            submission['user_id'],
+            'verification_status',
+            'Verification Accepted! ✅',
+            f'Your verification for "{submission["level_name"]}" has been accepted and placed at position #{placement}! You automatically received the record and points.',
+            new_level_id,
+            'level'
+        )
+        
+        # Send Discord notification
+        try:
+            if CHANGELOG_DISCORD_AVAILABLE:
+                # Create changelog message for Discord
+                message = f"{submission['level_name']} has been placed at #{placement}"
+                if below_level and above_level:
+                    message += f" below {above_level} and above {below_level}"
+                elif below_level:
+                    message += f" below {below_level}"
+                elif above_level:
+                    message += f" above {above_level}"
+                
+                if placement == 1 and dethroned_level:
+                    message = f"{submission['level_name']} has been placed at #1, dethroning {dethroned_level}"
+                
+                message += " on the main list."
+                
+                if pushed_to_legacy:
+                    message += f" This pushes {pushed_to_legacy} to the legacy list."
+                
+                notify_changelog(message, admin_username)
+        except Exception as e:
+            print(f"Discord changelog notification error: {e}")
+        
+        # Calculate points earned
+        points_earned = calculate_record_points(verifier_record, new_level)
+        
+        flash(f'✅ Verification accepted! "{submission["level_name"]}" has been placed at position #{placement}. {submitter["username"]} automatically received the record and {points_earned} points.', 'success')
+        
+    except Exception as e:
+        flash(f'Error accepting verification: {str(e)}', 'danger')
+        print(f"Admin accept verification error: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    return redirect(url_for('admin_verifications'))
+
+@app.route('/admin/verification/deny/<submission_id>', methods=['POST'])
+def admin_deny_verification(submission_id):
+    """Deny a verification submission and delete it"""
+    
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('admin_verifications'))
+    
+    try:
+        # Get the verification submission
+        submission = mongo_db.verification_submissions.find_one({"_id": ObjectId(submission_id)})
+        if not submission:
+            flash('Verification submission not found', 'danger')
+            return redirect(url_for('admin_verifications'))
+        
+        # Check if already processed
+        if submission.get('status') != 'pending':
+            flash('Verification submission has already been processed', 'warning')
+            return redirect(url_for('admin_verifications'))
+        
+        # Get admin info
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        
+        # Get submitter info
+        submitter = mongo_db.users.find_one({"_id": submission['user_id']})
+        
+        # Delete the verification submission
+        mongo_db.verification_submissions.delete_one({"_id": ObjectId(submission_id)})
+        
+        # Log admin action
+        if submitter:
+            log_admin_action(
+                admin_username, 
+                f"DENIED VERIFICATION: {submission['level_name']}", 
+                f"Submitted by {submitter['username']}, reason: Admin decision"
+            )
+            
+            # Create notification for submitter
+            create_notification(
+                submission['user_id'],
+                'verification_status',
+                'Verification Denied ❌',
+                f'Your verification submission for "{submission["level_name"]}" has been denied by an administrator.',
+                None,
+                'system'
+            )
+        
+        flash(f'❌ Verification for "{submission["level_name"]}" has been denied and removed.', 'success')
+        
+    except Exception as e:
+        flash(f'Error denying verification: {str(e)}', 'danger')
+        print(f"Admin deny verification error: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    return redirect(url_for('admin_verifications'))
+
+@app.route('/admin/cleanup_duplicate_verifications', methods=['POST'])
+def admin_cleanup_duplicate_verifications():
+    """Remove verification submissions for levels that already exist on the list"""
+    
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('admin_verifications'))
+    
+    try:
+        # Get admin info
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        
+        # Get all levels (main list and legacy)
+        all_levels = list(mongo_db.levels.find({}, {"name": 1, "level_id": 1, "position": 1, "is_legacy": 1}))
+        
+        # Create sets for faster lookup
+        level_names = {level['name'].lower().strip() for level in all_levels}
+        level_ids = {level.get('level_id') for level in all_levels if level.get('level_id')}
+        
+        # Get all pending verification submissions
+        pending_submissions = list(mongo_db.verification_submissions.find({"status": "pending"}))
+        
+        duplicates_found = []
+        removed_count = 0
+        
+        for submission in pending_submissions:
+            is_duplicate = False
+            duplicate_reason = ""
+            
+            # Check by level name (case-insensitive)
+            if submission.get('level_name', '').lower().strip() in level_names:
+                is_duplicate = True
+                duplicate_reason = "Level name already exists on the list"
+            
+            # Check by level ID if provided
+            elif submission.get('level_id') and submission['level_id'] in level_ids:
+                is_duplicate = True
+                duplicate_reason = "Level ID already exists on the list"
+            
+            if is_duplicate:
+                # Find the existing level for reference
+                existing_level = None
+                for level in all_levels:
+                    if (level['name'].lower().strip() == submission.get('level_name', '').lower().strip() or
+                        level.get('level_id') == submission.get('level_id')):
+                        existing_level = level
+                        break
+                
+                # Get submitter info
+                submitter = mongo_db.users.find_one({"_id": submission['user_id']})
+                submitter_name = submitter['username'] if submitter else 'Unknown'
+                
+                # Store duplicate info
+                duplicate_info = {
+                    'submission_id': submission['_id'],
+                    'level_name': submission.get('level_name', 'Unknown'),
+                    'submitter': submitter_name,
+                    'reason': duplicate_reason,
+                    'existing_position': existing_level['position'] if existing_level else 'Unknown',
+                    'existing_list': 'Legacy' if existing_level and existing_level.get('is_legacy') else 'Main'
+                }
+                duplicates_found.append(duplicate_info)
+                
+                # Remove the duplicate submission
+                mongo_db.verification_submissions.delete_one({"_id": submission['_id']})
+                removed_count += 1
+                
+                # Notify the submitter
+                if submitter:
+                    create_notification(
+                        submission['user_id'],
+                        'verification_status',
+                        'Verification Removed - Duplicate Level ⚠️',
+                        f'Your verification submission for "{submission.get("level_name", "Unknown")}" has been removed because this level already exists on the list at position #{existing_level["position"] if existing_level else "Unknown"}.',
+                        existing_level['_id'] if existing_level else None,
+                        'level'
+                    )
+        
+        # Log admin action
+        if removed_count > 0:
+            log_admin_action(
+                admin_username,
+                f"CLEANED UP DUPLICATE VERIFICATIONS",
+                f"Removed {removed_count} duplicate verification submissions"
+            )
+            
+            # Create detailed flash message
+            flash_message = f'✅ Cleanup complete! Removed {removed_count} duplicate verification submissions:'
+            for i, dup in enumerate(duplicates_found[:5]):  # Show first 5
+                flash_message += f'<br>• "{dup["level_name"]}" by {dup["submitter"]} (exists at #{dup["existing_position"]} on {dup["existing_list"]} list)'
+            
+            if len(duplicates_found) > 5:
+                flash_message += f'<br>• ... and {len(duplicates_found) - 5} more'
+            
+            flash(flash_message, 'success')
+        else:
+            flash('✅ No duplicate verification submissions found.', 'info')
+        
+    except Exception as e:
+        flash(f'Error during cleanup: {str(e)}', 'danger')
+        print(f"Admin cleanup duplicate verifications error: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    return redirect(url_for('admin_verifications'))
+
+def check_for_duplicate_levels():
+    """Background function to automatically check and remove duplicate verification submissions"""
+    try:
+        # Get all levels (main list and legacy)
+        all_levels = list(mongo_db.levels.find({}, {"name": 1, "level_id": 1}))
+        
+        # Create sets for faster lookup
+        level_names = {level['name'].lower().strip() for level in all_levels}
+        level_ids = {level.get('level_id') for level in all_levels if level.get('level_id')}
+        
+        # Get all pending verification submissions
+        pending_submissions = list(mongo_db.verification_submissions.find({"status": "pending"}))
+        
+        removed_count = 0
+        
+        for submission in pending_submissions:
+            is_duplicate = False
+            
+            # Check by level name (case-insensitive)
+            if submission.get('level_name', '').lower().strip() in level_names:
+                is_duplicate = True
+            
+            # Check by level ID if provided
+            elif submission.get('level_id') and submission['level_id'] in level_ids:
+                is_duplicate = True
+            
+            if is_duplicate:
+                # Remove the duplicate submission silently
+                mongo_db.verification_submissions.delete_one({"_id": submission['_id']})
+                removed_count += 1
+                
+                # Notify the submitter
+                submitter = mongo_db.users.find_one({"_id": submission['user_id']})
+                if submitter:
+                    create_notification(
+                        submission['user_id'],
+                        'verification_status',
+                        'Verification Removed - Level Already Exists ⚠️',
+                        f'Your verification submission for "{submission.get("level_name", "Unknown")}" has been automatically removed because this level already exists on the list.',
+                        None,
+                        'system'
+                    )
+        
+        if removed_count > 0:
+            print(f"🧹 Automatically removed {removed_count} duplicate verification submissions")
+        
+        return removed_count
+        
+    except Exception as e:
+        print(f"Error in automatic duplicate check: {e}")
+        return 0
 
 
 
@@ -8299,19 +8787,27 @@ def admin_levels():
     main_cache = levels_cache.get('main_list', []) or []
     legacy_cache = levels_cache.get('legacy_list', []) or []
     
-    if main_cache or legacy_cache:
-        # Use cached data
-        if is_legacy_filter:
+    # Always check if we need to load from database
+    if is_legacy_filter:
+        if legacy_cache:
             levels = legacy_cache
         else:
-            levels = main_cache
+            # Load legacy levels from database
+            levels = list(mongo_db.levels.find({"is_legacy": True}, {
+                "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, 
+                "level_id": 1, "difficulty": 1, "is_legacy": 1, "level_type": 1,
+                "demon_type": 1, "min_percentage": 1
+            }).sort("position", 1))
     else:
-        # Fallback to database with minimal fields
-        query = {"is_legacy": is_legacy_filter}
-        levels = list(mongo_db.levels.find(query, {
-            "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, 
-            "level_id": 1, "difficulty": 1, "is_legacy": 1, "level_type": 1
-        }).sort("position", 1))
+        if main_cache:
+            levels = main_cache
+        else:
+            # Load main levels from database
+            levels = list(mongo_db.levels.find({"is_legacy": {"$ne": True}}, {
+                "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, 
+                "level_id": 1, "difficulty": 1, "is_legacy": 1, "level_type": 1,
+                "demon_type": 1, "min_percentage": 1
+            }).sort("position", 1))
     
     # Debug: Check thumbnail URLs and file existence
     import os

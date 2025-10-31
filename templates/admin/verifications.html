@@ -13,6 +13,11 @@
                         Verification Submissions
                     </h3>
                     <div>
+                        <form method="POST" action="{{ url_for('admin_cleanup_duplicate_verifications') }}" class="d-inline me-2">
+                            <button type="submit" class="btn btn-warning btn-sm" onclick="return confirm('Remove all verification submissions for levels that already exist on the list?')">
+                                <i class="fas fa-broom me-1"></i> Cleanup Duplicates
+                            </button>
+                        </form>
                         <a href="{{ url_for('admin_verification_details') }}" class="btn btn-light btn-sm me-2">
                             <i class="fas fa-list-alt me-1"></i> View Details
                         </a>
@@ -29,7 +34,6 @@
                             <div class="card h-100 border-0 shadow-sm submission-card {% if submission.status == 'pending' %}border-warning{% elif submission.status == 'approved' %}border-success{% elif submission.status == 'rejected' %}border-danger{% endif %}">
                                 <div class="card-header bg-light border-0 d-flex justify-content-between align-items-center">
                                     <div class="d-flex align-items-center">
-                                        <!-- Avatar circle removed -->
                                         <div>
                                             <h6 class="mb-0 fw-bold">{{ submission.user.username }}</h6>
                                             {% if submission.user.discord_username %}
@@ -104,13 +108,42 @@
                                         <span class="text-dark">{{ submission.date_submitted.strftime('%B %d, %Y at %H:%M') }} UTC</span>
                                     </div>
                                 </div>
-                                <div class="card-footer bg-light border-0 d-flex justify-content-between">
-                                    <a href="{{ url_for('admin_verification_detail', submission_id=submission._id) }}" class="btn btn-primary btn-sm">
-                                        <i class="fas fa-eye me-1"></i> View Details
-                                    </a>
-                                    <a href="{{ submission.verification_url }}" target="_blank" class="btn btn-outline-primary btn-sm">
-                                        <i class="fas fa-external-link-alt me-1"></i> Watch Video
-                                    </a>
+                                <div class="card-footer bg-light border-0">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <a href="{{ url_for('admin_verification_detail', submission_id=submission._id) }}" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-eye me-1"></i> View Details
+                                        </a>
+                                        <a href="{{ submission.verification_url }}" target="_blank" class="btn btn-outline-primary btn-sm">
+                                            <i class="fas fa-external-link-alt me-1"></i> Watch Video
+                                        </a>
+                                    </div>
+                                    
+                                    {% if submission.status == 'pending' %}
+                                    <div class="admin-actions mt-2">
+                                        <div class="row g-2">
+                                            <div class="col-12">
+                                                <form method="POST" action="{{ url_for('admin_accept_verification', submission_id=submission._id) }}" class="accept-form">
+                                                    <div class="input-group input-group-sm mb-2">
+                                                        <span class="input-group-text bg-success text-white">
+                                                            <i class="fas fa-trophy"></i>
+                                                        </span>
+                                                        <input type="number" name="placement" class="form-control" placeholder="Position" min="1" max="150" value="{{ submission.placement }}" required>
+                                                        <button type="submit" class="btn btn-success btn-sm" onclick="return confirm('Accept this verification and place the level at position #' + this.form.placement.value + '?')">
+                                                            <i class="fas fa-check me-1"></i> Accept
+                                                        </button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                            <div class="col-12">
+                                                <form method="POST" action="{{ url_for('admin_deny_verification', submission_id=submission._id) }}" class="deny-form">
+                                                    <button type="submit" class="btn btn-danger btn-sm w-100" onclick="return confirm('Deny this verification? This will permanently delete the submission.')">
+                                                        <i class="fas fa-times me-1"></i> Deny & Delete
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
@@ -196,8 +229,6 @@
     border-left-color: #dc3545 !important;
 }
 
-/* Avatar circle CSS removed */
-
 .card {
     border-radius: 12px;
 }
@@ -227,6 +258,26 @@
 
 .card-footer {
     border-radius: 0 0 12px 12px !important;
+}
+
+.admin-actions {
+    border-top: 1px solid rgba(0,0,0,0.1);
+    padding-top: 10px;
+}
+
+.accept-form .input-group {
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.accept-form .form-control {
+    border: none;
+    box-shadow: none;
+}
+
+.accept-form .form-control:focus {
+    border-color: #198754;
+    box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.25);
 }
 </style>
 

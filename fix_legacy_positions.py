@@ -176,8 +176,8 @@ def main():
     
     print("\n✅ Legacy position fixes completed!")
     print("\n📝 Summary:")
-    print("  - Legacy levels now start at position #101")
-    print("  - Main list limited to 100 levels")
+    print("  - Legacy levels now start at position #151")
+    print("  - Main list limited to 150 levels")
     print("  - All position conflicts resolved")
 
 if __name__ == "__main__":
