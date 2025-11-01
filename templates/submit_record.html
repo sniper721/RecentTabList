@@ -31,7 +31,7 @@
                             <option value="" selected disabled>Select a level</option>
                             {% for level in levels %}
                                 {% if not level.get('is_legacy', False) %}
-                                <option value="{{ level._id }}">{{ level.position }}. {{ level.name }} by {{ level.verifier }}</option>
+                                <option value="{{ level._id }}">{{ level.position }}. {{ level.name }} by {{ level.creator }}</option>
                                 {% endif %}
                             {% endfor %}
                         </select>
@@ -140,7 +140,7 @@ const levelOptionsHTML = `
     <option value="" selected disabled>Select a level</option>
     {% for level in levels %}
         {% if not level.get('is_legacy', False) %}
-        <option value="{{ level._id }}">{{ level.position }}. {{ level.name }} by {{ level.verifier }}</option>
+        <option value="{{ level._id }}">{{ level.position }}. {{ level.name }} by {{ level.creator }}</option>
         {% endif %}
     {% endfor %}
 `;
@@ -228,17 +228,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Validate progress based on selected level for single form
     document.getElementById('level_id').addEventListener('change', function() {
-        const levelOption = this.options[this.selectedIndex];
-        const isLegacy = levelOption.parentElement.label === 'Legacy List';
         const progressInput = document.getElementById('progress');
         
-        if (isLegacy) {
-            progressInput.min = 50;
-            progressInput.title = "Minimum progress for legacy levels is 50%";
-        } else {
-            progressInput.min = 50;
-            progressInput.title = "Minimum progress for main list levels is 50%";
-        }
+        // Since we only show main list levels in this dropdown (not legacy),
+        // all levels have the same minimum progress requirement
+        progressInput.min = 50;
+        progressInput.title = "Minimum progress required is 50%";
     });
 });
 </script>
