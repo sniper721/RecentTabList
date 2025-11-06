@@ -5026,7 +5026,7 @@ def test_legacy_db():
         mongo_client.admin.command('ping', maxTimeMS=10000)
         
         # Test legacy count
-        legacy_count = mongo_db.levels.count_documents({"is_legacy": True}, maxTimeMS=30000)
+        legacy_count = mongo_db.levels.count_documents({"is_legacy": True}, max_time_ms=30000)
         
         # Test legacy query with limit
         legacy_sample = list(mongo_db.levels.find(
@@ -5060,7 +5060,7 @@ def health_check():
         mongo_client.admin.command('ping', maxTimeMS=5000)
         
         # Quick count test
-        level_count = mongo_db.levels.count_documents({}, maxTimeMS=5000)
+        level_count = mongo_db.levels.count_documents({}, max_time_ms=5000)
         
         # Check Discord bot status
         discord_status = 'unknown'
