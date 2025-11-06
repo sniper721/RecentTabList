@@ -100,7 +100,7 @@
                             {% endif %}
                         </div>
                         <div class="text-end">
-                            <div class="text-muted"><strong>{{ get_difficulty_text(level.difficulty) }}</strong></div>
+                            <div class="text-muted"><strong>{{ get_difficulty_text(level.get('difficulty', 5.0)) }}</strong></div>
                             <small class="text-muted">{{ format_points(level.historical_points) }} points</small>
                             {% if level.current_position %}
                                 <div class="mt-1">

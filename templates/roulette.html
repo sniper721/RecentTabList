@@ -364,7 +364,7 @@
                         <div class="level-title">#{{ current_level.position }} - {{ current_level.name }}</div>
                         <div class="level-creator">by {{ current_level.creator }}</div>
                         <div class="level-details">
-                            <span>Difficulty: {{ current_level.difficulty }}/10</span>
+                            <span>Difficulty: {{ current_level.get('difficulty', 5.0) }}/10</span>
                             <span>Verifier: {{ current_level.verifier }}</span>
                         </div>
                     </div>

@@ -71,7 +71,7 @@
                                     <p><strong>✅ Verifier:</strong> {{ random_level.verifier }}</p>
                                 </div>
                                 <div class="col-sm-6">
-                                    <p><strong>📊 Difficulty:</strong> {{ random_level.difficulty }}/10</p>
+                                    <p><strong>📊 Difficulty:</strong> {{ random_level.get('difficulty', 5.0) }}/10</p>
                                     <p><strong>📍 Position:</strong> #{{ random_level.position }} 
                                         {% if random_level.is_legacy %}(Legacy){% else %}(Main){% endif %}</p>
                                 </div>

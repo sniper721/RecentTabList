@@ -50,17 +50,17 @@
             </div>
             <div class="card-body p-0">
                 {% for level in levels %}
-                <div class="d-flex align-items-center p-3 border-bottom level-card mb-4" data-level-id="{{ level._id if level is not mapping else level['_id'] }}" style="cursor: pointer; transition: all 0.2s ease;">
+                <div class="d-flex align-items-center p-3 border-bottom level-card mb-4" data-level-id="{{ level.get('_id', '') }}" style="cursor: pointer; transition: all 0.2s ease;">
                     <div class="me-4">
                         <div class="position-relative">
-                            {% set level_name = level.name if level is not mapping else level['name'] %}
-                            {% set video_url = level.video_url if level is not mapping else level.get('video_url', '') %}
-                            {% set thumbnail_url = level.thumbnail_url if level is not mapping else level.get('thumbnail_url', '') %}
+                            {% set level_name = level.get('name', 'Unknown') %}
+                            {% set video_url = level.get('video_url', '') %}
+                            {% set thumbnail_url = level.get('thumbnail_url', '') %}
                             
                             <div class="level-thumbnail-container">
-                                {% set level_name = level.name if level is not mapping else level['name'] %}
-                                {% set video_url = level.video_url if level is not mapping else level.get('video_url', '') %}
-                                {% set thumbnail_url = level.thumbnail_url if level is not mapping else level.get('thumbnail_url', '') %}
+                                {% set level_name = level.get('name', 'Unknown') %}
+                                {% set video_url = level.get('video_url', '') %}
+                                {% set thumbnail_url = level.get('thumbnail_url', '') %}
                                 
                                 <!-- OPTIMIZED IMAGE SYSTEM FOR BASE64 -->
                                 {% if thumbnail_url and thumbnail_url.strip() %}
@@ -116,27 +116,27 @@
                             </div>
                             
                             <div class="position-absolute top-0 start-0 bg-dark text-white px-2 py-1 rounded">
-                                {{ level.position if level is not mapping else level['position'] }}
+                                {{ level.get('position', 0) }}
                             </div>
                         </div>
                     </div>
                     <div class="flex-grow-1">
-                        <h5 class="mb-1">{{ level.name if level is not mapping else level['name'] }}</h5>
-                        <p class="mb-1 text-muted">by {{ level.creator if level is not mapping else level['creator'] }}</p>
-                        <small class="text-muted d-block">verified by {{ level.verifier if level is not mapping else level['verifier'] }}</small>
-                        {% if level.level_id %}
-                            <small class="text-muted d-block">ID: {{ level.level_id }}</small>
+                        <h5 class="mb-1">{{ level.get('name', 'Unknown') }}</h5>
+                        <p class="mb-1 text-muted">by {{ level.get('creator', 'Unknown') }}</p>
+                        <small class="text-muted d-block">verified by {{ level.get('verifier', 'Unknown') }}</small>
+                        {% if level.get('level_id') %}
+                            <small class="text-muted d-block">ID: {{ level.get('level_id') }}</small>
                         {% endif %}
                     </div>
                     <div class="text-end">
-                        {% set difficulty = (level.difficulty|default(5.0)|float)|round|int if level is not mapping else (level['difficulty']|default(5.0)|float)|round|int %}
-                        {% set demon_type = level.demon_type if level is not mapping else level.get('demon_type') %}
+                        {% set difficulty = (level.get('difficulty', 5.0)|float)|round|int %}
+                        {% set demon_type = level.get('demon_type') %}
                         <div class="text-muted"><strong>{{ get_difficulty_text(difficulty) }}</strong></div>
                         {% if difficulty == 10 and get_demon_type_display(difficulty, demon_type) %}
                             <div class="text-muted small">{{ get_demon_type_display(difficulty, demon_type) }}</div>
                         {% endif %}
-                        {% set position = level.position if level is not mapping else level['position'] %}
-                        {% set points = level.points if level is not mapping else level['points'] %}
+                        {% set position = level.get('position', 0) %}
+                        {% set points = level.get('points', 0) %}
                         {% set points_num = points|float if points else ((100 - position + 1) / 10)|round(2) %}
                         <small class="text-muted">{{ format_points(points_num) }} points</small>
                     </div>

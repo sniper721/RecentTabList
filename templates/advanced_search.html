@@ -158,7 +158,7 @@
                             <div class="text-muted small">
                                 <span class="me-3">👨‍🎨 {{ level.creator }}</span>
                                 <span class="me-3">✅ {{ level.verifier }}</span>
-                                <span class="me-3">⭐ {{ get_difficulty_text(level.difficulty) }}</span>
+                                <span class="me-3">⭐ {{ get_difficulty_text(level.get('difficulty', 5.0)) }}</span>
                                 <span>🏆 {{ format_points(level.points or 0) }} points</span>
                             </div>
                         </div>

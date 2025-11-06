@@ -78,7 +78,7 @@
                             {% endif %}
                         </div>
                         <div class="text-end">
-                            <div class="text-muted"><strong>{{ get_difficulty_text(level.difficulty or 5) }}</strong></div>
+                            <div class="text-muted"><strong>{{ get_difficulty_text(level.get('difficulty', 5.0)) }}</strong></div>
                             <small class="text-muted">{{ level.points or 0 }} points</small>
                             <div class="mt-1">
                                 <span class="badge bg-info">Coming Soon</span>
