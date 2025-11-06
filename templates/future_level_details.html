@@ -17,7 +17,7 @@
                         <div class="col-md-6">
                             <p><strong>Creator:</strong> {{ level.creator }}</p>
                             <p><strong>Verifier:</strong> {{ level.verifier }}</p>
-                            <p><strong>Difficulty:</strong> {{ get_difficulty_text(level.difficulty or 5) }}</p>
+                            <p><strong>Difficulty:</strong> {{ get_difficulty_text(level.get('difficulty', 5.0)) }}</p>
                             <p><strong>Points:</strong> {{ level.points }}</p>
                         </div>
                         <div class="col-md-6">
