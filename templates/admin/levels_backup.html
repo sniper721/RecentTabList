@@ -45,7 +45,8 @@
                                         <td>{{ level.creator }}</td>
                                         <td>{{ level.verifier }}</td>
                                         <td>{{ level.difficulty }}</td>
-                                        <td>{{ level.points or ((100 - level.position + 1) / 10)|round(2) }}</td>
+                                        {% set level_points = level.points|float if level.points else ((100 - level.position + 1) / 10)|round(2) %}
+                                        <td>{{ format_points(level_points) }}</td>
                                         <td>{{ level.min_percentage }}%</td>
                                         <td>
                                             <div class="btn-group" role="group">

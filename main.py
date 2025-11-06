@@ -522,7 +522,11 @@ def utility_processor():
             
             # Filter and fix timezone issues
             active_polls = []
-            closed_polls = session.get('closed_polls', []) if 'user_id' in session else []
+            try:
+                closed_polls = session.get('closed_polls', []) if 'user_id' in session else []
+            except RuntimeError:
+                # No request context available
+                closed_polls = []
             
             for poll in polls:
                 # Skip polls that user has closed
@@ -565,8 +569,12 @@ def utility_processor():
         except:
             return None
     
-    # Get current theme from session
-    current_theme = session.get('theme', 'light')
+    # Get current theme from session (with error handling)
+    try:
+        current_theme = session.get('theme', 'light')
+    except RuntimeError:
+        # No request context available
+        current_theme = 'light'
     
     # Get Discord widget data
     def get_discord_data():
@@ -640,7 +648,14 @@ def get_difficulty_text(difficulty):
     if difficulty is None:
         return "Unknown"
     
-    difficulty = float(difficulty)
+    # If it's already a string (like 'Extreme Demon'), return it as is
+    if isinstance(difficulty, str):
+        return difficulty
+    
+    try:
+        difficulty = float(difficulty)
+    except (ValueError, TypeError):
+        return "Unknown"
     
     if difficulty >= 1 and difficulty < 2:
         return "Easy"
@@ -2587,6 +2602,119 @@ def ip_ban_user(user_id):
     except Exception as e:
         flash(f'Error: {str(e)}', 'danger')
         return redirect(url_for('admin'))
+
+@app.route('/admin/temp_ban', methods=['POST'])
+def admin_temp_ban():
+    """Temporarily ban a user from submitting records"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return {'error': 'Access denied'}, 403
+    
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        duration = int(data.get('duration', 1))
+        unit = data.get('unit', 'days')
+        reason = data.get('reason', 'Rule Violation')
+        
+        # Find the user
+        user = mongo_db.users.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            return {'error': 'User not found'}, 404
+        
+        # Prevent temp banning admins
+        if user.get('is_admin') or user.get('head_admin'):
+            return {'error': 'Cannot temp ban admin users'}, 400
+        
+        # Calculate ban expiry date
+        now = datetime.now(timezone.utc)
+        if unit == 'days':
+            expiry_date = now + timedelta(days=duration)
+        elif unit == 'weeks':
+            expiry_date = now + timedelta(weeks=duration)
+        elif unit == 'months':
+            expiry_date = now + timedelta(days=duration * 30)  # Approximate
+        elif unit == 'years':
+            expiry_date = now + timedelta(days=duration * 365)  # Approximate
+        else:
+            return {'error': 'Invalid time unit'}, 400
+        
+        # Get admin info
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        
+        # Create temp ban record
+        temp_ban = {
+            "_id": ObjectId(),
+            "user_id": ObjectId(user_id),
+            "username": user.get('username', 'Unknown'),
+            "reason": reason,
+            "duration": duration,
+            "unit": unit,
+            "banned_by": admin_username,
+            "ban_date": now,
+            "expiry_date": expiry_date,
+            "active": True
+        }
+        
+        # Insert temp ban
+        mongo_db.temp_bans.insert_one(temp_ban)
+        
+        # Log admin action
+        log_admin_action(admin_username, f"TEMP BANNED USER: {user.get('username')}", 
+                        f"Duration: {duration} {unit}, Reason: {reason}, Expires: {expiry_date.strftime('%Y-%m-%d %H:%M UTC')}")
+        
+        return {'success': True, 'message': f'User {user.get("username")} has been temporarily banned for {duration} {unit}'}
+        
+    except Exception as e:
+        print(f"Error in temp ban: {e}")
+        return {'error': str(e)}, 500
+
+@app.route('/admin/check_temp_ban/<user_id>')
+def admin_check_temp_ban(user_id):
+    """Check if a user is currently temp banned"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return {'error': 'Access denied'}, 403
+    
+    try:
+        now = datetime.now(timezone.utc)
+        
+        # Find active temp ban for user
+        temp_ban = mongo_db.temp_bans.find_one({
+            "user_id": ObjectId(user_id),
+            "active": True,
+            "expiry_date": {"$gt": now}
+        })
+        
+        if temp_ban:
+            return {
+                'temp_banned': True,
+                'reason': temp_ban.get('reason'),
+                'expiry_date': temp_ban.get('expiry_date').isoformat(),
+                'banned_by': temp_ban.get('banned_by')
+            }
+        else:
+            return {'temp_banned': False}
+            
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+def is_user_temp_banned(user_id):
+    """Check if a user is currently temp banned - helper function"""
+    try:
+        now = datetime.now(timezone.utc)
+        
+        # Find active temp ban for user
+        temp_ban = mongo_db.temp_bans.find_one({
+            "user_id": ObjectId(user_id),
+            "active": True,
+            "expiry_date": {"$gt": now}
+        })
+        
+        return temp_ban is not None, temp_ban
+        
+    except Exception as e:
+        print(f"Error checking temp ban: {e}")
+        return False, None
 
 @app.route('/news')
 def news_blog():
@@ -4993,40 +5121,54 @@ def test_discord():
 @app.route('/')
 def index():
     """AUTO-LOAD - Instantly loads everything automatically - ALL LEVELS ON ONE PAGE"""
-    main_list = get_cached_levels(is_legacy=False)
-    
-    # If no cache, auto-load it now
-    if not main_list:
-        try:
-            print("Auto-loading main levels...")
-            main_list = list(mongo_db.levels.find(
-                {"is_legacy": False},
-                {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, "level_id": 1, "difficulty": 1, "thumbnail_url": 1, "video_url": 1}
-            ).sort("position", 1))
-            
-            # Cache it
-            levels_cache['main_list'] = main_list
-            levels_cache['last_updated'] = datetime.now(timezone.utc)
-            print(f"Auto-loaded {len(main_list)} levels")
-            
-        except Exception as e:
-            print(f"Auto-load failed: {e}")
-            # Fallback to sample data
-            main_list = [
-                {"_id": 1, "name": "Loading failed - try /debug_db", "creator": "System", "verifier": "System", "position": 1, "points": 0, "level_id": "error", "difficulty": 5}
-            ]
-    
-    # 🎭 APRIL FOOLS MODE: Randomize positions if active
-    if is_april_fools_active():
-        main_list = randomize_level_positions(main_list.copy())
-    
-    # Show all levels on one page (no pagination)
-    total_levels = len(main_list)
-    
-    return render_template('index.html', 
-                         levels=main_list,
-                         total_levels=total_levels,
-                         april_fools_active=is_april_fools_active())
+    try:
+        main_list = get_cached_levels(is_legacy=False)
+        
+        # If no cache, auto-load it now
+        if not main_list:
+            try:
+                print("Auto-loading main levels...")
+                main_list = list(mongo_db.levels.find(
+                    {"is_legacy": False},
+                    {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, "level_id": 1, "difficulty": 1, "thumbnail_url": 1, "video_url": 1}
+                ).sort("position", 1).limit(200))  # Add limit for performance
+                
+                # Cache it
+                levels_cache['main_list'] = main_list
+                levels_cache['last_updated'] = datetime.now(timezone.utc)
+                print(f"Auto-loaded {len(main_list)} levels")
+                
+            except Exception as e:
+                print(f"Auto-load failed: {e}")
+                # Try emergency fallback with basic query
+                try:
+                    main_list = list(mongo_db.levels.find({"is_legacy": False}).sort("position", 1).limit(50))
+                    print(f"Emergency fallback loaded {len(main_list)} levels")
+                except Exception as e2:
+                    print(f"Emergency fallback also failed: {e2}")
+                    # Final fallback to sample data
+                    main_list = [
+                        {"_id": 1, "name": "Database Error - Check /debug_db", "creator": "System", "verifier": "System", "position": 1, "points": 0, "level_id": "error", "difficulty": 5}
+                    ]
+        
+        # 🎭 APRIL FOOLS MODE: Randomize positions if active
+        if is_april_fools_active():
+            main_list = randomize_level_positions(main_list.copy())
+        
+        # Show all levels on one page (no pagination)
+        total_levels = len(main_list)
+        
+        return render_template('index.html', 
+                             levels=main_list,
+                             total_levels=total_levels,
+                             april_fools_active=is_april_fools_active())
+    except Exception as e:
+        print(f"Critical error in index route: {e}")
+        # Emergency response
+        return render_template('index.html', 
+                             levels=[{"_id": 1, "name": "Critical Error - Contact Admin", "creator": "System", "verifier": "System", "position": 1, "points": 0, "level_id": "error", "difficulty": 5}],
+                             total_levels=1,
+                             april_fools_active=False)
 
 # Routes
 
@@ -5207,19 +5349,51 @@ def timemachine():
 @app.route('/level/<level_id>')
 def level_detail(level_id):
     try:
-        # Try to convert to ObjectId first (for new levels), then fall back to int (for old levels)
+        level = None
+        level_id_for_records = None
+        
+        # Try multiple approaches to find the level
+        # 1. Try as ObjectId first (for new levels)
         try:
             level_object_id = ObjectId(level_id)
-            level = mongo_db.levels.find_one({"_id": level_object_id}, max_time_ms=5000)
+            level = mongo_db.levels.find_one({"_id": level_object_id})
             level_id_for_records = level_object_id
+            print(f"Found level by ObjectId: {level_id}")
         except (ValueError, InvalidId):
-            # Fall back to integer ID for legacy levels
-            level_object_id = int(level_id)
-            level = mongo_db.levels.find_one({"_id": level_object_id}, max_time_ms=5000)
-            level_id_for_records = level_object_id
+            pass
+        
+        # 2. If not found, try as integer (for legacy levels)
+        if not level:
+            try:
+                level_int_id = int(level_id)
+                level = mongo_db.levels.find_one({"_id": level_int_id})
+                level_id_for_records = level_int_id
+                print(f"Found level by int ID: {level_id}")
+            except (ValueError, TypeError):
+                pass
+        
+        # 3. If still not found, try searching by level_id field (GD level ID)
+        if not level:
+            try:
+                level = mongo_db.levels.find_one({"level_id": level_id})
+                if level:
+                    level_id_for_records = level["_id"]
+                    print(f"Found level by level_id field: {level_id}")
+            except Exception:
+                pass
+        
+        # 4. Final attempt: search by name (case insensitive)
+        if not level:
+            try:
+                level = mongo_db.levels.find_one({"name": {"$regex": f"^{level_id}$", "$options": "i"}})
+                if level:
+                    level_id_for_records = level["_id"]
+                    print(f"Found level by name: {level_id}")
+            except Exception:
+                pass
         
         if not level:
-            flash('Level not found', 'danger')
+            flash('Level not found. Please check the level ID or try browsing the main list.', 'danger')
             return redirect(url_for('index'))
         
         # Check if user is admin to show hidden records
@@ -5233,28 +5407,48 @@ def level_detail(level_id):
                 {"hidden": False}
             ]
         
-        # Get approved records with user info - optimized with timeout and limit
-        # Sort by progress (100% first) then by date submitted
-        records = list(mongo_db.records.aggregate([
-            {"$match": match_criteria},
-            {"$lookup": {
-                "from": "users",
-                "localField": "user_id",
-                "foreignField": "_id",
-                "as": "user"
-            }},
-            {"$unwind": "$user"},
-            {"$limit": 100}  # Limit to first 100 records for performance
-        ], maxTimeMS=5000))
+        # Get approved records with user info - with error handling
+        records = []
+        try:
+            records = list(mongo_db.records.aggregate([
+                {"$match": match_criteria},
+                {"$lookup": {
+                    "from": "users",
+                    "localField": "user_id",
+                    "foreignField": "_id",
+                    "as": "user"
+                }},
+                {"$unwind": "$user"},
+                {"$sort": {"progress": -1, "date_submitted": 1}},  # 100% first, then by date
+                {"$limit": 100}  # Limit to first 100 records for performance
+            ]))
+        except Exception as e:
+            print(f"Error loading records for level {level_id}: {e}")
+            # Fallback to simple query
+            try:
+                records = list(mongo_db.records.find(match_criteria).limit(50))
+                # Add user info manually
+                for record in records:
+                    user = mongo_db.users.find_one({"_id": record["user_id"]})
+                    record["user"] = user if user else {"username": "Unknown User"}
+            except Exception as e2:
+                print(f"Fallback record query also failed: {e2}")
+                records = []
         
         # Get position history for this level
-        position_history = list(mongo_db.position_history.find(
-            {"level_id": level_id_for_records}
-        ).sort("change_date", -1).limit(20))
+        position_history = []
+        try:
+            position_history = list(mongo_db.position_history.find(
+                {"level_id": level_id_for_records}
+            ).sort("change_date", -1).limit(20))
+        except Exception as e:
+            print(f"Error loading position history: {e}")
         
         return render_template('level_detail.html', level=level, records=records, position_history=position_history, is_admin=is_admin)
-    except (ValueError, InvalidId):
-        flash('Invalid level ID', 'danger')
+        
+    except Exception as e:
+        print(f"Critical error in level_detail route: {e}")
+        flash('An error occurred while loading the level. Please try again.', 'danger')
         return redirect(url_for('index'))
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -5960,6 +6154,15 @@ def submit_record():
         flash('Please log in to submit a record', 'warning')
         return redirect(url_for('login'))
     
+    # Check if user is temp banned
+    is_banned, ban_info = is_user_temp_banned(session['user_id'])
+    if is_banned and ban_info:
+        expiry_date = ban_info.get('expiry_date')
+        reason = ban_info.get('reason', 'Rule Violation')
+        expiry_str = expiry_date.strftime('%Y-%m-%d %H:%M UTC') if expiry_date else 'Unknown'
+        flash(f'You are temporarily banned from submitting records. Reason: {reason}. Ban expires: {expiry_str}', 'danger')
+        return redirect(url_for('index'))
+    
     # Check if submissions are enabled
     try:
         settings = mongo_db.site_settings.find_one({"_id": "main"})
@@ -5995,6 +6198,15 @@ def submit_verification():
     if 'user_id' not in session:
         flash('Please log in to submit a verification', 'warning')
         return redirect(url_for('login'))
+    
+    # Check if user is temp banned
+    is_banned, ban_info = is_user_temp_banned(session['user_id'])
+    if is_banned and ban_info:
+        expiry_date = ban_info.get('expiry_date')
+        reason = ban_info.get('reason', 'Rule Violation')
+        expiry_str = expiry_date.strftime('%Y-%m-%d %H:%M UTC') if expiry_date else 'Unknown'
+        flash(f'You are temporarily banned from submitting records. Reason: {reason}. Ban expires: {expiry_str}', 'danger')
+        return redirect(url_for('index'))
     
     # Check if user has connected their Discord account
     user = mongo_db.users.find_one({"_id": session['user_id']})
@@ -8654,175 +8866,182 @@ def admin_levels():
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
     
-    # Check if we're filtering for legacy levels
-    filter_type = request.args.get('filter')
-    is_legacy_filter = (filter_type == 'legacy')
-    
-    if request.method == 'POST':
-        # Get next level ID
-        last_level = mongo_db.levels.find_one(sort=[("_id", -1)])
-        next_id = (last_level['_id'] + 1) if last_level else 1
+    try:
+        # Check if we're filtering for legacy levels
+        filter_type = request.args.get('filter')
+        is_legacy_filter = (filter_type == 'legacy')
         
-        name = request.form.get('name')
-        creator = request.form.get('creator')
-        verifier = request.form.get('verifier')
-        level_id = request.form.get('level_id')
-        video_url = request.form.get('video_url')
-        
-        # Handle thumbnail options
-        thumbnail_type = request.form.get('thumbnail_type', 'auto')
-        thumbnail_url = ''
-        
-        if thumbnail_type == 'url':
-            # Custom URL
-            thumbnail_url = request.form.get('thumbnail_url', '').strip()
-        elif thumbnail_type == 'upload':
-            # Handle file upload
-            if 'thumbnail_file' in request.files:
-                file = request.files['thumbnail_file']
-                if file and file.filename:
-                    try:
-                        # Convert uploaded image to base64
-                        thumbnail_url = convert_image_to_base64(file)
-                        if not thumbnail_url:
-                            flash('Failed to process uploaded image. Please try a different image.', 'warning')
-                            thumbnail_url = ''
-                    except Exception as e:
-                        print(f"Image upload error: {e}")
-                        flash('Error processing uploaded image. Please try again.', 'danger')
-                        thumbnail_url = ''
-                else:
-                    flash('No file selected for upload.', 'warning')
-                    thumbnail_url = ''
-        # If thumbnail_type == 'auto', thumbnail_url stays empty (uses YouTube auto)
-        
-        description = request.form.get('description')
-        difficulty = float(request.form.get('difficulty'))
-        position = int(request.form.get('position'))
-        is_legacy = 'is_legacy' in request.form
-        
-        points_str = request.form.get('points')
-        min_percentage = int(request.form.get('min_percentage', '100'))
-        
-        # Calculate points
-        if points_str and points_str.strip():
-            points = int(float(points_str))
-        else:
-            level_type = request.form.get('level_type', 'Level')
-            points = calculate_level_points(position, is_legacy, level_type)
-        
-        # Shift existing levels at this position and below
-        shift_level_positions(position, is_legacy, 1)
-        
-        new_level = {
-            "_id": next_id,
-            "name": name,
-            "creator": creator,
-            "verifier": verifier,
-            "level_id": level_id or None,
-            "video_url": video_url,
-            "thumbnail_url": thumbnail_url,
-            "description": description,
-            "difficulty": difficulty,
-            "position": position,
-            "is_legacy": is_legacy,
-            "level_type": request.form.get('level_type', 'Level'),
-            "date_added": datetime.now(timezone.utc),
-            "points": points,
-            "min_percentage": min_percentage
-        }
-        
-        mongo_db.levels.insert_one(new_level)
-        
-        # Clear cache since levels changed
-        levels_cache['main_list'] = None
-        levels_cache['legacy_list'] = None
-        
-        # Recalculate points for all levels after position changes
-        recalculate_all_points()
-        
-        # Log level placement to changelog
-        above_level = None
-        below_level = None
-        
-        # Special case: if placing at position 1, check if there was a previous #1
-        if position == 1:
-            # Find the previous #1 level (if any)
-            previous_top_level = mongo_db.levels.find_one({"position": 1, "is_legacy": is_legacy})
-            if previous_top_level and previous_top_level['name'] != name:
-                above_level = previous_top_level['name']
-        else:
-            # Find levels above and below for positions > 1
-            if position > 1:
-                above_level_doc = mongo_db.levels.find_one({"position": position - 1, "is_legacy": is_legacy})
-                if above_level_doc:
-                    above_level = above_level_doc['name']
+        if request.method == 'POST':
+            # Get next level ID
+            last_level = mongo_db.levels.find_one(sort=[("_id", -1)])
+            next_id = (last_level['_id'] + 1) if last_level else 1
             
-            below_level_doc = mongo_db.levels.find_one({"position": position + 1, "is_legacy": is_legacy})
-            if below_level_doc:
-                below_level = below_level_doc['name']
-        
-        log_level_change(
-            action="placed",
-            level_name=name,
-            admin_username=session.get('username', 'Unknown'),
-            position=position,
-            above_level=above_level,
-            below_level=below_level,
-            list_type="legacy" if is_legacy else "main"
-        )
-        
-        # Save history
-        history_entry = {
-            "level_id": next_id,
-            "action": "added",
-            "new_data": new_level,
-            "timestamp": datetime.now(timezone.utc)
-        }
-        mongo_db.level_history.insert_one(history_entry)
-        
-        flash('Level added successfully!', 'success')
-        return redirect(url_for('admin_levels'))
-    
-    # Try to use cached data first, fallback to database
-    main_cache = levels_cache.get('main_list', []) or []
-    legacy_cache = levels_cache.get('legacy_list', []) or []
-    
-    # Always check if we need to load from database
-    if is_legacy_filter:
-        if legacy_cache:
-            levels = legacy_cache
-        else:
-            # Load legacy levels from database
-            levels = list(mongo_db.levels.find({"is_legacy": True}, {
-                "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, 
-                "level_id": 1, "difficulty": 1, "is_legacy": 1, "level_type": 1,
-                "demon_type": 1, "min_percentage": 1
-            }).sort("position", 1))
-    else:
-        if main_cache:
-            levels = main_cache
-        else:
-            # Load main levels from database
-            levels = list(mongo_db.levels.find({"is_legacy": {"$ne": True}}, {
-                "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, 
-                "level_id": 1, "difficulty": 1, "is_legacy": 1, "level_type": 1,
-                "demon_type": 1, "min_percentage": 1
-            }).sort("position", 1))
-    
-    # Debug: Check thumbnail URLs and file existence
-    import os
-    for level in levels:
-        thumb = level.get('thumbnail_url', '')
-        if thumb:
-            if thumb.startswith('/static/uploads/'):
-                file_path = thumb[1:]  # Remove leading slash
-                exists = os.path.exists(file_path)
-                print(f"Level {level['name']}: FILE {file_path} - {'EXISTS' if exists else 'MISSING'}")
+            name = request.form.get('name')
+            creator = request.form.get('creator')
+            verifier = request.form.get('verifier')
+            level_id = request.form.get('level_id')
+            video_url = request.form.get('video_url')
+            
+            # Handle thumbnail options
+            thumbnail_type = request.form.get('thumbnail_type', 'auto')
+            thumbnail_url = ''
+            
+            if thumbnail_type == 'url':
+                # Custom URL
+                thumbnail_url = request.form.get('thumbnail_url', '').strip()
+            elif thumbnail_type == 'upload':
+                # Handle file upload
+                if 'thumbnail_file' in request.files:
+                    file = request.files['thumbnail_file']
+                    if file and file.filename:
+                        try:
+                            # Convert uploaded image to base64
+                            thumbnail_url = convert_image_to_base64(file)
+                            if not thumbnail_url:
+                                flash('Failed to process uploaded image. Please try a different image.', 'warning')
+                                thumbnail_url = ''
+                        except Exception as e:
+                            print(f"Image upload error: {e}")
+                            flash('Error processing uploaded image. Please try again.', 'danger')
+                            thumbnail_url = ''
+                    else:
+                        flash('No file selected for upload.', 'warning')
+                        thumbnail_url = ''
+            # If thumbnail_type == 'auto', thumbnail_url stays empty (uses YouTube auto)
+            
+            description = request.form.get('description')
+            difficulty = float(request.form.get('difficulty'))
+            position = int(request.form.get('position'))
+            is_legacy = 'is_legacy' in request.form
+            
+            points_str = request.form.get('points')
+            min_percentage = int(request.form.get('min_percentage', '100'))
+            
+            # Calculate points
+            if points_str and points_str.strip():
+                points = int(float(points_str))
             else:
-                print(f"Level {level['name']}: URL {thumb}")
+                level_type = request.form.get('level_type', 'Level')
+                points = calculate_level_points(position, is_legacy, level_type)
+            
+            # Shift existing levels at this position and below
+            shift_level_positions(position, is_legacy, 1)
+            
+            new_level = {
+                "_id": next_id,
+                "name": name,
+                "creator": creator,
+                "verifier": verifier,
+                "level_id": level_id or None,
+                "video_url": video_url,
+                "thumbnail_url": thumbnail_url,
+                "description": description,
+                "difficulty": difficulty,
+                "position": position,
+                "is_legacy": is_legacy,
+                "level_type": request.form.get('level_type', 'Level'),
+                "date_added": datetime.now(timezone.utc),
+                "points": points,
+                "min_percentage": min_percentage
+            }
+        
+            mongo_db.levels.insert_one(new_level)
+            
+            # Clear cache since levels changed
+            levels_cache['main_list'] = None
+            levels_cache['legacy_list'] = None
+            
+            # Recalculate points for all levels after position changes
+            recalculate_all_points()
+            
+            # Log level placement to changelog
+            above_level = None
+            below_level = None
+            
+            # Special case: if placing at position 1, check if there was a previous #1
+            if position == 1:
+                # Find the previous #1 level (if any)
+                previous_top_level = mongo_db.levels.find_one({"position": 1, "is_legacy": is_legacy})
+                if previous_top_level and previous_top_level['name'] != name:
+                    above_level = previous_top_level['name']
+            else:
+                # Find levels above and below for positions > 1
+                if position > 1:
+                    above_level_doc = mongo_db.levels.find_one({"position": position - 1, "is_legacy": is_legacy})
+                    if above_level_doc:
+                        above_level = above_level_doc['name']
+                
+                below_level_doc = mongo_db.levels.find_one({"position": position + 1, "is_legacy": is_legacy})
+                if below_level_doc:
+                    below_level = below_level_doc['name']
+            
+            log_level_change(
+                action="placed",
+                level_name=name,
+                admin_username=session.get('username', 'Unknown'),
+                position=position,
+                above_level=above_level,
+                below_level=below_level,
+                list_type="legacy" if is_legacy else "main"
+            )
+            
+            # Save history
+            history_entry = {
+                "level_id": next_id,
+                "action": "added",
+                "new_data": new_level,
+                "timestamp": datetime.now(timezone.utc)
+            }
+            mongo_db.level_history.insert_one(history_entry)
+            
+            flash('Level added successfully!', 'success')
+            return redirect(url_for('admin_levels'))
+        
+        # GET request - display levels
+        # Try to use cached data first, fallback to database
+        main_cache = levels_cache.get('main_list', []) or []
+        legacy_cache = levels_cache.get('legacy_list', []) or []
+        
+        # Always check if we need to load from database
+        if is_legacy_filter:
+            if legacy_cache:
+                levels = legacy_cache
+            else:
+                # Load legacy levels from database
+                levels = list(mongo_db.levels.find({"is_legacy": True}, {
+                    "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, 
+                    "level_id": 1, "difficulty": 1, "is_legacy": 1, "level_type": 1,
+                    "demon_type": 1, "min_percentage": 1
+                }).sort("position", 1))
+        else:
+            if main_cache:
+                levels = main_cache
+            else:
+                # Load main levels from database
+                levels = list(mongo_db.levels.find({"$or": [{"is_legacy": False}, {"is_legacy": {"$exists": False}}]}, {
+                    "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, 
+                    "level_id": 1, "difficulty": 1, "is_legacy": 1, "level_type": 1,
+                    "demon_type": 1, "min_percentage": 1
+                }).sort("position", 1))
+        
+        # Debug: Check thumbnail URLs and file existence
+        import os
+        for level in levels:
+            thumb = level.get('thumbnail_url', '')
+            if thumb:
+                if thumb.startswith('/static/uploads/'):
+                    file_path = thumb[1:]  # Remove leading slash
+                    exists = os.path.exists(file_path)
+                    print(f"Level {level['name']}: FILE {file_path} - {'EXISTS' if exists else 'MISSING'}")
+                else:
+                    print(f"Level {level['name']}: URL {thumb}")
+        
+        return render_template('admin/levels.html', levels=levels, is_legacy_filter=is_legacy_filter)
     
-    return render_template('admin/levels.html', levels=levels, is_legacy_filter=is_legacy_filter)
+    except Exception as e:
+        print(f"Error in admin_levels route: {e}")
+        flash('An error occurred while loading the levels management page. Please try again.', 'danger')
+        return redirect(url_for('admin'))
 
 @app.route('/admin/edit_level', methods=['POST'])
 def admin_edit_level():

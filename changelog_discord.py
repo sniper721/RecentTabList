@@ -215,21 +215,8 @@ def send_changelog_notification(action, level_name, admin_username=None, **kwarg
                 message += f" at position #{legacy_position + 100}"  # Legacy starts from #101
             message += "."
         
-        # Try to send via Discord bot first (enhanced), then fallback to webhook
+        # Send message only via webhook to prevent duplicates
         if message:
-            try:
-                # Try Discord bot first for enhanced formatting
-                from discord_bot import send_changelog_notification, DISCORD_BOT_AVAILABLE
-                # Re-import to get current status
-                import discord_bot
-                if discord_bot.DISCORD_BOT_AVAILABLE:
-                    bot_success = send_changelog_notification(message)
-                    if bot_success:
-                        return True
-            except Exception as e:
-                print(f"Discord bot changelog notification failed: {e}")
-            
-            # Fallback to webhook
             return notify_changelog(message, admin_username)
         
         return False

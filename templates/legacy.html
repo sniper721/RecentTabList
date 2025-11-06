@@ -50,7 +50,7 @@
                                 <td class="position">{{ level.position if level is not mapping else level['position'] }}</td>
                                 <td class="level-name">
                                     {% set difficulty = level.difficulty if level is not mapping else level['difficulty'] %}
-                                    <span class="level-difficulty level-difficulty-{{ difficulty|round|int }}"></span>
+                                    <span class="level-difficulty level-difficulty-{{ difficulty|float|round|int }}"></span>
                                     {{ level.name if level is not mapping else level['name'] }}
                                 </td>
                                 <td>{{ level.creator if level is not mapping else level['creator'] }}</td>
