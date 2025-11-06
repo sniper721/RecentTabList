@@ -9,8 +9,8 @@
             <div class="card-header bg-dark text-white">
                 <div class="d-flex justify-content-between align-items-center">
                     <h2 class="mb-0">
-                        {% set difficulty = level.get('difficulty', 5.0)|float|round|int %}
-                        {% set position = level.get('position', 1) %}
+                        {% set difficulty = level.difficulty|float|round|int if level is not mapping else level['difficulty']|float|round|int %}
+                        {% set position = level.position if level is not mapping else level['position'] %}
                         <span class="badge level-difficulty-badge level-difficulty-{{ difficulty }}">{{ position }}</span>
                         {{ level.get('name', 'Unknown Level') }}
                     </h2>
