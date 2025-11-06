@@ -9,7 +9,6 @@
             <div class="card-header bg-dark text-white">
                 <div class="d-flex justify-content-between align-items-center">
                     <h2 class="mb-0">
-                        {% set difficulty = level.difficulty|float|round|int if level is not mapping else level['difficulty']|round|int %}
                         {% set position = level.position if level is not mapping else level['position'] %}
                         <span class="badge level-difficulty-badge level-difficulty-{{ difficulty }}">{{ position }}</span>
                         {{ level.name if level is not mapping else level['name'] }}
@@ -35,7 +34,8 @@
                         
                         {% set position = level.position if level is not mapping else level['position'] %}
                         {% set points = level.points if level is not mapping else level['points'] %}
-                        <p><strong>Points:</strong> {{ points or ((100 - position + 1) / 10)|round(2) }}</p>
+                        {% set points_display = points|float if points else ((100 - position + 1) / 10)|round(2) %}
+                        <p><strong>Points:</strong> {{ format_points(points_display) }}</p>
                         
                         {% set min_percentage = level.min_percentage if level is not mapping else level['min_percentage'] %}
                         <p><strong>Minimum Percentage:</strong> {{ min_percentage }}%</p>
@@ -296,7 +296,8 @@
                 <p>Completing this level (100%) will award you:</p>
                 {% set position = level.position if level is not mapping else level['position'] %}
                 {% set points = level.points if level is not mapping else level['points'] %}
-                <h3 class="text-center">{{ points or ((100 - position + 1) / 10)|round(2) }} Points</h3>
+                {% set points_num = points|float if points else ((100 - position + 1) / 10)|round(2) %}
+                <h3 class="text-center">{{ format_points(points_num) }} Points</h3>
                 
                 {% set min_percentage = level.min_percentage if level is not mapping else level['min_percentage'] %}
                 {% if min_percentage < 100 %}
@@ -314,7 +315,8 @@
                             {% for progress in [min_percentage, (min_percentage + 100) // 2, 100] %}
                             <tr>
                                 <td>{{ progress }}%</td>
-                                <td>{{ (points or ((100 - position + 1) / 10)) * (progress / 100) | round(2) }}</td>
+                                {% set base_points = points|float if points else ((100 - position + 1) / 10) %}
+                                <td>{{ (base_points * (progress / 100)) | round(2) }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>

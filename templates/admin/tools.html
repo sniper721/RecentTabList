@@ -48,7 +48,8 @@
                         <p><strong>User ID:</strong> <span id="resultUserId"></span></p>
                         <div class="mt-2">
                             <a href="#" id="ipBanLink" class="btn btn-danger btn-sm">IP Ban User</a>
-                            <a href="#" id="resetPointsLink" class="btn btn-warning btn-sm">Reset Points & Records</a>
+                            <a href="#" id="tempBanLink" class="btn btn-warning btn-sm">Temp Ban User</a>
+                            <a href="#" id="resetPointsLink" class="btn btn-info btn-sm">Reset Points & Records</a>
                         </div>
                     </div>
                 </div>
@@ -72,6 +73,44 @@
             <h5 class="mb-0">🛡️ Security Tools</h5>
         </div>
         <div class="card-body">
+            <!-- Temp Ban Section -->
+            <div class="mb-4">
+                <h6>⏰ Temporary Ban User</h6>
+                <p>Temporarily ban a user from submitting records for a specified duration.</p>
+                <form id="tempBanForm">
+                    <div class="mb-3">
+                        <label for="tempBanUsername" class="form-label">Username to Temp Ban</label>
+                        <input type="text" class="form-control" id="tempBanUsername" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="tempBanDuration" class="form-label">Ban Duration</label>
+                        <input type="number" class="form-control" id="tempBanDuration" name="duration" min="1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="tempBanUnit" class="form-label">Time Unit</label>
+                        <select class="form-select" id="tempBanUnit" name="unit" required>
+                            <option value="days">Days</option>
+                            <option value="weeks">Weeks</option>
+                            <option value="months">Months</option>
+                            <option value="years">Years</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="tempBanReason" class="form-label">Ban Reason</label>
+                        <select class="form-select" id="tempBanReason" name="reason" required>
+                            <option value="Suspicious Activity">Suspicious Activity</option>
+                            <option value="Rule Violation">Rule Violation</option>
+                            <option value="Inappropriate Behavior">Inappropriate Behavior</option>
+                            <option value="Spam Submissions">Spam Submissions</option>
+                            <option value="False Information">False Information</option>
+                            <option value="Warning Period">Warning Period</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-warning">Temp Ban User</button>
+                </form>
+            </div>
+
             <!-- IP Ban Section -->
             <div class="mb-4">
                 <h6>🚫 IP Ban User</h6>
@@ -216,6 +255,71 @@ document.getElementById('recalculatePointsBtn').addEventListener('click', functi
     });
 });
 
+document.getElementById('tempBanForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('tempBanUsername').value.trim();
+    const duration = document.getElementById('tempBanDuration').value;
+    const unit = document.getElementById('tempBanUnit').value;
+    const reason = document.getElementById('tempBanReason').value;
+    
+    if (!username || !duration) {
+        alert('Please fill in all required fields');
+        return;
+    }
+    
+    // First, find the user
+    fetch('/admin/find_user', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({username: username})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error: ' + data.error);
+        } else {
+            // Confirm temp ban action
+            const confirmMsg = `⏰ TEMPORARY BAN\n\nYou are about to temporarily ban user: ${data.username}\n\nDuration: ${duration} ${unit}\nReason: ${reason}\n\nThis will prevent them from submitting records until the ban expires.\n\nProceed with temporary ban?`;
+            
+            if (confirm(confirmMsg)) {
+                // Proceed with temp ban
+                fetch('/admin/temp_ban', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: data.user_id,
+                        duration: duration,
+                        unit: unit,
+                        reason: reason
+                    })
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        alert('User has been temporarily banned successfully!');
+                        document.getElementById('tempBanForm').reset();
+                    } else {
+                        alert('Error: ' + result.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while applying the temporary ban');
+                });
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while finding the user');
+    });
+});
+
 document.getElementById('ipBanForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
@@ -279,6 +383,10 @@ document.getElementById('findUserForm').addEventListener('submit', function(e) {
             document.getElementById('resultUsername').textContent = data.username;
             document.getElementById('resultUserId').textContent = data.user_id;
             document.getElementById('ipBanLink').href = '/admin/ip_ban/' + data.user_id;
+            document.getElementById('tempBanLink').onclick = function() { 
+                document.getElementById('tempBanUsername').value = data.username;
+                document.getElementById('tempBanUsername').scrollIntoView();
+            };
             document.getElementById('resetPointsLink').href = '/admin/reset_user/' + data.user_id;
             document.getElementById('userResult').style.display = 'block';
         }
