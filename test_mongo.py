@@ -48,7 +48,7 @@ try:
     
     # Test a quick query
     start_time = time.time()
-    sample_level = db.levels.find_one({}, {"name": 1, "creator": 1}, maxTimeMS=3000)
+    sample_level = db.levels.find_one({}, {"name": 1, "creator": 1}, max_time_ms=3000)
     query_time = time.time() - start_time
     
     if sample_level:
