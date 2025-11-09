@@ -46,17 +46,17 @@
                         </thead>
                         <tbody>
                             {% for level in levels %}
-                            <tr class="level-row" data-level-id="{{ level.get(\'_id\', \'\') }}">
-                                <td class="position">{{ level.get(\'position\', \'\') }}</td>
+                            <tr class="level-row" data-level-id="{{ level.get('_id', '') }}">
+                                <td class="position">{{ level.get('position', '') }}</td>
                                 <td class="level-name">
                                     {% set difficulty = level.get('difficulty', 5.0) %}
                                     <span class="level-difficulty level-difficulty-{{ difficulty|float|round|int }}"></span>
-                                    {{ level.get(\'name\', \'\') }}
+                                    {{ level.get('name', '') }}
                                 </td>
-                                <td>{{ level.get(\'creator\', \'\') }}</td>
-                                <td>{{ level.get(\'verifier\', \'\') }}</td>
+                                <td>{{ level.get('creator', '') }}</td>
+                                <td>{{ level.get('verifier', '') }}</td>
                                 <td>
-                                    {% set video_url = level.get(\'video_url\', \'\') %}
+                                    {% set video_url = level.get('video_url', '') %}
                                     {% if video_url %}
                                     <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-danger">
                                         <i class="fab fa-youtube"></i>
