@@ -317,6 +317,10 @@
                                                         <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-dark" title="TikTok">
                                                             <i class="fab fa-tiktok"></i>
                                                         </a>
+                                                    {% elif video_info.platform == 'twitch' %}
+                                                        <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-purple" title="Twitch">
+                                                            <i class="fab fa-twitch"></i>
+                                                        </a>
                                                     {% endif %}
                                                 {% else %}
                                                     <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-secondary" title="Video">
@@ -382,6 +386,10 @@
                                                     {% elif video_info.platform == 'tiktok' %}
                                                         <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-dark" title="TikTok">
                                                             <i class="fab fa-tiktok"></i>
+                                                        </a>
+                                                    {% elif video_info.platform == 'twitch' %}
+                                                        <a href="{{ record.video_url }}" target="_blank" class="btn btn-sm btn-purple" title="Twitch">
+                                                            <i class="fab fa-twitch"></i>
                                                         </a>
                                                     {% endif %}
                                                 {% else %}

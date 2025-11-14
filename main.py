@@ -26,6 +26,14 @@ except ImportError as e:
 # Try to import Discord bot integration
 try:
     from discord_bot import start_discord_bot, check_user_role, send_dm_to_user, is_bot_available, notify_verification_submission
+
+    # Add the new import for role assignment functions
+    from discord_bot import assign_discord_role, remove_discord_role, assign_verifier_role, assign_future_list_verifier_role, assign_top_1_player_role, remove_top_1_player_role
+
+    import threading
+    import base64
+    import hashlib
+
     print("✅ Discord bot integration loaded successfully")
 except ImportError as e:
     print(f"❌ Discord bot integration failed to load: {e}")
@@ -455,6 +463,33 @@ def get_video_embed_info(video_url):
             'video_id': video_id
         }
     
+    # Twitch support
+    elif 'twitch.tv' in video_url:
+        # Handle Twitch clips
+        if '/clip/' in video_url:
+            clip_id = video_url.split('/clip/')[-1].split('?')[0].split('&')[0]
+            return {
+                'platform': 'twitch',
+                'embed_url': f'https://clips.twitch.tv/embed?clip={clip_id}&parent=localhost',
+                'video_id': clip_id
+            }
+        # Handle Twitch VODs/streams
+        elif '/videos/' in video_url:
+            video_id = video_url.split('/videos/')[-1].split('?')[0].split('&')[0]
+            return {
+                'platform': 'twitch',
+                'embed_url': f'https://player.twitch.tv/?video={video_id}&parent=localhost',
+                'video_id': video_id
+            }
+        else:
+            # Handle channel streams
+            channel = video_url.split('twitch.tv/')[-1].split('?')[0].split('&')[0]
+            return {
+                'platform': 'twitch',
+                'embed_url': f'https://player.twitch.tv/?channel={channel}&parent=localhost',
+                'video_id': channel
+            }
+    
     # TikTok support
     elif 'tiktok.com' in video_url:
         # Extract video ID from TikTok URL
@@ -483,12 +518,23 @@ def utility_processor():
         return f"{points_float:.1f}".rstrip('0').rstrip('.')
     
     def get_active_announcements():
-        """Get active announcements that haven't expired"""
+        """Get active announcements that haven't expired and were created after user joined"""
         try:
             now = datetime.now(timezone.utc)
-            announcements = list(mongo_db.announcements.find({
-                "active": True
-            }).sort("created_at", -1).limit(5))
+            
+            # Get user join date if logged in
+            user_join_date = None
+            if 'user_id' in session:
+                user = mongo_db.users.find_one({"_id": session['user_id']})
+                if user and 'date_joined' in user:
+                    user_join_date = user['date_joined']
+            
+            query = {"active": True}
+            # If user has a join date, only show announcements created after they joined
+            if user_join_date:
+                query["created_at"] = {"$gte": user_join_date}
+            
+            announcements = list(mongo_db.announcements.find(query).sort("created_at", -1).limit(5))
             
             # Filter and fix timezone issues
             active_announcements = []
@@ -513,12 +559,23 @@ def utility_processor():
             return []
     
     def get_active_polls():
-        """Get active polls that haven't expired, filtering out closed polls for current user"""
+        """Get active polls that haven't expired and were created after user joined, filtering out closed polls for current user"""
         try:
             now = datetime.now(timezone.utc)
-            polls = list(mongo_db.polls.find({
-                "active": True
-            }).sort("created_at", -1).limit(3))  # Show max 3 polls
+            
+            # Get user join date if logged in
+            user_join_date = None
+            if 'user_id' in session:
+                user = mongo_db.users.find_one({"_id": session['user_id']})
+                if user and 'date_joined' in user:
+                    user_join_date = user['date_joined']
+            
+            query = {"active": True}
+            # If user has a join date, only show polls created after they joined
+            if user_join_date:
+                query["created_at"] = {"$gte": user_join_date}
+            
+            polls = list(mongo_db.polls.find(query).sort("created_at", -1).limit(3))  # Show max 3 polls
             
             # Filter and fix timezone issues
             active_polls = []
@@ -865,10 +922,53 @@ def create_global_notification(notification_type, title, message, related_id=Non
         print(f"Error creating global notification: {e}")
         return 0
 
-def get_user_notifications(user_id, limit=20, unread_only=False):
-    """Get notifications for a user"""
+def fix_verifier_points_bug():
+    """Fix the bug where verifiers lose points and update affected users"""
     try:
+        print("🔍 Starting verifier points bug fix...")
+        
+        # Find all records that are marked as verifier records
+        verifier_records = list(mongo_db.records.find({"is_verifier": True}))
+        print(f"Found {len(verifier_records)} verifier records to check")
+        
+        # Group records by user
+        user_records = {}
+        for record in verifier_records:
+            user_id = record['user_id']
+            if user_id not in user_records:
+                user_records[user_id] = []
+            user_records[user_id].append(record)
+        
+        # Update points for each user with verifier records
+        updated_users = 0
+        for user_id, records in user_records.items():
+            try:
+                # Recalculate points for this user
+                new_points = update_user_points(user_id)
+                updated_users += 1
+                print(f"✅ Updated points for user {user_id}: {new_points} points")
+            except Exception as e:
+                print(f"❌ Error updating points for user {user_id}: {e}")
+        
+        print(f"✅ Verifier points bug fix completed. Updated {updated_users} users.")
+        return updated_users
+        
+    except Exception as e:
+        print(f"❌ Error in fix_verifier_points_bug: {e}")
+        return 0
+
+
+def get_user_notifications(user_id, limit=20, unread_only=False):
+    """Get notifications for a user that were created after they joined"""
+    try:
+        # Get user join date
+        user = mongo_db.users.find_one({"_id": user_id})
+        user_join_date = user.get('date_joined') if user else None
+        
         query = {"user_id": user_id}
+        # If user has a join date, only show notifications created after they joined
+        if user_join_date:
+            query["created_at"] = {"$gte": user_join_date}
         if unread_only:
             query["read"] = False
             
@@ -893,12 +993,18 @@ def mark_notification_read(notification_id, user_id):
         return False
 
 def get_unread_notification_count(user_id):
-    """Get count of unread notifications for a user"""
+    """Get count of unread notifications for a user that were created after they joined"""
     try:
-        return mongo_db.notifications.count_documents({
-            "user_id": user_id,
-            "read": False
-        })
+        # Get user join date
+        user = mongo_db.users.find_one({"_id": user_id})
+        user_join_date = user.get('date_joined') if user else None
+        
+        query = {"user_id": user_id, "read": False}
+        # If user has a join date, only count notifications created after they joined
+        if user_join_date:
+            query["created_at"] = {"$gte": user_join_date}
+            
+        return mongo_db.notifications.count_documents(query)
     except Exception as e:
         print(f"Error getting unread notification count: {e}")
         return 0
@@ -980,11 +1086,171 @@ def update_user_points(user_id):
     
     print(f"DEBUG: User {user_id} total points: {total_points}")
     
+    # Get user's current points before update
+    user = mongo_db.users.find_one({"_id": user_id})
+    old_points = user.get('points', 0) if user else 0
+    
     mongo_db.users.update_one(
         {"_id": user_id},
         {"$set": {"points": total_points}}
     )
+    
+    # Check if user reached a new milestone and send Discord notifications
+    if user and user.get('discord_id'):
+        check_and_notify_points_milestones(user, old_points, total_points)
+    
     return total_points
+
+def check_and_notify_points_milestones(user, old_points, new_points):
+    """Check if user reached a new points milestone and send Discord notifications"""
+    # Check if we're in a role sync period to avoid spamming notifications
+    try:
+        # Check when the last role sync was performed
+        last_sync_doc = mongo_db.site_settings.find_one({"_id": "discord_bot"})
+        if last_sync_doc and "last_role_sync" in last_sync_doc:
+            last_sync_time = last_sync_doc["last_role_sync"]
+            # If the last sync was less than 5 minutes ago, skip notifications
+            from datetime import datetime, timezone
+            if isinstance(last_sync_time, datetime):
+                time_diff = datetime.now(timezone.utc) - last_sync_time
+                if time_diff.total_seconds() < 300:  # 5 minutes
+                    print(f"⏭️ Skipping milestone notifications for user {user['username']} - role sync in progress or recently completed")
+                    return
+    except Exception as e:
+        print(f"⚠️ Error checking role sync status: {e}")
+    
+    # Define points thresholds and corresponding roles
+    milestones = [
+        (1, "1407154476900548638"),      # 1+ points
+        (50, "1434561864477708412"),     # 50+ points
+        (100, "1434559158056910859"),    # 100+ points
+        (150, "1434559357978284072"),    # 150+ points
+        (200, "1434559491164078210"),    # 200+ points
+        (250, "1434559736430334013"),    # 250+ points
+        (300, "1434559950142832812"),    # 300+ points
+        (350, "1434560160193450056"),    # 350+ points
+        (400, "1434560335540654170"),    # 400+ points
+        (450, "1434560559315030279"),    # 450+ points
+        (500, "1434560792845353073"),    # 500+ points
+        (600, "1434562564607447072"),    # 600+ points
+        (700, "1434562844678029322"),    # 700+ points
+        (800, "1434563139302854796"),    # 800+ points
+        (900, "1434563355917680722"),    # 900+ points
+        (1000, "1434563588349100135"),   # 1000+ points
+        (1500, "1434563863126474782"),   # 1500+ points
+        (2000, "1434564153032315120"),   # 2000+ points
+        (2500, "1434564465084596325"),   # 2500+ points
+        (3000, "1434564672949977219"),   # 3000+ points
+        (3500, "1434564972083413123"),   # 3500+ points
+        (4000, "1434566288256012393")    # 4000+ points
+    ]
+    
+    # Find all milestones the user has reached
+    old_milestones = [points for points, role_id in milestones if old_points >= points]
+    new_milestones = [points for points, role_id in milestones if new_points >= points]
+    
+    # Determine which milestones are newly reached
+    newly_reached = [points for points in new_milestones if points not in old_milestones]
+    
+    # Determine which milestones are no longer reached (lost)
+    lost_milestones = [points for points in old_milestones if points not in new_milestones]
+    
+    # Role names mapping
+    role_names = {
+        "1407154476900548638": "List Player",
+        "1434561864477708412": "50+ Points",
+        "1434559158056910859": "100+ Points",
+        "1434559357978284072": "150+ Points",
+        "1434559491164078210": "200+ Points",
+        "1434559736430334013": "250+ Points",
+        "1434559950142832812": "300+ Points",
+        "1434560160193450056": "350+ Points",
+        "1434560335540654170": "400+ Points",
+        "1434560559315030279": "450+ Points",
+        "1434560792845353073": "500+ Points",
+        "1434562564607447072": "600+ Points",
+        "1434562844678029322": "700+ Points",
+        "1434563139302854796": "800+ Points",
+        "1434563355917680722": "900+ Points",
+        "1434563588349100135": "1000+ Points",
+        "1434563863126474782": "1500+ Points",
+        "1434564153032315120": "2000+ Points",
+        "1434564465084596325": "2500+ Points",
+        "1434564672949977219": "3000+ Points",
+        "1434564972083413123": "3500+ Points",
+        "1434566288256012393": "4000+ Points",
+        # Additional achievement roles
+        "1407749092821565632": "Completed Entire List",
+        "1434573744889794591": "#1 Player on Stats Viewer",
+        "1434089770040168499": "Top 10 Player on Stats Viewer",
+        "1387947809948307516": "Current Top 1 Player",
+        "1387947951426371735": "Top 5 Level Completer",
+        "1387948023073738792": "Top 10 Level Completer",
+        "1418198223851618327": "Future List Verifier",
+        "1387982674043338804": "List Verifier",
+        "1387982763549790229": "First Victor"
+    }
+    
+    # If user reached new milestones, send notifications and assign roles
+    if newly_reached:
+        # For each newly reached milestone, send notification and assign all roles up to that milestone
+        for milestone_points in newly_reached:
+            # Find the role ID for this milestone
+            milestone_role_id = next((role_id for points, role_id in milestones if points == milestone_points), None)
+            if not milestone_role_id:
+                continue
+                
+            role_name = role_names.get(milestone_role_id, "New Role")
+            
+            # Send DM notification for the highest milestone reached
+            message = f"🎉 Congratulations! You've reached {milestone_points} points on the RTL list and have been awarded the '{role_name}' role and all previous roles!"
+            try:
+                if is_bot_available():
+                    send_dm_to_user(user['discord_id'], message)
+                    print(f"✅ Sent milestone notification to user {user['username']} for {milestone_points} points")
+                else:
+                    print("⚠️ Discord bot not available - skipping milestone notification")
+            except Exception as e:
+                print(f"Error sending milestone notification: {e}")
+            
+            # Assign all roles up to this milestone
+            roles_to_assign = [(points, role_id) for points, role_id in milestones if points <= milestone_points]
+            
+            for points, role_id in roles_to_assign:
+                current_role_name = role_names.get(role_id, f"{points}+ Points")
+                try:
+                    if is_bot_available():
+                        if assign_discord_role(user['discord_id'], role_id):
+                            print(f"✅ Assigned role {current_role_name} to user {user['username']} for {points} points")
+                        else:
+                            print(f"❌ Failed to assign role {current_role_name} to user {user['username']}")
+                    else:
+                        print("⚠️ Discord bot not available - skipping role assignment")
+                except Exception as e:
+                    print(f"Error assigning role {current_role_name}: {e}")
+    
+    # If user lost milestones, remove roles
+    if lost_milestones:
+        # For each lost milestone, remove the corresponding role
+        for milestone_points in lost_milestones:
+            # Find the role ID for this milestone
+            milestone_role_id = next((role_id for points, role_id in milestones if points == milestone_points), None)
+            if not milestone_role_id:
+                continue
+                
+            role_name = role_names.get(milestone_role_id, f"{milestone_points}+ Points")
+            
+            # Remove the role
+            try:
+                if is_bot_available():
+                    if remove_discord_role(user['discord_id'], milestone_role_id):
+                        print(f"✅ Removed role {role_name} from user {user['username']} for {milestone_points} points")
+                    else:
+                        print(f"❌ Failed to remove role {role_name} from user {user['username']}")
+                else:
+                    print("⚠️ Discord bot not available - skipping role removal")
+            except Exception as e:
+                print(f"Error removing role {role_name}: {e}")
 
 def shift_level_positions(position, is_legacy=False, direction=1):
     """Shift level positions up or down from a given position"""
@@ -1217,6 +1483,23 @@ def auto_manage_legacy_list():
                 }}
             )
             
+            # Fix: Properly shift positions in the main list to fill the gap at position 151
+            mongo_db.levels.update_many(
+                {"position": {"$gt": 151}, "is_legacy": {"$ne": True}},
+                {"$inc": {"position": -1}}
+            )
+            
+            # Also update any levels that might have is_legacy field missing (treat as False)
+            mongo_db.levels.update_many(
+                {"position": {"$gt": 151}, "is_legacy": {"$exists": False}},
+                {"$inc": {"position": -1}}
+            )
+            
+            # Clear the cache to ensure fresh data
+            global levels_cache
+            levels_cache['main_list'] = None
+            levels_cache['legacy_list'] = None
+            
             # Recalculate user points for this level (remove points since it's now legacy)
             old_points = level_at_151.get('points', 0)
             recalculate_user_points_after_level_move(level_at_151["_id"], old_points, 0.0)
@@ -1226,6 +1509,7 @@ def auto_manage_legacy_list():
             
             print(f"🔄 Automatically moved {level_at_151['name']} to legacy list at position #151")
             print(f"🔄 Shifted all other legacy levels down by 1 position")
+            print(f"🔄 Shifted main list positions to fill the gap")
             return level_at_151["name"]
         
         return None
@@ -1255,29 +1539,6 @@ def get_top10_pushout_info(new_position):
         print(f"Error getting top 10 pushout info: {e}")
         return None
 
-def get_level_neighbors(position, is_legacy=False):
-    """Get the levels above and below a given position"""
-    try:
-        above_level = mongo_db.levels.find_one({
-            "position": position - 1,
-            "is_legacy": is_legacy
-        }, {"name": 1})
-        
-        below_level = mongo_db.levels.find_one({
-            "position": position + 1,
-            "is_legacy": is_legacy
-        }, {"name": 1})
-        
-        return (
-            above_level["name"] if above_level else None,
-            below_level["name"] if below_level else None
-        )
-    except Exception as e:
-        print(f"Error getting level neighbors: {e}")
-        return None, None
-
-
-
 def log_admin_action(admin_username, action, details=""):
     """Log admin actions to database and Discord"""
     try:
@@ -1304,68 +1565,6 @@ def log_admin_action(admin_username, action, details=""):
     except Exception as e:
         print(f"Error in log_admin_action: {e}")
 
-# Image conversion function removed - profile pictures no longer supported
-
-def send_discord_notification_direct(username, level_name, progress, video_url):
-    """Direct Discord notification without external file"""
-    import requests
-    import os
-    
-    webhook_url = os.environ.get('DISCORD_WEBHOOK_URL')
-    website_url = os.environ.get('WEBSITE_URL', 'http://localhost:10000')
-    
-    if not webhook_url:
-        print("❌ No Discord webhook URL configured")
-        return
-    
-    print(f"🔔 Sending direct Discord notification for {username}")
-    
-    embed = {
-        "title": "📝 New Record Submission",
-        "description": "A new record has been submitted for review",
-        "color": 16766020,  # Yellow color
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "fields": [
-            {"name": "👤 Player", "value": username, "inline": True},
-            {"name": "🎮 Level", "value": level_name, "inline": True},
-            {"name": "📊 Progress", "value": f"{progress}%", "inline": True},
-        ],
-        "footer": {"text": "RTL Admin Notification System"}
-    }
-    
-    if video_url:
-        embed["fields"].append({
-            "name": "🎥 Video",
-            "value": f"[Watch Video]({video_url})",
-            "inline": False
-        })
-    
-    embed["fields"].append({
-        "name": "⚙️ Admin Panel",
-        "value": f"[Review Submission]({website_url}/admin)",
-        "inline": False
-    })
-    
-    try:
-        response = requests.post(
-            webhook_url,
-            json={"embeds": [embed]},
-            headers={"Content-Type": "application/json"},
-            timeout=10
-        )
-        
-        print(f"📡 Discord API response: {response.status_code}")
-        
-        if response.status_code == 204:
-            print("✅ Direct Discord notification sent successfully")
-        else:
-            print(f"❌ Discord webhook failed: {response.status_code} - {response.text}")
-            
-    except Exception as e:
-        print(f"❌ Direct Discord notification error: {e}")
-        import traceback
-        traceback.print_exc()
-
 print("Setting up routes...")
 
 # Start Discord bot after all initialization is complete
@@ -1374,6 +1573,10 @@ try:
     print("📦 Importing Discord bot module...")
     from discord_bot import start_discord_bot, is_bot_available
     print("✅ Discord bot module imported successfully")
+    
+    # Set the MongoDB reference for the discord_bot module
+    import discord_bot
+    discord_bot.mongo_db = mongo_db
     
     print("🤖 Attempting to start Discord bot...")
     bot_started = start_discord_bot()
@@ -7294,93 +7497,161 @@ def admin_accept_verification(submission_id):
         # Get the placement position from the form
         placement = int(request.form.get('placement', 1))
         
-        # Get the verification submission
-        submission = mongo_db.verification_submissions.find_one({"_id": ObjectId(submission_id)})
-        if not submission:
-            flash('Verification submission not found', 'danger')
-            return redirect(url_for('admin_verifications'))
-        
-        # Check if already processed
-        if submission.get('status') != 'pending':
-            flash('Verification submission has already been processed', 'warning')
-            return redirect(url_for('admin_verifications'))
-        
         # Get admin info
         admin_user = mongo_db.users.find_one({"_id": session['user_id']})
         admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
         
+        # Call the function to accept the verification submission
+        result = accept_verification_submission(submission_id, admin_username)
+        
+        if result:
+            return redirect(url_for('admin_verifications'))
+        else:
+            flash('Error accepting verification submission', 'danger')
+            return redirect(url_for('admin_verifications'))
+        
+    except Exception as e:
+        flash(f'Error accepting verification: {str(e)}', 'danger')
+        print(f"Admin accept verification error: {e}")
+        import traceback
+        traceback.print_exc()
+        return redirect(url_for('admin_verifications'))
+
+def text_difficulty_to_numeric(text_difficulty):
+    """Convert text-based difficulty to numeric value"""
+    difficulty_mapping = {
+        'easy': 1.0,
+        'normal': 3.0,
+        'hard': 5.0,
+        'harder': 7.0,
+        'insane': 9.0,
+        'easy demon': 10.0,
+        'medium demon': 10.0,
+        'hard demon': 10.0,
+        'insane demon': 10.0,
+        'extreme demon': 10.0,
+        'demon': 10.0
+    }
+    
+    # If it's already a number, return it as float
+    if isinstance(text_difficulty, (int, float)):
+        return float(text_difficulty)
+    
+    # Convert to lowercase for case-insensitive matching
+    return difficulty_mapping.get(text_difficulty.lower(), 10.0)  # Default to 10.0 (Demon)
+
+def accept_verification_submission(submission_id, admin_username):
+    """Accept a verification submission and add it to the main list"""
+    submission = mongo_db.verification_submissions.find_one({"_id": ObjectId(submission_id)})
+    if not submission:
+        return False
+    
+    try:
+        # Check if already processed
+        if submission.get('status') != 'pending':
+            print(f"Verification submission {submission_id} already processed")
+            return False
+        
+        # Validate required fields
+        required_fields = ['level_name', 'creator', 'verifier', 'difficulty', 'verification_url']
+        for field in required_fields:
+            if not submission.get(field):
+                print(f"Missing required field: {field}")
+                return False
+        
         # Get submitter info
         submitter = mongo_db.users.find_one({"_id": submission['user_id']})
         if not submitter:
-            flash('Submitter not found', 'danger')
-            return redirect(url_for('admin_verifications'))
+            print("Submitter not found")
+            return False
         
-        # Check if level already exists
-        existing_level = mongo_db.levels.find_one({
-            "$or": [
-                {"name": submission['level_name']},
-                {"level_id": submission.get('level_id')} if submission.get('level_id') else {}
-            ]
-        })
+        # Calculate placement position
+        placement = int(submission.get('placement', 1))
         
-        if existing_level:
-            flash(f'Level "{submission["level_name"]}" already exists on the list', 'warning')
-            return redirect(url_for('admin_verifications'))
+        # Validate placement
+        if placement < 1:
+            placement = 1
         
-        # Get levels that will be above and below the new level
-        above_level, below_level = get_level_neighbors(placement, False)
+        # Shift existing levels down to make room
+        shift_level_positions(placement, is_legacy=False, direction=1)
         
-        # Special handling for #1 placement
+        # Check for dethroning at #1
         dethroned_level = None
-        if placement == 1:
-            current_first = mongo_db.levels.find_one({
-                "position": 1,
-                "is_legacy": {"$ne": True}
-            })
-            if current_first:
-                dethroned_level = current_first["name"]
-        
-        # Check if this placement will push something to legacy
         pushed_to_legacy = None
-        main_list_count = mongo_db.levels.count_documents({"is_legacy": {"$ne": True}})
-        if main_list_count >= 150:
-            level_at_150 = mongo_db.levels.find_one({
-                "position": 150,
-                "is_legacy": {"$ne": True}
-            })
-            if level_at_150:
-                pushed_to_legacy = level_at_150["name"]
         
-        # Create new level
+        if placement == 1:
+            # Get current #1 level
+            current_top_level = mongo_db.levels.find_one(
+                {"position": 1, "is_legacy": False}
+            )
+            if current_top_level:
+                dethroned_level = current_top_level['name']
+                
+                # Handle automatic legacy management
+                try:
+                    settings = mongo_db.site_settings.find_one({"_id": "main"})
+                    if settings and settings.get('auto_legacy_enabled', False):
+                        # Move current #1 to legacy list
+                        mongo_db.levels.update_one(
+                            {"_id": current_top_level['_id']},
+                            {"$set": {"is_legacy": True, "position": 1}}
+                        )
+                        # Shift legacy positions
+                        mongo_db.levels.update_many(
+                            {"is_legacy": True, "position": {"$gte": 1}},
+                            {"$inc": {"position": 1}}
+                        )
+                        pushed_to_legacy = current_top_level['name']
+                except Exception as e:
+                    print(f"Auto-legacy management error: {e}")
+        
+        # Convert text difficulty to numeric value
+        numeric_difficulty = text_difficulty_to_numeric(submission['difficulty'])
+        
+        # Create new level document
         new_level_id = ObjectId()
-        points = calculate_level_points(placement, False)
-        
         new_level = {
             "_id": new_level_id,
             "name": submission['level_name'],
             "creator": submission['creator'],
             "verifier": submission['verifier'],
             "position": placement,
-            "difficulty": submission['difficulty'],
-            "demon_type": None,
-            "points": points,
+            "difficulty": numeric_difficulty,
             "video_url": submission.get('verification_url', ''),
-            "level_id": int(submission['level_id']) if submission.get('level_id') and str(submission['level_id']).strip() else None,
-            "min_percentage": 100,  # Default to 100% for verification submissions
+            "level_id": submission.get('level_id', ''),
             "is_legacy": False,
-            "date_added": datetime.now(timezone.utc)
+            "date_added": datetime.now(timezone.utc),
+            "points": 0  # Will be calculated after insertion
         }
-        
-        # Shift existing levels down
-        mongo_db.levels.update_many(
-            {"position": {"$gte": placement}, "is_legacy": {"$ne": True}},
-            {"$inc": {"position": 1}}
-        )
         
         # Insert the new level
         mongo_db.levels.insert_one(new_level)
         
-        # Use real-time points system to recalculate points
+        # Calculate points for the new level
+        new_level['points'] = calculate_level_points(placement, False)
+        mongo_db.levels.update_one(
+            {"_id": new_level_id},
+            {"$set": {"points": new_level['points']}}
+        )
+        
+        # Get surrounding levels for changelog
+        above_level = None
+        below_level = None
+        
+        if placement > 1:
+            above_level_doc = mongo_db.levels.find_one(
+                {"position": placement - 1, "is_legacy": False}
+            )
+            if above_level_doc:
+                above_level = above_level_doc['name']
+        
+        below_level_doc = mongo_db.levels.find_one(
+            {"position": placement + 1, "is_legacy": False}
+        )
+        if below_level_doc:
+            below_level = below_level_doc['name']
+        
+        # Trigger real-time points recalculation if available
         if REAL_TIME_POINTS_AVAILABLE:
             try:
                 from real_time_points_system import RealTimePointsManager
@@ -7416,6 +7687,39 @@ def admin_accept_verification(submission_id):
         
         # Insert the verifier record
         mongo_db.records.insert_one(verifier_record)
+        
+        # Check if the user has a Discord account connected and assign appropriate roles
+        submitter = mongo_db.users.find_one({"_id": submission['user_id']})
+        if submitter and submitter.get('discord_id'):
+            # Assign List Verifier role
+            try:
+                if is_bot_available():
+                    if assign_verifier_role(submitter['discord_id']):
+                        print(f"✅ Assigned List Verifier role to user {submitter['username']}")
+                    else:
+                        print(f"❌ Failed to assign List Verifier role to user {submitter['username']}")
+                else:
+                    print("⚠️ Discord bot not available - skipping List Verifier role assignment")
+            except Exception as e:
+                print(f"Error assigning List Verifier role: {e}")
+            
+            # Check if this is a future list level and assign Future List Verifier role if applicable
+            try:
+                # Get all future levels to check if this level name matches
+                future_levels = list(mongo_db.future_levels.find({}, {"name": 1}))
+                future_level_names = [level['name'].lower() for level in future_levels]
+                
+                if submission['level_name'].lower() in future_level_names:
+                    # Assign Future List Verifier role
+                    if is_bot_available():
+                        if assign_future_list_verifier_role(submitter['discord_id']):
+                            print(f"✅ Assigned Future List Verifier role to user {submitter['username']}")
+                        else:
+                            print(f"❌ Failed to assign Future List Verifier role to user {submitter['username']}")
+                    else:
+                        print("⚠️ Discord bot not available - skipping Future List Verifier role assignment")
+            except Exception as e:
+                print(f"Error checking future list or assigning Future List Verifier role: {e}")
         
         # Update user points to include the new record
         update_user_points(submission['user_id'])
@@ -7498,14 +7802,77 @@ def admin_accept_verification(submission_id):
         points_earned = calculate_record_points(verifier_record, new_level)
         
         flash(f'✅ Verification accepted! "{submission["level_name"]}" has been placed at position #{placement}. {submitter["username"]} automatically received the record and {points_earned} points.', 'success')
+        return True
         
     except Exception as e:
         flash(f'Error accepting verification: {str(e)}', 'danger')
         print(f"Admin accept verification error: {e}")
         import traceback
         traceback.print_exc()
-    
-    return redirect(url_for('admin_verifications'))
+        return False
+
+def update_top_1_player_role():
+    """Assign the Top 1 Player role to the current #1 player on the list"""
+    try:
+        # Get the current #1 player
+        top_player = mongo_db.users.find_one(
+            {"points": {"$gt": 0}}, 
+            sort=[("points", -1)]
+        )
+        
+        if not top_player:
+            print("No players found with points")
+            return False
+            
+        # Remove the role from any previous holder
+        previous_top_player = mongo_db.users.find_one(
+            {"has_top_1_role": True}
+        )
+        
+        if previous_top_player and previous_top_player['_id'] != top_player['_id']:
+            # Remove role from previous holder
+            if previous_top_player.get('discord_id'):
+                try:
+                    if is_bot_available():
+                        if remove_top_1_player_role(previous_top_player['discord_id']):
+                            print(f"✅ Removed Top 1 Player role from {previous_top_player['username']}")
+                        else:
+                            print(f"❌ Failed to remove Top 1 Player role from {previous_top_player['username']}")
+                    else:
+                        print("⚠️ Discord bot not available - skipping Top 1 Player role removal")
+                except Exception as e:
+                    print(f"Error removing Top 1 Player role: {e}")
+            
+            # Update database
+            mongo_db.users.update_one(
+                {"_id": previous_top_player['_id']},
+                {"$unset": {"has_top_1_role": ""}}
+            )
+        
+        # Assign role to current top player
+        if top_player.get('discord_id'):
+            try:
+                if is_bot_available():
+                    if assign_top_1_player_role(top_player['discord_id']):
+                        print(f"✅ Assigned Top 1 Player role to {top_player['username']}")
+                    else:
+                        print(f"❌ Failed to assign Top 1 Player role to {top_player['username']}")
+                else:
+                    print("⚠️ Discord bot not available - skipping Top 1 Player role assignment")
+            except Exception as e:
+                print(f"Error assigning Top 1 Player role: {e}")
+            
+            # Update database
+            mongo_db.users.update_one(
+                {"_id": top_player['_id']},
+                {"$set": {"has_top_1_role": True}}
+            )
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error in update_top_1_player_role: {e}")
+        return False
 
 @app.route('/admin/verification/deny/<submission_id>', methods=['POST'])
 def admin_deny_verification(submission_id):
@@ -9333,7 +9700,7 @@ def admin_move_to_legacy():
         {"is_legacy": True}, 
         sort=[("position", -1)]
     )
-    new_position = 101 if not highest_legacy else highest_legacy['position'] + 1
+    new_position = 151 if not highest_legacy else highest_legacy['position'] + 1
     
     # Move level to legacy
     mongo_db.levels.update_one(
@@ -9341,11 +9708,22 @@ def admin_move_to_legacy():
         {"$set": {"is_legacy": True, "position": new_position}}
     )
     
-    # Shift positions in the main list
+    # Fix: Properly shift positions in the main list to fill the gap
     mongo_db.levels.update_many(
-        {"position": {"$gt": old_position}, "is_legacy": False},
+        {"position": {"$gt": old_position}, "is_legacy": {"$ne": True}},
         {"$inc": {"position": -1}}
     )
+    
+    # Also update any levels that might have is_legacy field missing (treat as False)
+    mongo_db.levels.update_many(
+        {"position": {"$gt": old_position}, "is_legacy": {"$exists": False}},
+        {"$inc": {"position": -1}}
+    )
+    
+    # Clear the cache to ensure fresh data
+    global levels_cache
+    levels_cache['main_list'] = None
+    levels_cache['legacy_list'] = None
     
     # Recalculate points for all levels after position changes
     recalculate_all_points()
@@ -9381,17 +9759,28 @@ def admin_move_to_main():
     
     old_position = level['position']
     
-    # Shift positions in the legacy list
+    # Fix: Properly shift positions in the legacy list to fill the gap
     mongo_db.levels.update_many(
         {"position": {"$gt": old_position}, "is_legacy": True},
         {"$inc": {"position": -1}}
     )
     
-    # Shift positions in the main list
+    # Shift positions in the main list to make room
     mongo_db.levels.update_many(
-        {"position": {"$gte": position}, "is_legacy": False},
+        {"position": {"$gte": position}, "is_legacy": {"$ne": True}},
         {"$inc": {"position": 1}}
     )
+    
+    # Also update any levels that might have is_legacy field missing (treat as False)
+    mongo_db.levels.update_many(
+        {"position": {"$gte": position}, "is_legacy": {"$exists": False}},
+        {"$inc": {"position": 1}}
+    )
+    
+    # Clear the cache to ensure fresh data
+    global levels_cache
+    levels_cache['main_list'] = None
+    levels_cache['legacy_list'] = None
     
     # Move level to main list
     mongo_db.levels.update_one(
@@ -9413,8 +9802,6 @@ def admin_approve_record(record_id):
         return redirect(url_for('index'))
     
     try:
-        print(f"DEBUG: Attempting to approve record {record_id}")
-        
         # Convert string record_id to ObjectId
         try:
             record_object_id = ObjectId(record_id)
@@ -9556,6 +9943,56 @@ def admin_approve_record(record_id):
     return redirect(url_for('admin'))
 
 
+@app.route('/admin/fix_verifier_points', methods=['POST'])
+def admin_fix_verifier_points():
+    """Admin route to fix the verifier points bug"""
+    
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('admin_panel'))
+    
+    try:
+        # Run the fix function
+        updated_users = fix_verifier_points_bug()
+        flash(f'✅ Verifier points bug fix completed. Updated {updated_users} users.', 'success')
+    except Exception as e:
+        flash(f'❌ Error fixing verifier points: {str(e)}', 'danger')
+        print(f"Admin fix verifier points error: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    return redirect(url_for('admin_panel'))
+import traceback
+
+from bson import ObjectId
+from bson.errors import InvalidId
+
+from flask import flash, redirect, url_for, session
+
+
+
+@app.route('/admin/update_top_1_role', methods=['POST'])
+def admin_update_top_1_role():
+    """Admin route to manually update the top 1 player role"""
+    
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('admin_panel'))
+    
+    try:
+        # Run the update function
+        if update_top_1_player_role():
+            flash('✅ Top 1 player role updated successfully.', 'success')
+        else:
+            flash('❌ Failed to update Top 1 player role.', 'danger')
+    except Exception as e:
+        flash(f'❌ Error updating Top 1 player role: {str(e)}', 'danger')
+        print(f"Admin update top 1 role error: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    return redirect(url_for('admin_panel'))
+
 
 @app.route('/admin/reject_record/<record_id>', methods=['POST'])
 def admin_reject_record(record_id):
@@ -9573,6 +10010,90 @@ def admin_reject_record(record_id):
             return redirect(url_for('admin'))
         
         # Get record info before rejecting
+        record = mongo_db.records.find_one({"_id": record_object_id})
+        if not record:
+            flash('Record not found', 'danger')
+            return redirect(url_for('admin'))
+        
+        # Call the separate function to handle the actual rejection
+        success = reject_record(record_id)
+        
+        if success:
+            flash(f'✅ Record rejected for "{record["level_name"]}".', 'success')
+        else:
+            flash(f'❌ Error rejecting record for "{record["level_name"]}".', 'danger')
+            
+    except Exception as e:
+        flash(f'Error rejecting record: {str(e)}', 'danger')
+        print(f"Admin reject record error: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    return redirect(url_for('admin'))
+
+
+@app.route('/admin/accept_verification_legacy/<submission_id>', methods=['POST'])
+def admin_accept_verification_legacy(submission_id):
+    """Admin route to accept a verification submission"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Convert string submission_id to ObjectId
+        try:
+            submission_object_id = ObjectId(submission_id)
+        except InvalidId:
+            flash('Invalid submission ID', 'danger')
+            return redirect(url_for('admin'))
+        
+        # Get submission info before accepting
+        submission = mongo_db.verification_submissions.find_one({"_id": submission_object_id})
+        if not submission:
+            flash('Submission not found', 'danger')
+            return redirect(url_for('admin'))
+        
+        admin_username = session.get('username')
+        
+        # Check for dethroning at #1
+        dethroned_level = None
+        current_first = mongo_db.levels.find_one({"position": 1, "is_legacy": False})
+        if current_first:
+            dethroned_level = current_first["name"]
+        
+        # Call the separate function to handle the actual acceptance
+        success = accept_verification_submission(submission_id, admin_username)
+        
+        if success:
+            # Get placement info from submission for the success message
+            placement = submission.get('placement', 1)
+            flash(f'✅ Verification accepted! "{submission["level_name"]}" has been placed at position #{placement}.', 'success')
+        else:
+            flash(f'❌ Error accepting verification for "{submission["level_name"]}".', 'danger')
+            
+    except Exception as e:
+        flash(f'Error accepting verification: {str(e)}', 'danger')
+        print(f"Admin accept verification error: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    return redirect(url_for('admin_verifications'))
+
+@app.route('/admin/record_legacy/<string:record_id>/reject', methods=['POST'])
+def admin_reject_record_legacy(record_id):
+    """Reject a specific record"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        # Validate record ID
+        try:
+            record_object_id = ObjectId(record_id)
+        except Exception:
+            flash('Invalid record ID', 'danger')
+            return redirect(url_for('admin'))
+        
         record = mongo_db.records.find_one({"_id": record_object_id})
         if not record:
             flash('Record not found', 'danger')
@@ -12793,5 +13314,30 @@ def migrate_notification_preferences():
         return redirect(url_for('admin'))
 
 if __name__ == '__main__':
+    # Start background thread for periodic tasks
+    import threading
+    import time
+    
+    def periodic_tasks():
+        """Run periodic maintenance tasks"""
+        while True:
+            try:
+                # Update top 1 player role every hour
+                print("Running periodic tasks...")
+                update_top_1_player_role()
+                # Fix verifier points bug every hour
+                fix_verifier_points_bug()
+                print("Periodic tasks completed.")
+            except Exception as e:
+                print(f"Error in periodic tasks: {e}")
+            
+            # Wait for 1 hour before next run
+            time.sleep(3600)
+    
+    # Start periodic tasks in background thread
+    periodic_thread = threading.Thread(target=periodic_tasks, daemon=True)
+    periodic_thread.start()
+    print("✅ Periodic tasks thread started")
+    
     port = int(os.environ.get('PORT', 10000))
     app.run(debug=True, host='0.0.0.0', port=port)

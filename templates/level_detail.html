@@ -64,6 +64,8 @@
                             <iframe src="{{ video_info.embed_url }}" title="{{ name }}" allowfullscreen></iframe>
                         {% elif video_info.platform == 'tiktok' %}
                             <iframe src="{{ video_info.embed_url }}" title="{{ name }}" allowfullscreen></iframe>
+                        {% elif video_info.platform == 'twitch' %}
+                            <iframe src="{{ video_info.embed_url }}" title="{{ name }}" allowfullscreen></iframe>
                         {% endif %}
                     {% else %}
                         <div class="d-flex justify-content-center align-items-center bg-light">
@@ -150,6 +152,10 @@
                                                     <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-dark" title="TikTok">
                                                         <i class="fab fa-tiktok"></i>
                                                     </a>
+                                                {% elif video_info.platform == 'twitch' %}
+                                                    <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-purple" title="Twitch">
+                                                        <i class="fab fa-twitch"></i>
+                                                    </a>
                                                 {% endif %}
                                             {% else %}
                                                 <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-secondary" title="Video">
@@ -220,6 +226,10 @@
                                                     {% elif video_info.platform == 'tiktok' %}
                                                         <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-dark" title="TikTok">
                                                             <i class="fab fa-tiktok"></i>
+                                                        </a>
+                                                    {% elif video_info.platform == 'twitch' %}
+                                                        <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-purple" title="Twitch">
+                                                            <i class="fab fa-twitch"></i>
                                                         </a>
                                                     {% endif %}
                                                 {% else %}

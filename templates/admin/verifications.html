@@ -88,7 +88,7 @@
                                             <div class="d-flex align-items-center">
                                                 <span class="badge bg-secondary me-2">{{ submission.experience }}/10</span>
                                                 <div class="progress flex-grow-1" style="height: 6px;">
-                                                    <div class="progress-bar bg-info" style="width: {{ (submission.experience / 10) * 100 }}%"></div>
+                                                    <div class="progress-bar bg-info" data-width="{{ (submission.experience / 10) * 100 }}"></div>
                                                 </div>
                                             </div>
                                         </div>
@@ -97,7 +97,7 @@
                                             <div class="d-flex align-items-center">
                                                 <span class="badge bg-secondary me-2">{{ submission.enjoyment }}/10</span>
                                                 <div class="progress flex-grow-1" style="height: 6px;">
-                                                    <div class="progress-bar bg-success" style="width: {{ (submission.enjoyment / 10) * 100 }}%"></div>
+                                                    <div class="progress-bar bg-success" data-width="{{ (submission.enjoyment / 10) * 100 }}"></div>
                                                 </div>
                                             </div>
                                         </div>
@@ -122,7 +122,7 @@
                                     <div class="admin-actions mt-2">
                                         <div class="row g-2">
                                             <div class="col-12">
-                                                <form method="POST" action="{{ url_for('admin_accept_verification', submission_id=submission._id) }}" class="accept-form">
+                                                <form method="POST" action="{{ url_for('admin_accept_verification_legacy', submission_id=submission._id) }}" class="accept-form">
                                                     <div class="input-group input-group-sm mb-2">
                                                         <span class="input-group-text bg-success text-white">
                                                             <i class="fas fa-trophy"></i>
@@ -280,5 +280,18 @@
     box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.25);
 }
 </style>
+
+<script>
+// Set progress bar widths based on data attributes
+document.addEventListener('DOMContentLoaded', function() {
+    const progressBars = document.querySelectorAll('.progress-bar[data-width]');
+    progressBars.forEach(function(bar) {
+        const width = parseFloat(bar.getAttribute('data-width'));
+        if (!isNaN(width)) {
+            bar.style.width = width + '%';
+        }
+    });
+});
+</script>
 
 {% endblock %}
