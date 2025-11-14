@@ -1537,8 +1537,9 @@ body, .card, .navbar, .btn, .form-control, .form-select, .dropdown-menu, .alert,
         margin: 20% auto;
         width: 95%;
     }
-}/
-* Copy functionality styles */
+}
+
+/* Copy functionality styles */
 .social-copy {
     display: flex;
     align-items: center;
@@ -1563,4 +1564,17 @@ body, .card, .navbar, .btn, .form-control, .form-select, .dropdown-menu, .alert,
     background-color: var(--success-color) !important;
     color: white !important;
     transition: all 0.3s ease;
+}
+
+/* Twitch button color */
+.btn-purple {
+    background-color: #9146ff !important;
+    border-color: #9146ff !important;
+    color: white !important;
+}
+
+.btn-purple:hover {
+    background-color: #773dcf !important;
+    border-color: #773dcf !important;
+    color: white !important;
 }

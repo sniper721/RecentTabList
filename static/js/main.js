@@ -191,9 +191,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 if (!videoUrl.includes('youtube.com') && !videoUrl.includes('youtu.be') && 
                     !videoUrl.includes('streamable.com') && !videoUrl.includes('vimeo.com') && 
-                    !videoUrl.includes('tiktok.com')) {
+                    !videoUrl.includes('tiktok.com') && !videoUrl.includes('twitch.tv')) {
                     e.preventDefault();
-                    alert('Please provide a valid video URL (YouTube, Streamable, Vimeo, or TikTok)');
+                    alert('Please provide a valid video URL (YouTube, Streamable, Vimeo, TikTok, or Twitch)');
                     return;
                 }
             }
