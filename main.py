@@ -729,21 +729,7 @@ def get_difficulty_text(difficulty):
     else:
         return "Unknown"
 
-def text_difficulty_to_range(text_difficulty):
-    """Convert text-based difficulty to numerical range for filtering"""
-    if not text_difficulty:
-        return None
-    
-    ranges = {
-        'easy': (1, 1.99),
-        'normal': (2, 3.99), 
-        'hard': (4, 5.99),
-        'harder': (6, 7.99),
-        'insane': (8, 9.99),
-        'demon': (10, 10)
-    }
-    
-    return ranges.get(text_difficulty.lower())
+
 
 def recalculate_user_points_after_level_move(level_id, old_points, new_points):
     """Recalculate user points when a level's points change due to position movement - DEPRECATED"""
@@ -1191,43 +1177,48 @@ def check_and_notify_points_milestones(user, old_points, new_points):
         "1387982763549790229": "First Victor"
     }
     
-    # If user reached new milestones, send notifications and assign roles
+    # If user reached new milestones, send notifications and assign highest role only
     if newly_reached:
-        # For each newly reached milestone, send notification and assign all roles up to that milestone
-        for milestone_points in newly_reached:
-            # Find the role ID for this milestone
-            milestone_role_id = next((role_id for points, role_id in milestones if points == milestone_points), None)
-            if not milestone_role_id:
-                continue
-                
+        # Find the highest milestone reached
+        highest_milestone = max(newly_reached)
+        milestone_role_id = next((role_id for points, role_id in milestones if points == highest_milestone), None)
+        
+        if milestone_role_id:
             role_name = role_names.get(milestone_role_id, "New Role")
             
             # Send DM notification for the highest milestone reached
-            message = f"🎉 Congratulations! You've reached {milestone_points} points on the RTL list and have been awarded the '{role_name}' role and all previous roles!"
+            message = f"🎉 Congratulations! You've reached {highest_milestone} points on the RTL list and have been awarded the '{role_name}' role!"
             try:
                 if is_bot_available():
                     send_dm_to_user(user['discord_id'], message)
-                    print(f"✅ Sent milestone notification to user {user['username']} for {milestone_points} points")
+                    print(f"✅ Sent milestone notification to user {user['username']} for {highest_milestone} points")
                 else:
                     print("⚠️ Discord bot not available - skipping milestone notification")
             except Exception as e:
                 print(f"Error sending milestone notification: {e}")
             
-            # Assign all roles up to this milestone
-            roles_to_assign = [(points, role_id) for points, role_id in milestones if points <= milestone_points]
+            # Remove all lower milestone roles first
+            for points, role_id in milestones:
+                if points < highest_milestone:
+                    lower_role_name = role_names.get(role_id, f"{points}+ Points")
+                    try:
+                        if is_bot_available():
+                            if remove_discord_role(user['discord_id'], role_id):
+                                print(f"✅ Removed lower role {lower_role_name} from user {user['username']}")
+                    except Exception as e:
+                        print(f"Error removing lower role {lower_role_name}: {e}")
             
-            for points, role_id in roles_to_assign:
-                current_role_name = role_names.get(role_id, f"{points}+ Points")
-                try:
-                    if is_bot_available():
-                        if assign_discord_role(user['discord_id'], role_id):
-                            print(f"✅ Assigned role {current_role_name} to user {user['username']} for {points} points")
-                        else:
-                            print(f"❌ Failed to assign role {current_role_name} to user {user['username']}")
+            # Assign only the highest milestone role
+            try:
+                if is_bot_available():
+                    if assign_discord_role(user['discord_id'], milestone_role_id):
+                        print(f"✅ Assigned highest role {role_name} to user {user['username']} for {highest_milestone} points")
                     else:
-                        print("⚠️ Discord bot not available - skipping role assignment")
-                except Exception as e:
-                    print(f"Error assigning role {current_role_name}: {e}")
+                        print(f"❌ Failed to assign role {role_name} to user {user['username']}")
+                else:
+                    print("⚠️ Discord bot not available - skipping role assignment")
+            except Exception as e:
+                print(f"Error assigning role {role_name}: {e}")
     
     # If user lost milestones, remove roles
     if lost_milestones:
@@ -11656,122 +11647,6 @@ def search_levels():
         flash(f'Search error: {e}', 'danger')
         return redirect(url_for('index'))
 
-@app.route('/advanced_search')
-def advanced_search():
-    """Advanced search with filters for difficulty, verifier, uploader, player who beat it"""
-    # Get filter parameters
-    query = request.args.get('q', '').strip()
-    difficulty_min_text = request.args.get('difficulty_min', '').strip()
-    difficulty_max_text = request.args.get('difficulty_max', '').strip()
-    verifier_filter = request.args.get('verifier', '').strip()
-    creator_filter = request.args.get('creator', '').strip()
-    player_filter = request.args.get('player', '').strip()  # Player who beat it
-    position_min = request.args.get('position_min', type=int)
-    position_max = request.args.get('position_max', type=int)
-    points_min = request.args.get('points_min', type=float)
-    show_legacy = request.args.get('show_legacy') == 'on'
-    
-    # Build search filter
-    search_filter = {}
-    
-    # Legacy filter
-    if not show_legacy:
-        search_filter["is_legacy"] = False
-    
-    # Text search in multiple fields
-    if query:
-        search_filter["$or"] = [
-            {"name": {"$regex": query, "$options": "i"}},
-            {"creator": {"$regex": query, "$options": "i"}},
-            {"verifier": {"$regex": query, "$options": "i"}}
-        ]
-    
-    # Difficulty filter using text-based ranges
-    if difficulty_min_text or difficulty_max_text:
-        difficulty_range = {}
-        
-        if difficulty_min_text:
-            min_range = text_difficulty_to_range(difficulty_min_text)
-            if min_range:
-                difficulty_range["$gte"] = min_range[0]
-        
-        if difficulty_max_text:
-            max_range = text_difficulty_to_range(difficulty_max_text)
-            if max_range:
-                difficulty_range["$lte"] = max_range[1]
-        
-        if difficulty_range:
-            search_filter["difficulty"] = difficulty_range
-    
-    # Verifier filter
-    if verifier_filter:
-        search_filter["verifier"] = {"$regex": verifier_filter, "$options": "i"}
-    
-    # Creator filter
-    if creator_filter:
-        search_filter["creator"] = {"$regex": creator_filter, "$options": "i"}
-    
-    # Position filter
-    if position_min is not None or position_max is not None:
-        position_range = {}
-        if position_min is not None:
-            position_range["$gte"] = position_min
-        if position_max is not None:
-            position_range["$lte"] = position_max
-        if position_range:
-            search_filter["position"] = position_range
-    
-    # Points filter
-    if points_min is not None:
-        search_filter["points"] = {"$gte": points_min}
-    
-    try:
-        # Execute search
-        levels = list(mongo_db.levels.find(
-            search_filter,
-            {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, "level_id": 1, "difficulty": 1, "video_url": 1, "is_legacy": 1}
-        ).sort("position", 1))
-        
-        # If searching for a player who beat levels, filter by records
-        if player_filter:
-            # Find user by username
-            user = mongo_db.users.find_one({"username": {"$regex": player_filter, "$options": "i"}})
-            if user:
-                # Get levels this user has completed
-                completed_level_ids = list(mongo_db.records.distinct("level_id", {
-                    "user_id": user["_id"],
-                    "status": "approved",
-                    "progress": {"$gte": 100}  # Full completions only
-                }))
-                
-                # Filter levels to only those completed by this player
-                level_ids_in_search = [level["_id"] for level in levels]
-                filtered_level_ids = [lid for lid in completed_level_ids if lid in level_ids_in_search]
-                
-                # Re-fetch levels with the filtered IDs
-                if filtered_level_ids:
-                    search_filter["_id"] = {"$in": filtered_level_ids}
-                    levels = list(mongo_db.levels.find(
-                        search_filter,
-                        {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, "level_id": 1, "difficulty": 1, "video_url": 1, "is_legacy": 1}
-                    ).sort("position", 1))
-                else:
-                    levels = []
-        
-        # Get unique verifiers and creators for filter suggestions
-        all_verifiers = list(mongo_db.levels.distinct("verifier", {"is_legacy": False}))
-        all_creators = list(mongo_db.levels.distinct("creator", {"is_legacy": False}))
-        
-        return render_template('advanced_search.html', 
-                             levels=levels, 
-                             total_results=len(levels),
-                             search_params=request.args,
-                             all_verifiers=sorted(all_verifiers),
-                             all_creators=sorted(all_creators))
-        
-    except Exception as e:
-        flash(f'Advanced search error: {e}', 'danger')
-        return redirect(url_for('index'))
 
 @app.route('/guidelines')
 def guidelines():
