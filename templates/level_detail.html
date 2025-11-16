@@ -38,7 +38,7 @@
                         {% set points_display = points|float if points else ((100 - position + 1) / 10)|round(2) %}
                         <p><strong>Points:</strong> {{ format_points(points_display) }}</p>
                         
-                        {% set min_percentage = level.get('min_percentage', '') %}
+                        {% set min_percentage = level.get('min_percentage', 100)|int %}
                         <p><strong>Minimum Percentage:</strong> {{ min_percentage }}%</p>
                         
 
@@ -297,7 +297,7 @@
                 {% set points_num = points|float if points else ((100 - position + 1) / 10)|round(2) %}
                 <h3 class="text-center">{{ format_points(points_num) }} Points</h3>
                 
-                {% set min_percentage = level.get('min_percentage', '') %}
+                {% set min_percentage = level.get('min_percentage', 100)|int %}
                 {% if min_percentage < 100 %}
                 <hr>
                 <p>Partial completion (minimum {{ min_percentage }}%) will award proportional points:</p>
