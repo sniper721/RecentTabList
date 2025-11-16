@@ -637,30 +637,27 @@ async def sync_all_user_roles():
                 
                 user_role_ids = [str(role.id) for role in member.roles]
                 
-                # Remove roles for milestones no longer achieved
-                for points_threshold, role_id in sorted_milestones:
-                    if str(role_id) in user_role_ids and current_points < points_threshold:
-                        # User has role but no longer qualifies
-                        role_name = ROLE_NAMES.get(str(role_id), f"{points_threshold}+ Points")
-                        print(f"⬇️ Removing role '{role_name}' from {username} (points: {current_points} < threshold: {points_threshold})")
-                        await remove_role_from_user(discord_id, role_id)
-                
-                # Add roles for milestones achieved (assign highest milestone and all below it)
+                # Find the highest milestone the user qualifies for
                 highest_qualified_milestone = 0
+                highest_qualified_role_id = None
                 for points_threshold, role_id in sorted_milestones:
                     if current_points >= points_threshold:
                         highest_qualified_milestone = points_threshold
+                        highest_qualified_role_id = role_id
                         break
                 
-                # Assign all roles up to the highest qualified milestone
-                if highest_qualified_milestone > 0:
-                    for points_threshold, role_id in sorted_milestones:
-                        if points_threshold <= highest_qualified_milestone:
-                            role_name = ROLE_NAMES.get(str(role_id), f"{points_threshold}+ Points")
-                            if str(role_id) not in user_role_ids:
-                                # User qualifies but doesn't have the role
-                                print(f"⬆️ Assigning role '{role_name}' to {username} (points: {current_points} >= threshold: {points_threshold})")
-                                await assign_role_to_user(discord_id, role_id)
+                # Remove ALL milestone roles first
+                for points_threshold, role_id in sorted_milestones:
+                    if str(role_id) in user_role_ids:
+                        role_name = ROLE_NAMES.get(str(role_id), f"{points_threshold}+ Points")
+                        print(f"⬇️ Removing role '{role_name}' from {username} for role cleanup")
+                        await remove_role_from_user(discord_id, role_id)
+                
+                # Assign only the highest qualified milestone role
+                if highest_qualified_milestone > 0 and highest_qualified_role_id:
+                    role_name = ROLE_NAMES.get(str(highest_qualified_role_id), f"{highest_qualified_milestone}+ Points")
+                    print(f"⬆️ Assigning highest role '{role_name}' to {username} (points: {current_points} >= threshold: {highest_qualified_milestone})")
+                    await assign_role_to_user(discord_id, highest_qualified_role_id)
                 
                 updated_users += 1
                 
