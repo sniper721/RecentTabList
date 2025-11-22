@@ -367,7 +367,8 @@ def check_ip_ban_and_verifier_status():
 def get_cached_levels(is_legacy=False, quick_load=False):
     """Return cached levels only - auto-loading happens in routes"""
     cache_key = 'legacy_list' if is_legacy else 'main_list'
-    return levels_cache.get(cache_key, [])
+    cached_levels = levels_cache.get(cache_key)
+    return cached_levels if cached_levels is not None else []
 
 # Helper functions
 def retry_db_operation(max_retries=3, delay=1):
@@ -1084,6 +1085,15 @@ def update_user_points(user_id):
     # Check if user reached a new milestone and send Discord notifications
     if user and user.get('discord_id'):
         check_and_notify_points_milestones(user, old_points, total_points)
+        
+        # Sync Discord roles for this specific user if their points changed
+        if old_points != total_points:
+            try:
+                from discord_bot import sync_single_user_roles
+                sync_single_user_roles(user['discord_id'], total_points)
+                print(f"✅ Synced Discord roles for user {user.get('username', 'Unknown')} (points: {old_points} → {total_points})")
+            except Exception as e:
+                print(f"⚠️ Error syncing Discord roles for user {user.get('username', 'Unknown')}: {e}")
     
     return total_points
 
@@ -1177,7 +1187,7 @@ def check_and_notify_points_milestones(user, old_points, new_points):
         "1387982763549790229": "First Victor"
     }
     
-    # If user reached new milestones, send notifications and assign highest role only
+    # If user reached new milestones, send notifications (roles are handled by sync_single_user_roles)
     if newly_reached:
         # Find the highest milestone reached
         highest_milestone = max(newly_reached)
@@ -1196,52 +1206,9 @@ def check_and_notify_points_milestones(user, old_points, new_points):
                     print("⚠️ Discord bot not available - skipping milestone notification")
             except Exception as e:
                 print(f"Error sending milestone notification: {e}")
-            
-            # Remove all lower milestone roles first
-            for points, role_id in milestones:
-                if points < highest_milestone:
-                    lower_role_name = role_names.get(role_id, f"{points}+ Points")
-                    try:
-                        if is_bot_available():
-                            if remove_discord_role(user['discord_id'], role_id):
-                                print(f"✅ Removed lower role {lower_role_name} from user {user['username']}")
-                    except Exception as e:
-                        print(f"Error removing lower role {lower_role_name}: {e}")
-            
-            # Assign only the highest milestone role
-            try:
-                if is_bot_available():
-                    if assign_discord_role(user['discord_id'], milestone_role_id):
-                        print(f"✅ Assigned highest role {role_name} to user {user['username']} for {highest_milestone} points")
-                    else:
-                        print(f"❌ Failed to assign role {role_name} to user {user['username']}")
-                else:
-                    print("⚠️ Discord bot not available - skipping role assignment")
-            except Exception as e:
-                print(f"Error assigning role {role_name}: {e}")
     
-    # If user lost milestones, remove roles
-    if lost_milestones:
-        # For each lost milestone, remove the corresponding role
-        for milestone_points in lost_milestones:
-            # Find the role ID for this milestone
-            milestone_role_id = next((role_id for points, role_id in milestones if points == milestone_points), None)
-            if not milestone_role_id:
-                continue
-                
-            role_name = role_names.get(milestone_role_id, f"{milestone_points}+ Points")
-            
-            # Remove the role
-            try:
-                if is_bot_available():
-                    if remove_discord_role(user['discord_id'], milestone_role_id):
-                        print(f"✅ Removed role {role_name} from user {user['username']} for {milestone_points} points")
-                    else:
-                        print(f"❌ Failed to remove role {role_name} from user {user['username']}")
-                else:
-                    print("⚠️ Discord bot not available - skipping role removal")
-            except Exception as e:
-                print(f"Error removing role {role_name}: {e}")
+    # Note: Role assignment/removal is now handled automatically by sync_single_user_roles() 
+    # called from update_user_points(), so we don't need to manually manage roles here
 
 def shift_level_positions(position, is_legacy=False, direction=1):
     """Shift level positions up or down from a given position"""
@@ -1508,6 +1475,41 @@ def auto_manage_legacy_list():
     except Exception as e:
         print(f"Error in auto legacy management: {e}")
         return None
+
+def get_level_neighbors(position, is_legacy=False):
+    """Get the levels that will be above and below a given position"""
+    try:
+        above_level = None
+        below_level = None
+        
+        # Get level above (position - 1)
+        if position > 1:
+            above_query = {"position": position - 1}
+            if is_legacy:
+                above_query["is_legacy"] = True
+            else:
+                above_query["is_legacy"] = {"$ne": True}
+            
+            above_result = mongo_db.levels.find_one(above_query, {"name": 1})
+            if above_result:
+                above_level = above_result["name"]
+        
+        # Get level below (position + 1)
+        below_query = {"position": position + 1}
+        if is_legacy:
+            below_query["is_legacy"] = True
+        else:
+            below_query["is_legacy"] = {"$ne": True}
+        
+        below_result = mongo_db.levels.find_one(below_query, {"name": 1})
+        if below_result:
+            below_level = below_result["name"]
+        
+        return above_level, below_level
+        
+    except Exception as e:
+        print(f"Error getting level neighbors: {e}")
+        return None, None
 
 def get_top10_pushout_info(new_position):
     """Get information about what level gets pushed out of top 10 when a new level enters"""
@@ -3459,7 +3461,7 @@ def admin_add_level():
     """Add a new level with enhanced changelog support"""
     if 'user_id' not in session or not session.get('is_admin'):
         flash('Access denied - Admin only', 'danger')
-        return redirect(url_for('admin_levels_enhanced'))
+        return redirect(url_for('admin_levels'))
     
     try:
         from bson.objectid import ObjectId
@@ -3478,7 +3480,7 @@ def admin_add_level():
         is_name_clean, profanity_reason = check_level_name_profanity(name)
         if not is_name_clean:
             flash(f'Level name not allowed: {profanity_reason}', 'danger')
-            return redirect(url_for('admin_levels_enhanced'))
+            return redirect(url_for('admin_levels'))
         
         # Get admin username
         admin_username = session.get('username', 'Unknown Admin')
@@ -3633,11 +3635,11 @@ def admin_add_level():
         log_admin_action(admin_username, f"ADDED LEVEL: {name}", f"Position {position}, {difficulty}/10 difficulty")
         
         flash(f'Level "{name}" added successfully at position {position}', 'success')
-        return redirect(url_for('admin_levels_enhanced'))
+        return redirect(url_for('admin_levels'))
         
     except Exception as e:
         flash(f'Error adding level: {str(e)}', 'danger')
-        return redirect(url_for('admin_levels_enhanced'))
+        return redirect(url_for('admin_levels'))
 
 @app.route('/api/discord_refresh', methods=['POST'])
 def api_discord_refresh():
@@ -3698,7 +3700,7 @@ def admin_test_environment():
         
     except Exception as e:
         flash(f'Error loading test environment: {str(e)}', 'danger')
-        return redirect(url_for('admin_levels_enhanced'))
+        return redirect(url_for('admin_levels'))
 
 @app.route('/admin/rebuild_image_system')
 def admin_rebuild_image_system():
@@ -7083,13 +7085,13 @@ def admin_remove_level_with_reason():
         
         if not level_id:
             flash('Level ID is required', 'danger')
-            return redirect(url_for('admin_levels_enhanced'))
+            return redirect(url_for('admin_levels'))
         
         # Get level info
         level = mongo_db.levels.find_one({"_id": ObjectId(level_id)})
         if not level:
             flash('Level not found', 'danger')
-            return redirect(url_for('admin_levels_enhanced'))
+            return redirect(url_for('admin_levels'))
         
         # Remove the level (this will call the enhanced admin_delete_level logic)
         request.form = request.form.copy()
@@ -7100,7 +7102,7 @@ def admin_remove_level_with_reason():
         
     except Exception as e:
         flash(f'Error removing level: {str(e)}', 'danger')
-        return redirect(url_for('admin_levels_enhanced'))
+        return redirect(url_for('admin_levels'))
 @app.route('/admin/dashboard')
 def admin_dashboard():
     """New categorized admin dashboard"""

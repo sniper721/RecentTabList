@@ -147,16 +147,23 @@ class RTLBot(commands.Bot):
             else:
                 print(f'❌ Could not find admin channel with ID: {DISCORD_ADMIN_CHANNEL_ID}')
         
-        # Check and update user roles based on their points
+        # Check and update user roles based on their points (only for users who need updates)
         if DISCORD_BOT_AVAILABLE:
-            print("🔄 Starting automatic role synchronization for all users...")
-            try:
-                await sync_all_user_roles()
-                print("✅ Role synchronization completed successfully")
-            except Exception as e:
-                print(f"❌ Error during role synchronization: {e}")
-                import traceback
-                traceback.print_exc()
+            # Check if role sync on startup is enabled (can be disabled via environment variable)
+            startup_sync_enabled = os.environ.get('DISCORD_STARTUP_ROLE_SYNC', 'true').lower() == 'true'
+            
+            if startup_sync_enabled:
+                print("🔄 Starting smart role synchronization (only updating users who need changes)...")
+                try:
+                    await sync_user_roles_smart()
+                    print("✅ Smart role synchronization completed successfully")
+                except Exception as e:
+                    print(f"❌ Error during role synchronization: {e}")
+                    import traceback
+                    traceback.print_exc()
+            else:
+                print("⏭️ Startup role synchronization disabled via DISCORD_STARTUP_ROLE_SYNC=false")
+                print("💡 Use !syncsmartroles command to manually sync roles when needed")
     
     async def on_command_error(self, ctx, error):
         if isinstance(error, commands.CommandNotFound):
@@ -440,6 +447,89 @@ def assign_first_victor_role(discord_id):
     role_id = "1387982763549790229"  # First Victor role ID
     return assign_discord_role(discord_id, role_id)
 
+def sync_single_user_roles(discord_id, current_points):
+    """Synchronize roles for a single user based on their current points"""
+    if not bot or not DISCORD_BOT_AVAILABLE:
+        return False
+    
+    try:
+        loop = bot.loop
+        if loop and not loop.is_closed():
+            future = asyncio.run_coroutine_threadsafe(
+                sync_single_user_roles_async(discord_id, current_points), loop
+            )
+            return future.result(timeout=10)
+    except Exception as e:
+        print(f"Error in sync_single_user_roles: {e}")
+    return False
+
+async def sync_single_user_roles_async(discord_id, current_points):
+    """Async function to synchronize roles for a single user"""
+    try:
+        # Get current user's Discord roles
+        member = await get_user_by_discord_id(discord_id)
+        if not member:
+            print(f"⚠️ Could not find Discord member for ID {discord_id}")
+            return False
+        
+        user_role_ids = [str(role.id) for role in member.roles]
+        
+        # Sort milestones in descending order for proper role assignment
+        sorted_milestones = sorted(POINTS_ROLES.items(), key=lambda x: x[0], reverse=True)
+        
+        # Find the highest milestone the user qualifies for
+        highest_qualified_milestone = 0
+        highest_qualified_role_id = None
+        for points_threshold, role_id in sorted_milestones:
+            if current_points >= points_threshold:
+                highest_qualified_milestone = points_threshold
+                highest_qualified_role_id = role_id
+                break
+        
+        # Check if user already has the correct role
+        needs_update = False
+        current_milestone_roles = []
+        
+        for points_threshold, role_id in sorted_milestones:
+            if str(role_id) in user_role_ids:
+                current_milestone_roles.append((points_threshold, role_id))
+        
+        # Determine if update is needed
+        if not current_milestone_roles and highest_qualified_milestone > 0:
+            needs_update = True
+        elif current_milestone_roles:
+            # Check if user has the correct role and only that role
+            has_correct_role = highest_qualified_role_id and str(highest_qualified_role_id) in user_role_ids
+            has_only_one_role = len(current_milestone_roles) == 1
+            
+            if not (has_correct_role and has_only_one_role):
+                needs_update = True
+        elif current_milestone_roles and highest_qualified_milestone == 0:
+            needs_update = True
+        
+        if needs_update:
+            print(f"🔄 Updating roles for Discord user {discord_id} (Points: {current_points})")
+            
+            # Remove ALL milestone roles first
+            for points_threshold, role_id in sorted_milestones:
+                if str(role_id) in user_role_ids:
+                    await remove_role_from_user(discord_id, role_id)
+            
+            # Assign only the highest qualified milestone role
+            if highest_qualified_milestone > 0 and highest_qualified_role_id:
+                role_name = ROLE_NAMES.get(str(highest_qualified_role_id), f"{highest_qualified_milestone}+ Points")
+                print(f"⬆️ Assigning role '{role_name}' to Discord user {discord_id}")
+                await assign_role_to_user(discord_id, highest_qualified_role_id)
+            
+            return True
+        else:
+            print(f"✅ Discord user {discord_id} already has correct roles (Points: {current_points})")
+            return True
+            
+    except Exception as e:
+        print(f"❌ Error syncing roles for Discord user {discord_id}: {e}")
+        return False
+
 async def send_verification_embed(username, level_name, creator, verifier, difficulty, placement, experience, enjoyment, video_url, comments, level_id=None):
     """Send verification submission as Discord embed"""
     if not admin_channel:
@@ -586,6 +676,36 @@ if bot is not None:
         
         await ctx.send(embed=embed)
 
+    @bot.command(name='syncallroles')
+    @commands.has_permissions(administrator=True)
+    async def sync_all_roles_command(ctx):
+        """Admin command to manually trigger a full role synchronization"""
+        await ctx.send("🔄 Starting full role synchronization for all users... This may take a while.")
+        
+        try:
+            success = await sync_all_user_roles()
+            if success:
+                await ctx.send("✅ Full role synchronization completed successfully!")
+            else:
+                await ctx.send("❌ Role synchronization failed. Check bot logs for details.")
+        except Exception as e:
+            await ctx.send(f"❌ Error during role synchronization: {str(e)}")
+
+    @bot.command(name='syncsmartroles')
+    @commands.has_permissions(administrator=True)
+    async def sync_smart_roles_command(ctx):
+        """Admin command to trigger smart role synchronization (only users who need updates)"""
+        await ctx.send("🔄 Starting smart role synchronization (only updating users who need changes)...")
+        
+        try:
+            success = await sync_user_roles_smart()
+            if success:
+                await ctx.send("✅ Smart role synchronization completed successfully!")
+            else:
+                await ctx.send("❌ Role synchronization failed. Check bot logs for details.")
+        except Exception as e:
+            await ctx.send(f"❌ Error during role synchronization: {str(e)}")
+
 if __name__ == "__main__":
     # For testing the bot standalone
     if DISCORD_BOT_TOKEN:
@@ -593,8 +713,8 @@ if __name__ == "__main__":
     else:
         print("❌ No Discord bot token provided")
 
-async def sync_all_user_roles():
-    """Synchronize all users' Discord roles based on their current points"""
+async def sync_user_roles_smart():
+    """Smart role synchronization - only update users who actually need role changes"""
     global bot, guild
     
     if not bot or not guild:
@@ -618,6 +738,159 @@ async def sync_all_user_roles():
         # Sort milestones in descending order for proper role assignment
         sorted_milestones = sorted(POINTS_ROLES.items(), key=lambda x: x[0], reverse=True)
         
+        users_needing_updates = 0
+        users_already_correct = 0
+        error_users = 0
+        
+        for user in users_with_discord:
+            try:
+                discord_id = user.get('discord_id')
+                username = user.get('username', 'Unknown')
+                current_points = user.get('points', 0)
+                
+                # Get current user's Discord roles
+                member = await get_user_by_discord_id(discord_id)
+                if not member:
+                    print(f"⚠️ Could not find Discord member for user {username}")
+                    continue
+                
+                user_role_ids = [str(role.id) for role in member.roles]
+                
+                # Find the highest milestone the user qualifies for
+                highest_qualified_milestone = 0
+                highest_qualified_role_id = None
+                for points_threshold, role_id in sorted_milestones:
+                    if current_points >= points_threshold:
+                        highest_qualified_milestone = points_threshold
+                        highest_qualified_role_id = role_id
+                        break
+                
+                # Check what milestone roles the user currently has
+                current_milestone_roles = []
+                for points_threshold, role_id in sorted_milestones:
+                    if str(role_id) in user_role_ids:
+                        current_milestone_roles.append((points_threshold, role_id))
+                
+                # Determine if user needs role updates
+                needs_update = False
+                
+                # Case 1: User has no milestone roles but should have one
+                if not current_milestone_roles and highest_qualified_milestone > 0:
+                    needs_update = True
+                    print(f"📝 {username} needs role: No roles but qualifies for {highest_qualified_milestone}+ points")
+                
+                # Case 2: User has milestone roles but not the correct one
+                elif current_milestone_roles:
+                    # Check if user has the correct highest role
+                    has_correct_role = False
+                    if highest_qualified_role_id:
+                        has_correct_role = str(highest_qualified_role_id) in user_role_ids
+                    
+                    # Check if user has multiple milestone roles (should only have one)
+                    has_multiple_roles = len(current_milestone_roles) > 1
+                    
+                    # Check if user has wrong role (lower than they qualify for)
+                    has_wrong_role = False
+                    if not has_correct_role and highest_qualified_milestone > 0:
+                        has_wrong_role = True
+                    
+                    # Check if user has role they don't qualify for (higher than their points)
+                    has_unqualified_role = False
+                    for points_threshold, role_id in current_milestone_roles:
+                        if current_points < points_threshold:
+                            has_unqualified_role = True
+                            break
+                    
+                    if has_multiple_roles or has_wrong_role or has_unqualified_role:
+                        needs_update = True
+                        reasons = []
+                        if has_multiple_roles:
+                            reasons.append(f"has {len(current_milestone_roles)} roles (should have 1)")
+                        if has_wrong_role:
+                            reasons.append(f"missing {highest_qualified_milestone}+ role")
+                        if has_unqualified_role:
+                            reasons.append("has unqualified roles")
+                        print(f"📝 {username} needs role update: {', '.join(reasons)}")
+                
+                # Case 3: User has milestone roles but qualifies for none (0 points)
+                elif current_milestone_roles and highest_qualified_milestone == 0:
+                    needs_update = True
+                    print(f"📝 {username} needs role removal: Has roles but 0 points")
+                
+                # Only update if needed
+                if needs_update:
+                    print(f"🔄 Updating roles for {username} (Points: {current_points})")
+                    
+                    # Remove ALL milestone roles first
+                    for points_threshold, role_id in sorted_milestones:
+                        if str(role_id) in user_role_ids:
+                            role_name = ROLE_NAMES.get(str(role_id), f"{points_threshold}+ Points")
+                            await remove_role_from_user(discord_id, role_id)
+                    
+                    # Assign only the highest qualified milestone role
+                    if highest_qualified_milestone > 0 and highest_qualified_role_id:
+                        role_name = ROLE_NAMES.get(str(highest_qualified_role_id), f"{highest_qualified_milestone}+ Points")
+                        print(f"⬆️ Assigning role '{role_name}' to {username}")
+                        await assign_role_to_user(discord_id, highest_qualified_role_id)
+                    
+                    users_needing_updates += 1
+                else:
+                    users_already_correct += 1
+                
+            except Exception as e:
+                print(f"❌ Error processing user {user.get('username', 'Unknown')}: {e}")
+                error_users += 1
+                continue
+        
+        print(f"✅ Smart role sync complete: {users_needing_updates} users updated, {users_already_correct} already correct, {error_users} errors")
+        
+        # Update the last sync timestamp
+        try:
+            from discord_bot import mongo_db
+            if mongo_db:
+                # Store the last sync time in site_settings
+                mongo_db.site_settings.update_one(
+                    {"_id": "discord_bot"},
+                    {"$set": {"last_role_sync": datetime.now(timezone.utc)}},
+                    upsert=True
+                )
+                print("✅ Updated last role sync timestamp")
+        except Exception as e:
+            print(f"⚠️ Could not update last sync timestamp: {e}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error in sync_user_roles_smart: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+async def sync_all_user_roles():
+    """Synchronize all users' Discord roles based on their current points (FULL SYNC - use sparingly)"""
+    global bot, guild
+    
+    if not bot or not guild:
+        print("❌ Cannot sync roles: Bot or guild not available")
+        return False
+    
+    try:
+        # Import MongoDB reference - this will be set from main.py
+        from discord_bot import mongo_db
+        if mongo_db is None:
+            print("❌ Cannot sync roles: MongoDB not available")
+            return False
+            
+        # Get all users with Discord connections
+        users_with_discord = list(mongo_db.users.find({"discord_id": {"$exists": True, "$ne": None}}))
+        print(f"🔍 FULL SYNC: Found {len(users_with_discord)} users with Discord connections")
+        
+        # Import role mappings and functions
+        from discord_bot import POINTS_ROLES, ROLE_NAMES, remove_role_from_user, assign_role_to_user
+        
+        # Sort milestones in descending order for proper role assignment
+        sorted_milestones = sorted(POINTS_ROLES.items(), key=lambda x: x[0], reverse=True)
+        
         updated_users = 0
         error_users = 0
         
@@ -627,7 +900,7 @@ async def sync_all_user_roles():
                 username = user.get('username', 'Unknown')
                 current_points = user.get('points', 0)
                 
-                print(f"🔄 Checking roles for user: {username} (ID: {discord_id}, Points: {current_points})")
+                print(f"🔄 FULL SYNC: Checking roles for user: {username} (ID: {discord_id}, Points: {current_points})")
                 
                 # Get current user's Discord roles
                 member = await get_user_by_discord_id(discord_id)
@@ -666,7 +939,7 @@ async def sync_all_user_roles():
                 error_users += 1
                 continue
         
-        print(f"✅ Role synchronization complete: {updated_users} users processed, {error_users} errors")
+        print(f"✅ FULL role synchronization complete: {updated_users} users processed, {error_users} errors")
         
         # Update the last sync timestamp
         try:
