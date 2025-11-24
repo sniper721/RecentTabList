@@ -346,12 +346,6 @@
                                 <div class="card">
                                     <div class="card-body">
                                         <div class="form-check mb-2">
-                                            <input class="form-check-input" type="radio" name="thumbnail_type" id="edit_thumb_keep" value="keep">
-                                            <label class="form-check-label" for="edit_thumb_keep">
-                                                <strong>Keep Current Image</strong> - Don't change existing image
-                                            </label>
-                                        </div>
-                                        <div class="form-check mb-2">
                                             <input class="form-check-input" type="radio" name="thumbnail_type" id="edit_thumb_auto" value="auto">
                                             <label class="form-check-label" for="edit_thumb_auto">
                                                 <strong>Auto YouTube Thumbnail</strong> - Extract from video URL
@@ -364,8 +358,8 @@
                                             </label>
                                         </div>
                                         <div class="form-check mb-2">
-                                            <input class="form-check-input" type="radio" name="thumbnail_type" id="edit_thumb_keep" value="keep_existing">
-                                            <label class="form-check-label" for="edit_thumb_keep">
+                                            <input class="form-check-input" type="radio" name="thumbnail_type" id="edit_thumb_keep_existing" value="keep_existing">
+                                            <label class="form-check-label" for="edit_thumb_keep_existing">
                                                 <strong>Keep Current Image</strong> - Don't change existing thumbnail
                                             </label>
                                         </div>
@@ -590,7 +584,7 @@
             // Set the appropriate radio button
             document.getElementById('edit_thumb_auto').checked = (selectedThumbnailType === 'auto');
             document.getElementById('edit_thumb_url').checked = (selectedThumbnailType === 'url');
-            document.getElementById('edit_thumb_keep').checked = (selectedThumbnailType === 'keep_existing');
+            document.getElementById('edit_thumb_keep_existing').checked = (selectedThumbnailType === 'keep_existing');
             
             // Show/hide appropriate input sections
             const urlInput = document.getElementById('edit_url_input');

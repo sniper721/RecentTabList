@@ -9437,7 +9437,27 @@ def admin_edit_level():
     if thumbnail_type == 'url':
         # Custom URL
         thumbnail_url = request.form.get('thumbnail_url', '').strip()
-    # Image upload functionality removed
+    elif thumbnail_type == 'upload':
+        # Handle file upload
+        if 'thumbnail_file' in request.files:
+            file = request.files['thumbnail_file']
+            if file and file.filename:
+                try:
+                    # Convert uploaded image to base64
+                    thumbnail_url = convert_image_to_base64(file)
+                    if not thumbnail_url:
+                        flash('Failed to process uploaded image. Please try a different image.', 'warning')
+                        thumbnail_url = ''
+                except Exception as e:
+                    print(f"Image upload error: {e}")
+                    flash('Error processing uploaded image. Please try again.', 'danger')
+                    thumbnail_url = ''
+            else:
+                flash('No file selected for upload.', 'warning')
+                thumbnail_url = ''
+    elif thumbnail_type == 'keep' or thumbnail_type == 'keep_existing':
+        # Keep existing thumbnail
+        thumbnail_url = level.get('thumbnail_url', '')
     # If thumbnail_type == 'auto', thumbnail_url stays empty (uses YouTube auto)
     
     # Handle position changes
@@ -9503,7 +9523,6 @@ def admin_edit_level():
         "verifier": request.form.get('verifier'),
         "level_id": game_level_id if game_level_id and game_level_id.strip() else None,
         "video_url": request.form.get('video_url'),
-        "thumbnail_url": thumbnail_url,
         "description": request.form.get('description'),
         "difficulty": difficulty,
         "demon_type": demon_type,
@@ -9513,6 +9532,10 @@ def admin_edit_level():
         "points": points,
         "min_percentage": min_percentage
     }
+    
+    # Only update thumbnail_url if we're not keeping the existing one or if we have a new value
+    if thumbnail_type != 'keep' and thumbnail_type != 'keep_existing':
+        update_data["thumbnail_url"] = thumbnail_url
     
     # Save history before updating
     history_entry = {
