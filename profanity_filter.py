@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Profanity Filter System for RTL
-Blocks usernames, level names, and other content with inappropriate words
+Blocks usernames and comments with inappropriate words
+Level names are exempt from profanity filtering
 """
 
 import re
@@ -136,16 +137,12 @@ class ProfanityFilter:
     
     def check_level_name(self, level_name: str) -> Tuple[bool, str]:
         """
-        Check level name for profanity (strict mode)
+        Check level name for profanity - DISABLED
+        Level names are now allowed regardless of content
         
         Returns:
             (is_allowed, reason)
         """
-        is_clean, violations, reason = self.check_text(level_name, strict=True)
-        
-        if not is_clean:
-            return False, f"Level name not allowed: {reason}"
-        
         return True, "Level name is acceptable"
     
     def check_comment(self, comment: str) -> Tuple[bool, str]:
@@ -237,8 +234,9 @@ def check_username_profanity(username: str) -> Tuple[bool, str]:
 def check_level_name_profanity(level_name: str) -> Tuple[bool, str]:
     """
     Convenience function to check level name
+    Level names are now allowed regardless of content - profanity filter only applies to usernames
     """
-    return profanity_filter.check_level_name(level_name)
+    return True, "Level name is acceptable"
 
 def check_comment_profanity(comment: str) -> Tuple[bool, str]:
     """
