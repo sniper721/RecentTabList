@@ -41,6 +41,8 @@
                                 <th>Name</th>
                                 <th>Creator</th>
                                 <th>Verifier</th>
+                                <th>ID</th>
+                                <th>Points</th>
                                 <th>Video</th>
                             </tr>
                         </thead>
@@ -52,13 +54,33 @@
                                     {% set difficulty = level.get('difficulty', 5.0) %}
                                     <span class="level-difficulty level-difficulty-{{ difficulty|float|round|int }}"></span>
                                     {{ level.get('name', '') }}
+                                    <br>
+                                    <small class="text-muted">0 (79%) — 0 (100%) points</small>
                                 </td>
                                 <td>{{ level.get('creator', '') }}</td>
                                 <td>{{ level.get('verifier', '') }}</td>
                                 <td>
+                                    {% if level.get('level_id') %}
+                                        <div class="d-flex align-items-center">
+                                            <small class="me-2">{{ level.get('level_id') }}</small>
+                                            <button class="btn btn-sm btn-outline-secondary copy-id-btn" 
+                                                    data-id="{{ level.get('level_id') }}" 
+                                                    title="Copy Level ID"
+                                                    onclick="event.stopPropagation();">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                    {% else %}
+                                        <small class="text-muted">N/A</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">0 points<br>(Legacy)</small>
+                                </td>
+                                <td>
                                     {% set video_url = level.get('video_url', '') %}
                                     {% if video_url %}
-                                    <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-danger">
+                                    <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-danger" onclick="event.stopPropagation();">
                                         <i class="fab fa-youtube"></i>
                                     </a>
                                     {% endif %}
@@ -90,9 +112,57 @@
 <script>
     // Add click event to level rows
     document.querySelectorAll('.level-row').forEach(row => {
-        row.addEventListener('click', function() {
+        row.addEventListener('click', function(e) {
+            // Don't navigate if clicking on copy button or video link
+            if (e.target.closest('.copy-id-btn') || e.target.closest('a')) {
+                return;
+            }
             const levelId = this.getAttribute('data-level-id');
             window.location = '/level/' + levelId;
+        });
+    });
+
+    // Add copy functionality for level IDs
+    document.querySelectorAll('.copy-id-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent level row click
+            const levelId = this.getAttribute('data-id');
+            
+            navigator.clipboard.writeText(levelId).then(function() {
+                // Show success feedback
+                const icon = btn.querySelector('i');
+                const originalClass = icon.className;
+                icon.className = 'fas fa-check';
+                btn.classList.add('btn-success');
+                btn.classList.remove('btn-outline-secondary');
+                
+                setTimeout(function() {
+                    icon.className = originalClass;
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-outline-secondary');
+                }, 1500);
+            }).catch(function() {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = levelId;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                // Show success feedback
+                const icon = btn.querySelector('i');
+                const originalClass = icon.className;
+                icon.className = 'fas fa-check';
+                btn.classList.add('btn-success');
+                btn.classList.remove('btn-outline-secondary');
+                
+                setTimeout(function() {
+                    icon.className = originalClass;
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-outline-secondary');
+                }, 1500);
+            });
         });
     });
 </script>

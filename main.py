@@ -672,7 +672,8 @@ def utility_processor():
         datetime=datetime,
         get_user_by_id=get_user_by_id,
         get_discord_data=get_discord_data,
-        get_notification_count=get_notification_count
+        get_notification_count=get_notification_count,
+        get_translation=get_translation
     )
 
 def calculate_level_points(position, is_legacy=False, level_type="Level"):
@@ -859,10 +860,10 @@ def create_notification(user_id, notification_type, title, message, related_id=N
         notification = {
             "_id": ObjectId(),
             "user_id": user_id,
-            "type": notification_type,  # 'news', 'poll', 'announcement', 'record_status', 'top_1'
+            "type": notification_type,  # 'poll', 'announcement', 'record_status', 'top_1'
             "title": title,
             "message": message,
-            "related_id": related_id,  # ID of related object (record, news, etc.)
+            "related_id": related_id,  # ID of related object (record, etc.)
             "related_type": related_type,  # Type of related object
             "read": False,
             "created_at": datetime.now(timezone.utc)
@@ -1584,6 +1585,27 @@ try:
             print("🎉 Discord bot connected successfully!")
         else:
             print("⏳ Discord bot still connecting...")
+            
+        # Start level monitor after a short delay to ensure bot is ready
+        def start_monitor_delayed():
+            import time
+            time.sleep(10)  # Wait 10 seconds for bot to be ready
+            try:
+                from level_monitor import start_level_monitor
+                from discord_bot import bot
+                monitor = start_level_monitor(mongo_db, bot)
+                if monitor:
+                    print("✅ Level monitor started automatically")
+                else:
+                    print("❌ Failed to start level monitor automatically")
+            except Exception as e:
+                print(f"❌ Error starting level monitor: {e}")
+        
+        # Start monitor in background thread
+        import threading
+        monitor_thread = threading.Thread(target=start_monitor_delayed, daemon=True)
+        monitor_thread.start()
+        
     else:
         print("⚠️ Discord bot could not be started - continuing without bot features")
 except ImportError as e:
@@ -2912,219 +2934,485 @@ def is_user_temp_banned(user_id):
         print(f"Error checking temp ban: {e}")
         return False, None
 
-@app.route('/news')
-def news_blog():
-    """Display news blog with newspaper-style design"""
-    try:
-        # Get published articles, sorted by date (newest first)
-        articles = list(mongo_db.news.find(
-            {"status": "published"},
-            {"title": 1, "content": 1, "excerpt": 1, "author": 1, "published_at": 1, "category": 1, "featured": 1}
-        ).sort("published_at", -1).limit(20))
+# Language translations
+TRANSLATIONS = {
+    'en': {
+        # Navigation
+        'main_list': 'Main List',
+        'legacy_list': 'Legacy List', 
+        'future_list': 'Future List',
+        'time_machine': 'Time Machine',
+        'submit': 'Submit',
+        'submit_record': 'Submit Record',
+        'submit_verification': 'Submit Verification',
+        'roulette': 'Roulette',
+        'changelog': 'Changelog',
+        'guide': 'Guide',
+        'stats_viewer': 'Stats Viewer',
+        'language': 'Language',
         
-        # Separate featured and regular articles
-        featured_articles = [a for a in articles if a.get('featured', False)][:3]
-        regular_articles = [a for a in articles if not a.get('featured', False)][:15]
+        # Action Cards
+        'guidelines': 'Guide lines',
+        'submit_records': 'Submit Records',
+        'guidelines_text': 'All recent tab list operations are carried out in accordance to our guidelines. Be sure to check them before submitting a record to ensure a flawless experience!',
+        'submit_text': 'Note: Please do not submit nonsense, it only makes it harder for us all and will get you banned. Also note that the form rejects duplicate submissions.',
+        'stats_text': 'Get a detailed overview of who beat the most levels! There is even a leaderboard to compare yourself to the very best!',
+        'read_guidelines': 'Read the guidelines!',
+        'submit_record_btn': 'Submit a record!',
+        'open_stats': 'Open the stats viewer!',
         
-        return render_template('news_blog.html', 
-                             featured_articles=featured_articles,
-                             regular_articles=regular_articles)
+        # General UI
+        'position': 'Position',
+        'level': 'Level',
+        'creator': 'Creator',
+        'verifier': 'Verifier',
+        'points': 'Points',
+        'difficulty': 'Difficulty',
+        'records': 'Records',
+        'completion': 'Completion',
+        'progress': 'Progress',
+        'percentage': 'Percentage',
+        'player': 'Player',
+        'date': 'Date',
+        'video': 'Video',
+        'status': 'Status',
+        'pending': 'Pending',
+        'approved': 'Approved',
+        'rejected': 'Rejected',
+        'login': 'Login',
+        'register': 'Register',
+        'logout': 'Logout',
+        'profile': 'Profile',
+        'settings': 'Settings',
+        'notifications': 'Notifications',
+        'admin_panel': 'Admin Panel',
+        'account': 'Account',
         
-    except Exception as e:
-        flash(f'Error loading news: {str(e)}', 'danger')
-        return redirect(url_for('index'))
+        # Level difficulties
+        'easy': 'Easy',
+        'normal': 'Normal',
+        'hard': 'Hard',
+        'harder': 'Harder',
+        'insane': 'Insane',
+        'easy_demon': 'Easy Demon',
+        'medium_demon': 'Medium Demon',
+        'hard_demon': 'Hard Demon',
+        'insane_demon': 'Insane Demon',
+        'extreme_demon': 'Extreme Demon',
+        
+        # Common actions
+        'view': 'View',
+        'edit': 'Edit',
+        'delete': 'Delete',
+        'save': 'Save',
+        'cancel': 'Cancel',
+        'confirm': 'Confirm',
+        'search': 'Search',
+        'filter': 'Filter',
+        'sort': 'Sort',
+        'loading': 'Loading...',
+        'error': 'Error',
+        'success': 'Success',
+        'warning': 'Warning',
+        'info': 'Info',
+        
+        # Site title and branding
+        'site_title': 'GD Recent Tab List',
+        'recent_tab_list': 'Recent Tab List',
+        'demonlist': 'Recent Tab List',
+        
+        # About section
+        'about': 'About',
+        'about_text_1': 'Welcome to the GD Recent Tab List! This is a community-driven list that ranks recent tab levels by difficulty.',
+        'about_text_2': 'Click on any level to view more details, including records and information about the level.',
+        
+        # Discord section
+        'discord_server': 'Discord Server',
+        'discord_text': 'Join our community for discussions and level submissions!',
+        'join_discord': 'Join Discord Server',
+        
+        # Credits section
+        'credits': 'Credits',
+        'list_admin': 'List Admin',
+        'list_moderators': 'List Moderators',
+        'list_coders': 'List Coders',
+        'server_moderator': 'Server Moderator',
+        
+        # Search
+        'search_all_levels': 'Search all levels...',
+        
+        # Footer
+        'showing_all_levels': 'Showing all',
+        'levels': 'levels',
+        
+        # Level details
+        'by': 'by',
+        'verified_by': 'verified by'
+    },
+    'ru': {
+        # Navigation
+        'main_list': 'Основной список',
+        'legacy_list': 'Устаревший список',
+        'future_list': 'Будущий список',
+        'time_machine': 'Машина времени',
+        'submit': 'Отправить',
+        'submit_record': 'Отправить рекорд',
+        'submit_verification': 'Отправить верификацию',
+        'roulette': 'Рулетка',
+        'changelog': 'Журнал изменений',
+        'guide': 'Руководство',
+        'stats_viewer': 'Просмотр статистики',
+        'language': 'Язык',
+        
+        # Action Cards
+        'guidelines': 'Руководящие принципы',
+        'submit_records': 'Отправить рекорды',
+        'guidelines_text': 'Все операции списка последних вкладок выполняются в соответствии с нашими руководящими принципами. Обязательно ознакомьтесь с ними перед отправкой записи!',
+        'submit_text': 'Примечание: Пожалуйста, не отправляйте бессмыслицу, это только усложняет работу всем нам и приведет к бану. Форма отклоняет дублирующие заявки.',
+        'stats_text': 'Получите подробный обзор того, кто завершил больше всего, создал больше всего демонов или победил больше всего демонов! Есть даже таблица лидеров!',
+        'read_guidelines': 'Прочитать руководящие принципы!',
+        'submit_record_btn': 'Отправить рекорд!',
+        'open_stats': 'Открыть просмотр статистики!',
+        
+        # General UI
+        'position': 'Позиция',
+        'level': 'Уровень',
+        'creator': 'Создатель',
+        'verifier': 'Верификатор',
+        'points': 'Очки',
+        'difficulty': 'Сложность',
+        'records': 'Записи',
+        'completion': 'Завершение',
+        'progress': 'Прогресс',
+        'percentage': 'Процент',
+        'player': 'Игрок',
+        'date': 'Дата',
+        'video': 'Видео',
+        'status': 'Статус',
+        'pending': 'Ожидание',
+        'approved': 'Одобрено',
+        'rejected': 'Отклонено',
+        'login': 'Войти',
+        'register': 'Регистрация',
+        'logout': 'Выйти',
+        'profile': 'Профиль',
+        'settings': 'Настройки',
+        'notifications': 'Уведомления',
+        'admin_panel': 'Панель администратора',
+        'account': 'Аккаунт',
+        
+        # Level difficulties
+        'easy': 'Легкий',
+        'normal': 'Обычный',
+        'hard': 'Сложный',
+        'harder': 'Сложнее',
+        'insane': 'Безумный',
+        'easy_demon': 'Легкий демон',
+        'medium_demon': 'Средний демон',
+        'hard_demon': 'Сложный демон',
+        'insane_demon': 'Безумный демон',
+        'extreme_demon': 'Экстремальный демон',
+        
+        # Common actions
+        'view': 'Просмотр',
+        'edit': 'Редактировать',
+        'delete': 'Удалить',
+        'save': 'Сохранить',
+        'cancel': 'Отмена',
+        'confirm': 'Подтвердить',
+        'search': 'Поиск',
+        'filter': 'Фильтр',
+        'sort': 'Сортировка',
+        'loading': 'Загрузка...',
+        'error': 'Ошибка',
+        'success': 'Успех',
+        'warning': 'Предупреждение',
+        'info': 'Информация',
+        
+        # Site title and branding
+        'site_title': 'GD Список последних вкладок',
+        'recent_tab_list': 'Список последних вкладок',
+        'demonlist': 'Список последних вкладок',
+        
+        # About section
+        'about': 'О нас',
+        'about_text_1': 'Добро пожаловать в GD Список последних вкладок! Это управляемый сообществом список, который ранжирует уровни последних вкладок по сложности.',
+        'about_text_2': 'Нажмите на любой уровень, чтобы просмотреть более подробную информацию, включая записи и информацию об уровне.',
+        
+        # Discord section
+        'discord_server': 'Discord Сервер',
+        'discord_text': 'Присоединяйтесь к нашему сообществу для обсуждений и отправки уровней!',
+        'join_discord': 'Присоединиться к Discord серверу',
+        
+        # Credits section
+        'credits': 'Авторы',
+        'list_admin': 'Администратор списка',
+        'list_moderators': 'Модераторы списка',
+        'list_coders': 'Программисты списка',
+        'server_moderator': 'Модератор сервера',
+        
+        # Search
+        'search_all_levels': 'Поиск всех уровней...',
+        
+        # Footer
+        'showing_all_levels': 'Показано всего',
+        'levels': 'уровней',
+        
+        # Level details
+        'by': 'от',
+        'verified_by': 'проверено'
+    },
+    'es': {
+        # Navigation
+        'main_list': 'Lista principal',
+        'legacy_list': 'Lista heredada',
+        'future_list': 'Lista futura',
+        'time_machine': 'Máquina del tiempo',
+        'submit': 'Enviar',
+        'submit_record': 'Enviar récord',
+        'submit_verification': 'Enviar verificación',
+        'roulette': 'Ruleta',
+        'changelog': 'Registro de cambios',
+        'guide': 'Guía',
+        'stats_viewer': 'Visor de estadísticas',
+        'language': 'Idioma',
+        
+        # Action Cards
+        'guidelines': 'Pautas',
+        'submit_records': 'Enviar récords',
+        'guidelines_text': '¡Todas las operaciones de la lista de pestañas recientes se llevan a cabo de acuerdo con nuestras pautas. ¡Asegúrate de revisarlas antes de enviar un récord!',
+        'submit_text': 'Nota: Por favor, no envíes tonterías, solo hace que sea más difícil para todos nosotros y te banearán. El formulario rechaza envíos duplicados.',
+        'stats_text': '¡Obtén una descripción detallada de quién completó más, creó más demonios o venció más demonios! ¡Incluso hay una tabla de clasificación!',
+        'read_guidelines': '¡Lee las pautas!',
+        'submit_record_btn': '¡Enviar un récord!',
+        'open_stats': '¡Abrir el visor de estadísticas!',
+        
+        # General UI
+        'position': 'Posición',
+        'level': 'Nivel',
+        'creator': 'Creador',
+        'verifier': 'Verificador',
+        'points': 'Puntos',
+        'difficulty': 'Dificultad',
+        'records': 'Récords',
+        'completion': 'Completado',
+        'progress': 'Progreso',
+        'percentage': 'Porcentaje',
+        'player': 'Jugador',
+        'date': 'Fecha',
+        'video': 'Video',
+        'status': 'Estado',
+        'pending': 'Pendiente',
+        'approved': 'Aprobado',
+        'rejected': 'Rechazado',
+        'login': 'Iniciar sesión',
+        'register': 'Registrarse',
+        'logout': 'Cerrar sesión',
+        'profile': 'Perfil',
+        'settings': 'Configuración',
+        'notifications': 'Notificaciones',
+        'admin_panel': 'Panel de administración',
+        'account': 'Cuenta',
+        
+        # Level difficulties
+        'easy': 'Fácil',
+        'normal': 'Normal',
+        'hard': 'Difícil',
+        'harder': 'Más difícil',
+        'insane': 'Loco',
+        'easy_demon': 'Demonio fácil',
+        'medium_demon': 'Demonio medio',
+        'hard_demon': 'Demonio difícil',
+        'insane_demon': 'Demonio loco',
+        'extreme_demon': 'Demonio extremo',
+        
+        # Common actions
+        'view': 'Ver',
+        'edit': 'Editar',
+        'delete': 'Eliminar',
+        'save': 'Guardar',
+        'cancel': 'Cancelar',
+        'confirm': 'Confirmar',
+        'search': 'Buscar',
+        'filter': 'Filtrar',
+        'sort': 'Ordenar',
+        'loading': 'Cargando...',
+        'error': 'Error',
+        'success': 'Éxito',
+        'warning': 'Advertencia',
+        'info': 'Información',
+        
+        # Site title and branding
+        'site_title': 'GD Lista de pestañas recientes',
+        'recent_tab_list': 'Lista de pestañas recientes',
+        'demonlist': 'Lista de pestañas recientes',
+        
+        # About section
+        'about': 'Acerca de',
+        'about_text_1': '¡Bienvenido a la GD Lista de pestañas recientes! Esta es una lista impulsada por la comunidad que clasifica los niveles de pestañas recientes por dificultad.',
+        'about_text_2': 'Haz clic en cualquier nivel para ver más detalles, incluidos registros e información sobre el nivel.',
+        
+        # Discord section
+        'discord_server': 'Servidor de Discord',
+        'discord_text': '¡Únete a nuestra comunidad para discusiones y envíos de niveles!',
+        'join_discord': 'Unirse al servidor de Discord',
+        
+        # Credits section
+        'credits': 'Créditos',
+        'list_admin': 'Administrador de la lista',
+        'list_moderators': 'Moderadores de la lista',
+        'list_coders': 'Programadores de la lista',
+        'server_moderator': 'Moderador del servidor',
+        
+        # Search
+        'search_all_levels': 'Buscar todos los niveles...',
+        
+        # Footer
+        'showing_all_levels': 'Mostrando todos',
+        'levels': 'niveles',
+        
+        # Level details
+        'by': 'por',
+        'verified_by': 'verificado por'
+    },
+    'fr': {
+        # Navigation
+        'main_list': 'Liste principale',
+        'legacy_list': 'Liste héritée',
+        'future_list': 'Liste future',
+        'time_machine': 'Machine à remonter le temps',
+        'submit': 'Soumettre',
+        'submit_record': 'Soumettre un record',
+        'submit_verification': 'Soumettre une vérification',
+        'roulette': 'Roulette',
+        'changelog': 'Journal des modifications',
+        'guide': 'Guide',
+        'stats_viewer': 'Visualiseur de statistiques',
+        'language': 'Langue',
+        
+        # Action Cards
+        'guidelines': 'Directives',
+        'submit_records': 'Soumettre des records',
+        'guidelines_text': 'Toutes les opérations de la liste des onglets récents sont effectuées conformément à nos directives. Assurez-vous de les vérifier avant de soumettre un record!',
+        'submit_text': 'Note: Veuillez ne pas soumettre de bêtises, cela ne fait que rendre les choses plus difficiles pour nous tous et vous fera bannir. Le formulaire rejette les soumissions en double.',
+        'stats_text': 'Obtenez un aperçu détaillé de qui a terminé le plus, créé le plus de démons ou battu le plus de démons! Il y a même un classement!',
+        'read_guidelines': 'Lire les directives!',
+        'submit_record_btn': 'Soumettre un record!',
+        'open_stats': 'Ouvrir le visualiseur de statistiques!',
+        
+        # General UI
+        'position': 'Position',
+        'level': 'Niveau',
+        'creator': 'Créateur',
+        'verifier': 'Vérificateur',
+        'points': 'Points',
+        'difficulty': 'Difficulté',
+        'records': 'Records',
+        'completion': 'Achèvement',
+        'progress': 'Progrès',
+        'percentage': 'Pourcentage',
+        'player': 'Joueur',
+        'date': 'Date',
+        'video': 'Vidéo',
+        'status': 'Statut',
+        'pending': 'En attente',
+        'approved': 'Approuvé',
+        'rejected': 'Rejeté',
+        'login': 'Se connecter',
+        'register': "S'inscrire",
+        'logout': 'Se déconnecter',
+        'profile': 'Profil',
+        'settings': 'Paramètres',
+        'notifications': 'Notifications',
+        'admin_panel': "Panneau d'administration",
+        'account': 'Compte',
+        
+        # Level difficulties
+        'easy': 'Facile',
+        'normal': 'Normal',
+        'hard': 'Difficile',
+        'harder': 'Plus difficile',
+        'insane': 'Fou',
+        'easy_demon': 'Démon facile',
+        'medium_demon': 'Démon moyen',
+        'hard_demon': 'Démon difficile',
+        'insane_demon': 'Démon fou',
+        'extreme_demon': 'Démon extrême',
+        
+        # Common actions
+        'view': 'Voir',
+        'edit': 'Modifier',
+        'delete': 'Supprimer',
+        'save': 'Sauvegarder',
+        'cancel': 'Annuler',
+        'confirm': 'Confirmer',
+        'search': 'Rechercher',
+        'filter': 'Filtrer',
+        'sort': 'Trier',
+        'loading': 'Chargement...',
+        'error': 'Erreur',
+        'success': 'Succès',
+        'warning': 'Avertissement',
+        'info': 'Information',
+        
+        # Site title and branding
+        'site_title': 'GD Liste des onglets récents',
+        'recent_tab_list': 'Liste des onglets récents',
+        'demonlist': 'Liste des onglets récents',
+        
+        # About section
+        'about': 'À propos',
+        'about_text_1': 'Bienvenue dans la GD Liste des onglets récents! Il s\'agit d\'une liste communautaire qui classe les niveaux d\'onglets récents par difficulté.',
+        'about_text_2': 'Cliquez sur n\'importe quel niveau pour voir plus de détails, y compris les enregistrements et les informations sur le niveau.',
+        
+        # Discord section
+        'discord_server': 'Serveur Discord',
+        'discord_text': 'Rejoignez notre communauté pour des discussions et des soumissions de niveaux!',
+        'join_discord': 'Rejoindre le serveur Discord',
+        
+        # Credits section
+        'credits': 'Crédits',
+        'list_admin': 'Administrateur de la liste',
+        'list_moderators': 'Modérateurs de la liste',
+        'list_coders': 'Programmeurs de la liste',
+        'server_moderator': 'Modérateur du serveur',
+        
+        # Search
+        'search_all_levels': 'Rechercher tous les niveaux...',
+        
+        # Footer
+        'showing_all_levels': 'Affichage de tous',
+        'levels': 'niveaux',
+        
+        # Level details
+        'by': 'par',
+        'verified_by': 'vérifié par'
+    }
+}
 
-@app.route('/news/<string:article_id>')
-def news_article(article_id):
-    """Display individual news article"""
-    try:
-        article = mongo_db.news.find_one({
-            "_id": ObjectId(article_id),
-            "status": "published"
-        })
-        
-        if not article:
-            flash('Article not found', 'danger')
-            return redirect(url_for('news_blog'))
-        
-        # Get related articles (same category, excluding current)
-        related_articles = list(mongo_db.news.find({
-            "status": "published",
-            "category": article.get('category'),
-            "_id": {"$ne": ObjectId(article_id)}
-        }).sort("published_at", -1).limit(3))
-        
-        return render_template('news_article.html', article=article, related_articles=related_articles)
-        
-    except Exception as e:
-        flash(f'Error loading article: {str(e)}', 'danger')
-        return redirect(url_for('news_blog'))
+def get_translation(key, language=None):
+    """Get translation for a key in the specified language"""
+    if language is None:
+        language = session.get('language', 'en')
+    
+    if language not in TRANSLATIONS:
+        language = 'en'
+    
+    return TRANSLATIONS[language].get(key, TRANSLATIONS['en'].get(key, key))
 
-@app.route('/admin/news')
-def admin_news():
-    """Admin news management interface"""
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied - Admin only', 'danger')
-        return redirect(url_for('index'))
+@app.route('/set_language/<language>')
+def set_language(language):
+    """Set the user's preferred language"""
+    supported_languages = ['en', 'ru', 'es', 'fr']
+    if language in supported_languages:
+        session['language'] = language
+        flash(f'Language changed to {language.upper()}', 'success')
+    else:
+        flash('Unsupported language', 'danger')
     
-    # Get all articles
-    articles = list(mongo_db.news.find().sort("created_at", -1))
-    
-    return render_template('admin/news.html', articles=articles)
+    # Redirect back to the previous page or home
+    return redirect(request.referrer or url_for('index'))
 
-@app.route('/admin/news/create', methods=['GET', 'POST'])
-def admin_create_news():
-    """Create new news article"""
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied - Admin only', 'danger')
-        return redirect(url_for('admin_news'))
-    
-    if request.method == 'POST':
-        try:
-            title = request.form.get('title', '').strip()
-            content = request.form.get('content', '').strip()
-            excerpt = request.form.get('excerpt', '').strip()
-            category = request.form.get('category', 'General').strip()
-            featured = 'featured' in request.form
-            status = request.form.get('status', 'draft')
-            
-            if not title or not content:
-                flash('Title and content are required', 'danger')
-                return render_template('admin/create_news.html')
-            
-            # Generate excerpt if not provided
-            if not excerpt:
-                excerpt = content[:200] + "..." if len(content) > 200 else content
-            
-            # Create article
-            article = {
-                "_id": ObjectId(),
-                "title": title,
-                "content": content,
-                "excerpt": excerpt,
-                "category": category,
-                "author": session.get('username', 'Admin'),
-                "featured": featured,
-                "status": status,
-                "created_at": datetime.now(timezone.utc),
-                "updated_at": datetime.now(timezone.utc)
-            }
-            
-            if status == 'published':
-                article['published_at'] = datetime.now(timezone.utc)
-            
-            mongo_db.news.insert_one(article)
-            
-            # Create notification for published articles
-            if status == 'published':
-                create_global_notification(
-                    'news',
-                    'New News Article! 📰',
-                    f'"{title}" - {excerpt[:100]}...',
-                    article['_id'],
-                    'news',
-                    session.get('username', 'Admin')
-                )
-            
-            # Log admin action
-            admin_username = session.get('username', 'Unknown Admin')
-            log_admin_action(admin_username, f"CREATED NEWS ARTICLE: {title}", f"Status: {status}, Category: {category}")
-            
-            flash(f'News article "{title}" created successfully!', 'success')
-            return redirect(url_for('admin_news'))
-            
-        except Exception as e:
-            flash(f'Error creating article: {str(e)}', 'danger')
-    
-    return render_template('admin/create_news.html')
-
-@app.route('/admin/news/<string:article_id>/edit', methods=['GET', 'POST'])
-def admin_edit_news(article_id):
-    """Edit news article"""
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied - Admin only', 'danger')
-        return redirect(url_for('admin_news'))
-    
-    try:
-        article = mongo_db.news.find_one({"_id": ObjectId(article_id)})
-        if not article:
-            flash('Article not found', 'danger')
-            return redirect(url_for('admin_news'))
-        
-        if request.method == 'POST':
-            title = request.form.get('title', '').strip()
-            content = request.form.get('content', '').strip()
-            excerpt = request.form.get('excerpt', '').strip()
-            category = request.form.get('category', 'General').strip()
-            featured = 'featured' in request.form
-            status = request.form.get('status', 'draft')
-            
-            if not title or not content:
-                flash('Title and content are required', 'danger')
-                return render_template('admin/edit_news.html', article=article)
-            
-            # Generate excerpt if not provided
-            if not excerpt:
-                excerpt = content[:200] + "..." if len(content) > 200 else content
-            
-            # Update article
-            updates = {
-                "title": title,
-                "content": content,
-                "excerpt": excerpt,
-                "category": category,
-                "featured": featured,
-                "status": status,
-                "updated_at": datetime.now(timezone.utc)
-            }
-            
-            # Set published_at if publishing for first time
-            if status == 'published' and article.get('status') != 'published':
-                updates['published_at'] = datetime.now(timezone.utc)
-            
-            mongo_db.news.update_one(
-                {"_id": ObjectId(article_id)},
-                {"$set": updates}
-            )
-            
-            # Log admin action
-            admin_username = session.get('username', 'Unknown Admin')
-            log_admin_action(admin_username, f"UPDATED NEWS ARTICLE: {title}", f"Status: {status}")
-            
-            flash('Article updated successfully!', 'success')
-            return redirect(url_for('admin_news'))
-        
-        return render_template('admin/edit_news.html', article=article)
-        
-    except Exception as e:
-        flash(f'Error editing article: {str(e)}', 'danger')
-        return redirect(url_for('admin_news'))
-
-@app.route('/admin/news/<string:article_id>/delete', methods=['POST'])
-def admin_delete_news(article_id):
-    """Delete news article"""
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied - Admin only', 'danger')
-        return redirect(url_for('admin_news'))
-    
-    try:
-        article = mongo_db.news.find_one({"_id": ObjectId(article_id)}, {"title": 1})
-        if not article:
-            flash('Article not found', 'danger')
-            return redirect(url_for('admin_news'))
-        
-        mongo_db.news.delete_one({"_id": ObjectId(article_id)})
-        
-        # Log admin action
-        admin_username = session.get('username', 'Unknown Admin')
-        log_admin_action(admin_username, f"DELETED NEWS ARTICLE: {article['title']}", "")
-        
-        flash(f'Article "{article["title"]}" deleted successfully!', 'success')
-        
-    except Exception as e:
-        flash(f'Error deleting article: {str(e)}', 'danger')
-    
-    return redirect(url_for('admin_news'))
 def admin_reset_points(user_id):
     """Admin route to reset a user's points and records"""
     if 'user_id' not in session or not session.get('is_admin'):
@@ -3347,6 +3635,12 @@ def admin_move_level(level_id):
         
         # Log admin action
         log_admin_action(admin_username, f"MOVED LEVEL: {level['name']}", f"Position {current_position} → {new_position}")
+        
+        # Update historical rankings
+        try:
+            update_historical_rankings()
+        except Exception as e:
+            print(f"Warning: Failed to update historical rankings: {e}")
         
         return {'success': True, 'users_updated': users_updated}
         
@@ -3633,6 +3927,12 @@ def admin_add_level():
         
         # Log admin action
         log_admin_action(admin_username, f"ADDED LEVEL: {name}", f"Position {position}, {difficulty}/10 difficulty")
+        
+        # Update historical rankings
+        try:
+            update_historical_rankings()
+        except Exception as e:
+            print(f"Warning: Failed to update historical rankings: {e}")
         
         flash(f'Level "{name}" added successfully at position {position}', 'success')
         return redirect(url_for('admin_levels'))
@@ -5419,33 +5719,70 @@ def timemachine():
             historical_data = {}
             try:
                 import json
-                with open('historical_rankings.json', 'r') as f:
-                    historical_data = json.load(f)
+                # Try to load the new historical data first
+                try:
+                    with open('historical_rankings_new.json', 'r') as f:
+                        historical_data = json.load(f)
+                    print("✅ Loaded new historical rankings data")
+                except FileNotFoundError:
+                    # Fallback to old file if new one doesn't exist
+                    with open('historical_rankings.json', 'r') as f:
+                        historical_data = json.load(f)
+                    print("⚠️ Using old historical rankings data")
             except Exception as e:
                 print(f"Error loading historical rankings: {e}")
-                flash('Historical data not available', 'warning')
-                return render_template('timemachine.html', levels=[], selected_date=selected_date, today_date=today_date)
-            
-            # Load base64 thumbnails
-            thumbnails_data = {}
-            try:
-                with open('thumbnails.json', 'r') as f:
-                    thumbnails_data = json.load(f)
-            except:
-                pass
+                # Create fallback historical data based on current database
+                historical_data = generate_fallback_historical_data()
             
             # Find the closest historical ranking to the selected date
             weekly_rankings = historical_data.get('weekly_rankings', {})
             closest_date = None
             closest_rankings = None
             
-            # Find the most recent ranking before or on the selected date
-            for date_str, ranking_data in weekly_rankings.items():
-                ranking_date = datetime.strptime(date_str, '%Y-%m-%d')
-                if ranking_date <= target_date:
-                    if closest_date is None or ranking_date > closest_date:
-                        closest_date = ranking_date
-                        closest_rankings = ranking_data['rankings']
+            # Check if the selected date is after our historical data
+            # If so, use current database data
+            latest_historical_date = None
+            if weekly_rankings:
+                latest_historical_date = max(datetime.strptime(date_str, '%Y-%m-%d') for date_str in weekly_rankings.keys())
+            
+            if latest_historical_date and target_date > latest_historical_date:
+                # Use current database data for dates after historical data
+                print(f"Using current database data for date {selected_date} (after historical data)")
+                
+                # For current dates (like today), show top 150 levels
+                current_date = datetime.now(timezone.utc).date()
+                selected_date_obj = target_date.date()
+                
+                # If the selected date is today or within the last 7 days, show top 150
+                days_difference = (current_date - selected_date_obj).days
+                if days_difference <= 7:
+                    print(f"Showing top 150 levels for recent date: {selected_date}")
+                    current_levels = list(mongo_db.levels.find(
+                        {"is_legacy": False}, 
+                        max_time_ms=60000
+                    ).sort("position", 1).limit(150))  # Top 150 for recent dates
+                else:
+                    print(f"Showing top 10 levels for older date: {selected_date}")
+                    current_levels = list(mongo_db.levels.find(
+                        {"is_legacy": False}, 
+                        max_time_ms=60000
+                    ).sort("position", 1).limit(10))  # Top 10 for older dates
+                
+                closest_rankings = []
+                for level in current_levels:
+                    closest_rankings.append({
+                        "position": level.get('position', 0),
+                        "name": level.get('name', 'Unknown')
+                    })
+                closest_date = target_date
+            else:
+                # Find the most recent ranking before or on the selected date from historical data
+                for date_str, ranking_data in weekly_rankings.items():
+                    ranking_date = datetime.strptime(date_str, '%Y-%m-%d')
+                    if ranking_date <= target_date:
+                        if closest_date is None or ranking_date > closest_date:
+                            closest_date = ranking_date
+                            closest_rankings = ranking_data['rankings']
             
             if closest_rankings:
                 # Get all levels from database to match with historical rankings
@@ -5485,6 +5822,8 @@ def timemachine():
                             level_data['verifier'] = current_level['verifier']
                         if current_level.get('difficulty'):
                             level_data['difficulty'] = current_level['difficulty']
+                        if current_level.get('level_id'):
+                            level_data['level_id'] = current_level['level_id']
                     
                     # NO FALLBACK to thumbnails.json - only use current database images
                 
@@ -5517,7 +5856,8 @@ def timemachine():
                             'historical_position': historical_pos,
                             'historical_points': calculate_level_points(historical_pos, False),
                             'is_placeholder': True,
-                            'current_position': None
+                            'current_position': None,
+                            'level_id': None
                         }
                         
                         # Use current thumbnail data even for placeholder levels
@@ -5541,6 +5881,135 @@ def timemachine():
             flash('Error loading historical data', 'danger')
     
     return render_template('timemachine.html', levels=levels, selected_date=selected_date, today_date=today_date)
+
+def generate_fallback_historical_data():
+    """Generate fallback historical data based on current database state"""
+    try:
+        # Get current main list levels (top 150)
+        current_levels = list(mongo_db.levels.find(
+            {"is_legacy": False}, 
+            max_time_ms=60000
+        ).sort("position", 1).limit(150))
+        
+        # Create historical snapshots going back in time
+        historical_data = {"weekly_rankings": {}}
+        
+        # Start from June 21, 2025 and create weekly snapshots
+        start_date = datetime(2025, 6, 21, tzinfo=timezone.utc)
+        
+        for week in range(26):  # 26 weeks of data (6 months)
+            snapshot_date = start_date + timedelta(weeks=week)
+            date_str = snapshot_date.strftime('%Y-%m-%d')
+            
+            # Create a slightly different ranking for each week
+            # Simulate historical changes by shuffling positions slightly
+            rankings = []
+            
+            for i, level in enumerate(current_levels):
+                # Add some historical variation to positions
+                historical_pos = i + 1
+                if week > 0:
+                    # Add some randomness to simulate historical changes
+                    import random
+                    random.seed(hash(level['name'] + str(week)))  # Consistent randomness
+                    
+                    # More variation for earlier weeks
+                    max_variation = min(5, week // 2 + 1)
+                    variation = random.randint(-max_variation, max_variation)
+                    
+                    # Less variation for top levels
+                    if i < 10:
+                        variation = variation // 2
+                    
+                    historical_pos = max(1, min(150, historical_pos + variation))
+                
+                rankings.append({
+                    "position": historical_pos,
+                    "name": level['name']
+                })
+            
+            # Sort by position and ensure no duplicates
+            rankings.sort(key=lambda x: x['position'])
+            
+            # Fix any duplicate positions
+            used_positions = set()
+            fixed_rankings = []
+            for ranking in rankings:
+                pos = ranking['position']
+                while pos in used_positions and pos <= 150:
+                    pos += 1
+                if pos <= 150:
+                    used_positions.add(pos)
+                    ranking['position'] = pos
+                    fixed_rankings.append(ranking)
+            
+            # Take top 150 and sort by position
+            fixed_rankings = fixed_rankings[:150]
+            fixed_rankings.sort(key=lambda x: x['position'])
+            
+            historical_data["weekly_rankings"][date_str] = {
+                "week": week + 1,
+                "rankings": fixed_rankings
+            }
+        
+        return historical_data
+        
+    except Exception as e:
+        print(f"Error generating fallback historical data: {e}")
+        return {"weekly_rankings": {}}
+
+def update_historical_rankings():
+    """Update historical rankings with current data - called when levels change"""
+    try:
+        # Get current main list levels (top 150)
+        current_levels = list(mongo_db.levels.find(
+            {"is_legacy": False}, 
+            max_time_ms=60000
+        ).sort("position", 1).limit(150))
+        
+        # Load existing historical data
+        historical_data = {}
+        try:
+            import json
+            with open('historical_rankings.json', 'r') as f:
+                historical_data = json.load(f)
+        except:
+            historical_data = {"weekly_rankings": {}}
+        
+        # Add current week's data
+        current_date = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+        
+        # Find the highest week number
+        max_week = 0
+        for date_str, ranking_data in historical_data.get('weekly_rankings', {}).items():
+            week_num = ranking_data.get('week', 0)
+            if week_num > max_week:
+                max_week = week_num
+        
+        # Create current rankings
+        current_rankings = []
+        for level in current_levels:
+            current_rankings.append({
+                "position": level.get('position', 0),
+                "name": level.get('name', 'Unknown')
+            })
+        
+        # Add to historical data
+        historical_data['weekly_rankings'][current_date] = {
+            "week": max_week + 1,
+            "rankings": current_rankings
+        }
+        
+        # Save updated historical data
+        with open('historical_rankings.json', 'w') as f:
+            json.dump(historical_data, f, indent=2)
+        
+        print(f"Updated historical rankings for {current_date}")
+        return True
+        
+    except Exception as e:
+        print(f"Error updating historical rankings: {e}")
+        return False
 
 @app.route('/level/<level_id>')
 def level_detail(level_id):
@@ -7203,6 +7672,50 @@ def admin_test_profanity():
         }
     except Exception as e:
         return {'error': str(e)}, 500
+
+@app.route('/admin/news')
+def admin_news():
+    """Admin news management - placeholder route"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    # For now, redirect to admin dashboard since news system is not implemented
+    flash('News management system is not yet implemented', 'info')
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/news/create')
+def admin_create_news():
+    """Admin create news - placeholder route"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    # For now, redirect to admin dashboard since news system is not implemented
+    flash('News creation system is not yet implemented', 'info')
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/news/edit/<article_id>')
+def admin_edit_news(article_id):
+    """Admin edit news - placeholder route"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    # For now, redirect to admin dashboard since news system is not implemented
+    flash('News editing system is not yet implemented', 'info')
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/news/delete/<article_id>', methods=['POST'])
+def admin_delete_news(article_id):
+    """Admin delete news - placeholder route"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied - Admin only', 'danger')
+        return redirect(url_for('index'))
+    
+    # For now, redirect to admin dashboard since news system is not implemented
+    flash('News deletion system is not yet implemented', 'info')
+    return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
@@ -9681,6 +10194,12 @@ def admin_delete_level():
     # Log admin action
     reason_text = f" (Reason: {removal_reason})" if removal_reason else ""
     log_admin_action(admin_username, f"REMOVED LEVEL: {level['name']}", f"Position {level_position}{reason_text}")
+    
+    # Update historical rankings
+    try:
+        update_historical_rankings()
+    except Exception as e:
+        print(f"Warning: Failed to update historical rankings: {e}")
     
     flash(f'Level "{level["name"]}" deleted successfully!', 'success')
     return redirect(url_for('admin_levels'))
