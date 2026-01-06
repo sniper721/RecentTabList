@@ -138,8 +138,13 @@
                             <small class="text-muted">
                                 {% set position = level.get('position', 0) %}
                                 {% set points_100 = (250 * (0.9636214148582346 ** (position - 1)))|round(2) %}
-                                {% set points_79 = (points_100 * 0.79)|round(2) %}
-                                {{ format_points(points_79) }} (79%) — {{ format_points(points_100) }} (100%) points
+                                {% set min_percentage = level.get('min_percentage', 100)|int %}
+                                {% if min_percentage < 100 %}
+                                    {% set points_min = (points_100 * 0.1)|round(2) %}
+                                    {{ format_points(points_min) }} ({{ min_percentage }}%) — {{ format_points(points_100) }} (100%) points
+                                {% else %}
+                                    {{ format_points(points_100) }} (100%) points
+                                {% endif %}
                             </small>
                         </div>
                     </div>

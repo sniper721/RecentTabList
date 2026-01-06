@@ -664,7 +664,7 @@ def utility_processor():
         current_theme=current_theme,
         get_active_announcements=get_active_announcements,
         get_active_polls=get_active_polls,
-        get_all_levels=lambda: list(mongo_db.levels.find().sort("position", 1)),
+        get_all_levels=lambda: list(mongo_db.levels.find({}, {"name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, "level_id": 1, "difficulty": 1, "is_legacy": 1, "min_percentage": 1}).sort("position", 1)),
         get_future_levels=lambda: list(mongo_db.future_levels.find().sort("position", 1)),
         get_demon_difficulty_display=get_demon_difficulty_display,
         get_demon_type_display=get_demon_type_display,
@@ -5626,7 +5626,7 @@ def index():
                 print("Auto-loading main levels...")
                 main_list = list(mongo_db.levels.find(
                     {"is_legacy": False},
-                    {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, "level_id": 1, "difficulty": 1, "thumbnail_url": 1, "video_url": 1}
+                    {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, "level_id": 1, "difficulty": 1, "thumbnail_url": 1, "video_url": 1, "min_percentage": 1}
                 ).sort("position", 1).limit(200))  # Add limit for performance
                 
                 # Cache it
@@ -5679,7 +5679,7 @@ def legacy():
             print("Auto-loading legacy levels...")
             legacy_list = list(mongo_db.levels.find(
                 {"is_legacy": True},
-                {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, "level_id": 1, "difficulty": 1, "thumbnail_url": 1, "video_url": 1}
+                {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, "level_id": 1, "difficulty": 1, "thumbnail_url": 1, "video_url": 1, "min_percentage": 1}
             ).sort("position", 1))
             
             # Cache it
