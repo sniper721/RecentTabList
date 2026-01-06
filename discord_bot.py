@@ -147,6 +147,28 @@ class RTLBot(commands.Bot):
             else:
                 print(f'❌ Could not find admin channel with ID: {DISCORD_ADMIN_CHANNEL_ID}')
         
+        # Auto-start level monitoring if it was enabled before restart
+        if DISCORD_BOT_AVAILABLE and mongo_db:
+            try:
+                from level_monitor import auto_start_level_monitor_if_enabled, get_level_monitor
+                monitor = auto_start_level_monitor_if_enabled(mongo_db, self)
+                if monitor:
+                    # If monitor was created but not started due to event loop issues, start it now
+                    if not monitor.running:
+                        success = monitor.start_monitoring_task(self.loop)
+                        if success:
+                            print("✅ Level monitoring started successfully with Discord bot event loop")
+                        else:
+                            print("❌ Failed to start level monitoring even with Discord bot event loop")
+                    else:
+                        print("✅ Level monitoring auto-started (was enabled before restart)")
+                else:
+                    print("ℹ️ Level monitoring not auto-started (was disabled before restart)")
+            except Exception as e:
+                print(f"⚠️ Could not auto-start level monitoring: {e}")
+                import traceback
+                traceback.print_exc()
+        
         # Check and update user roles based on their points (only for users who need updates)
         if DISCORD_BOT_AVAILABLE:
             # Check if role sync on startup is enabled (can be disabled via environment variable)
@@ -705,6 +727,385 @@ if bot is not None:
                 await ctx.send("❌ Role synchronization failed. Check bot logs for details.")
         except Exception as e:
             await ctx.send(f"❌ Error during role synchronization: {str(e)}")
+
+    @bot.command(name='startmonitor')
+    @commands.has_permissions(administrator=True)
+    async def start_monitor_command(ctx):
+        """Admin command to start level monitoring"""
+        try:
+            from level_monitor import start_level_monitor, get_level_monitor
+            
+            existing_monitor = get_level_monitor()
+            if existing_monitor and existing_monitor.running:
+                await ctx.send("⚠️ Level monitor is already running!")
+                return
+                
+            monitor = start_level_monitor(mongo_db, bot)
+            if monitor:
+                await ctx.send("✅ Level monitor started! Will check for removed levels every 5 minutes.")
+            else:
+                await ctx.send("❌ Failed to start level monitor.")
+                
+        except Exception as e:
+            await ctx.send(f"❌ Error starting level monitor: {str(e)}")
+
+    @bot.command(name='stopmonitor')
+    @commands.has_permissions(administrator=True)
+    async def stop_monitor_command(ctx):
+        """Admin command to stop level monitoring"""
+        try:
+            from level_monitor import stop_level_monitor, get_level_monitor
+            
+            monitor = get_level_monitor()
+            if not monitor or not monitor.running:
+                await ctx.send("⚠️ Level monitor is not running!")
+                return
+                
+            stop_level_monitor()
+            await ctx.send("✅ Level monitor stopped.")
+            
+        except Exception as e:
+            await ctx.send(f"❌ Error stopping level monitor: {str(e)}")
+
+    @bot.command(name='monitorstatus')
+    @commands.has_permissions(administrator=True)
+    async def monitor_status_command(ctx):
+        """Admin command to check level monitor status"""
+        try:
+            from level_monitor import get_level_monitor
+            
+            monitor = get_level_monitor()
+            if monitor and monitor.running:
+                interval_minutes = monitor.check_interval // 60
+                embed = discord.Embed(
+                    title="🔍 Level Monitor Status",
+                    color=0x00ff00,
+                    timestamp=datetime.now(timezone.utc)
+                )
+                embed.add_field(name="Status", value="✅ Running", inline=True)
+                embed.add_field(name="Check Interval", value=f"{interval_minutes} minutes", inline=True)
+                embed.add_field(name="Session", value="✅ Active" if monitor.session else "❌ Inactive", inline=True)
+                await ctx.send(embed=embed)
+            else:
+                embed = discord.Embed(
+                    title="🔍 Level Monitor Status",
+                    color=0xff0000,
+                    timestamp=datetime.now(timezone.utc)
+                )
+                embed.add_field(name="Status", value="❌ Not Running", inline=True)
+                embed.add_field(name="Info", value="Use `!startmonitor` to start monitoring", inline=False)
+                await ctx.send(embed=embed)
+                
+        except Exception as e:
+            await ctx.send(f"❌ Error checking monitor status: {str(e)}")
+
+    @bot.command(name='setmonitorinterval')
+    @commands.has_permissions(administrator=True)
+    async def set_monitor_interval_command(ctx, minutes: int):
+        """Admin command to set level monitor check interval"""
+        try:
+            if minutes < 1 or minutes > 1440:  # 1 minute to 24 hours
+                await ctx.send("❌ Interval must be between 1 and 1440 minutes (24 hours).")
+                return
+                
+            from level_monitor import get_level_monitor
+            
+            monitor = get_level_monitor()
+            if monitor:
+                monitor.set_check_interval(minutes)
+                embed = discord.Embed(
+                    title="⏰ Monitor Interval Updated",
+                    color=0x00ff00,
+                    timestamp=datetime.now(timezone.utc)
+                )
+                embed.add_field(name="New Interval", value=f"{minutes} minutes", inline=True)
+                embed.add_field(name="Persistent", value="✅ Saved (survives restarts)", inline=True)
+                embed.add_field(name="Next Check", value=f"In {minutes} minutes", inline=True)
+                embed.set_footer(text="Level Monitor Configuration")
+                await ctx.send(embed=embed)
+            else:
+                await ctx.send("❌ Level monitor is not running. Start it first with `!startchecks`.")
+                
+        except ValueError:
+            await ctx.send("❌ Please provide a valid number of minutes.")
+        except Exception as e:
+            await ctx.send(f"❌ Error setting monitor interval: {str(e)}")
+
+    @bot.command(name='checklevelnow')
+    @commands.has_permissions(administrator=True)
+    async def check_level_now_command(ctx, level_id: str):
+        """Admin command to manually check if a specific GD level ID exists"""
+        try:
+            from level_monitor import get_level_monitor
+            
+            monitor = get_level_monitor()
+            if not monitor or not monitor.running:
+                await ctx.send("❌ Level checking is disabled. Use `!startchecks` to enable checking.")
+                return
+            
+            # Validate level_id is numeric
+            try:
+                int(level_id)
+            except ValueError:
+                await ctx.send("❌ Level ID must be a number (e.g. `!checklevelnow 12345678`)")
+                return
+                
+            await ctx.send(f"🔍 Checking GD level ID {level_id}...")
+            
+            exists = await monitor.check_level_exists(level_id)
+            
+            embed = discord.Embed(
+                title=f"🔍 Level Check Result",
+                color=0x00ff00 if exists else 0xff0000,
+                timestamp=datetime.now(timezone.utc)
+            )
+            
+            embed.add_field(name="GD Level ID", value=level_id, inline=True)
+            embed.add_field(name="Status", value="✅ EXISTS" if exists else "❌ NOT FOUND", inline=True)
+            
+            if exists:
+                embed.add_field(name="Result", value="Level is accessible on GD servers", inline=False)
+            else:
+                embed.add_field(name="Result", value="Level was not found on GD servers (may be removed)", inline=False)
+            
+            embed.set_footer(text="Manual Level Check")
+            await ctx.send(embed=embed)
+                
+        except Exception as e:
+            await ctx.send(f"❌ Error checking level: {str(e)}")
+
+    @bot.command(name='checklevel')
+    @commands.has_permissions(administrator=True)
+    async def check_level_by_name_command(ctx, *, level_name: str):
+        """Admin command to check a level from the database by name"""
+        try:
+            from level_monitor import get_level_monitor
+            
+            monitor = get_level_monitor()
+            if not monitor or not monitor.running:
+                await ctx.send("❌ Level checking is disabled. Use `!startchecks` to enable checking.")
+                return
+            
+            # Search for level in database (case insensitive)
+            level = mongo_db.levels.find_one({
+                "name": {"$regex": f"^{level_name}$", "$options": "i"}
+            })
+            
+            if not level:
+                await ctx.send(f"❌ Level '{level_name}' not found in database.")
+                return
+            
+            level_gd_id = level.get('level_id')
+            if not level_gd_id:
+                await ctx.send(f"❌ Level '{level_name}' has no GD level ID in database.")
+                return
+            
+            position = level.get('position', '?')
+            is_legacy = level.get('is_legacy', False)
+            list_type = "Legacy List" if is_legacy else "Main List"
+            
+            await ctx.send(f"🔍 Checking '{level_name}' (GD ID: {level_gd_id})...")
+            
+            exists = await monitor.check_level_exists(level_gd_id)
+            
+            embed = discord.Embed(
+                title=f"🔍 Level Check: {level['name']}",
+                color=0x00ff00 if exists else 0xff0000,
+                timestamp=datetime.now(timezone.utc)
+            )
+            
+            embed.add_field(name="Level Name", value=level['name'], inline=True)
+            embed.add_field(name="GD Level ID", value=str(level_gd_id), inline=True)
+            embed.add_field(name="Position", value=f"#{position} ({list_type})", inline=True)
+            
+            embed.add_field(name="Creator", value=level.get('creator', 'Unknown'), inline=True)
+            embed.add_field(name="Verifier", value=level.get('verifier', 'Unknown'), inline=True)
+            embed.add_field(name="Status", value="✅ EXISTS" if exists else "❌ NOT FOUND", inline=True)
+            
+            if exists:
+                embed.add_field(name="Result", value="✅ Level is accessible on GD servers", inline=False)
+            else:
+                embed.add_field(name="Result", value="❌ Level was not found on GD servers (may be removed)", inline=False)
+            
+            embed.set_footer(text="Database Level Check")
+            await ctx.send(embed=embed)
+                
+        except Exception as e:
+            await ctx.send(f"❌ Error checking level: {str(e)}")
+
+    @bot.command(name='stopchecking')
+    @commands.has_permissions(administrator=True)
+    async def stop_checking_command(ctx):
+        """Admin command to stop all level checking (monitoring and manual checks)"""
+        try:
+            from level_monitor import get_level_monitor, stop_level_monitor
+            
+            monitor = get_level_monitor()
+            if monitor and monitor.running:
+                # Use the monitor's stop method to save persistent state
+                await monitor.stop_monitoring()
+                
+                embed = discord.Embed(
+                    title="🛑 Level Checking Stopped",
+                    color=0xff0000,
+                    timestamp=datetime.now(timezone.utc)
+                )
+                embed.add_field(name="Status", value="❌ All level checking stopped", inline=False)
+                embed.add_field(name="Automatic Monitoring", value="❌ Disabled", inline=True)
+                embed.add_field(name="Manual Checks", value="❌ Disabled", inline=True)
+                embed.add_field(name="Persistent State", value="❌ Saved (won't auto-start after restarts)", inline=True)
+                embed.add_field(name="To Resume", value="Use `!startchecks` to resume all checking", inline=False)
+                embed.set_footer(text="Level Monitor Control • Enhanced with Persistence")
+                
+                await ctx.send(embed=embed)
+            else:
+                await ctx.send("⚠️ Level checking is not currently running.")
+                
+        except Exception as e:
+            await ctx.send(f"❌ Error stopping level checking: {str(e)}")
+
+    @bot.command(name='startchecks')
+    @commands.has_permissions(administrator=True)
+    async def start_checks_command(ctx):
+        """Admin command to start/resume all level checking"""
+        try:
+            from level_monitor import start_level_monitor, get_level_monitor
+            
+            existing_monitor = get_level_monitor()
+            if existing_monitor and existing_monitor.running:
+                await ctx.send("⚠️ Level checking is already running!")
+                return
+                
+            monitor = start_level_monitor(mongo_db, bot)
+            if monitor:
+                # Ensure the monitor is actually running
+                if not monitor.running:
+                    success = monitor.start_monitoring_task(bot.loop)
+                    if not success:
+                        await ctx.send("❌ Failed to start level monitoring task.")
+                        return
+                
+                embed = discord.Embed(
+                    title="✅ Level Checking Started",
+                    color=0x00ff00,
+                    timestamp=datetime.now(timezone.utc)
+                )
+                embed.add_field(name="Status", value="✅ All level checking enabled", inline=False)
+                embed.add_field(name="Automatic Monitoring", value="✅ Running every 30 minutes", inline=True)
+                embed.add_field(name="Manual Checks", value="✅ Available", inline=True)
+                embed.add_field(name="Persistent State", value="✅ Saved (will auto-start after restarts)", inline=True)
+                embed.add_field(name="Available Commands", value="`!checklevelnow <id>`, `!checklevel <name>`, `!checkalllevels`", inline=False)
+                embed.set_footer(text="Level Monitor Control • Enhanced with Persistence")
+                
+                await ctx.send(embed=embed)
+            else:
+                await ctx.send("❌ Failed to start level checking.")
+                
+        except Exception as e:
+            await ctx.send(f"❌ Error starting level checking: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
+    @bot.command(name='checkingstatus')
+    @commands.has_permissions(administrator=True)
+    async def checking_status_command(ctx):
+        """Admin command to check the status of level checking system"""
+        try:
+            from level_monitor import get_level_monitor
+            
+            monitor = get_level_monitor()
+            
+            embed = discord.Embed(
+                title="📊 Level Checking Status",
+                timestamp=datetime.now(timezone.utc)
+            )
+            
+            if monitor and monitor.running:
+                embed.color = 0x00ff00
+                embed.add_field(name="Monitor Status", value="✅ Running", inline=True)
+                embed.add_field(name="Check Interval", value=f"{monitor.check_interval // 60} minutes", inline=True)
+                embed.add_field(name="Session Status", value="✅ Active" if monitor.session else "❌ Inactive", inline=True)
+                embed.add_field(name="Manual Checks", value="✅ Available", inline=True)
+                embed.add_field(name="Auto Monitoring", value="✅ Active", inline=True)
+                embed.add_field(name="Persistent State", value="✅ Enabled (survives restarts)", inline=True)
+                embed.add_field(name="Control", value="Use `!stopchecking` to stop", inline=False)
+            else:
+                embed.color = 0xff0000
+                embed.add_field(name="Monitor Status", value="❌ Not Running", inline=True)
+                embed.add_field(name="Manual Checks", value="❌ Unavailable", inline=True)
+                embed.add_field(name="Auto Monitoring", value="❌ Disabled", inline=True)
+                
+                # Check if it's enabled in settings but not running
+                if monitor and monitor.is_enabled_in_settings():
+                    embed.add_field(name="Persistent State", value="⚠️ Enabled but not running", inline=True)
+                    embed.add_field(name="Issue", value="Monitor should be running but isn't", inline=True)
+                else:
+                    embed.add_field(name="Persistent State", value="❌ Disabled (won't auto-start)", inline=True)
+                
+                embed.add_field(name="Control", value="Use `!startchecks` to start", inline=False)
+            
+            embed.set_footer(text="Level Monitor System • Enhanced with Persistent State")
+            await ctx.send(embed=embed)
+                
+        except Exception as e:
+            await ctx.send(f"❌ Error checking status: {str(e)}")
+
+    @bot.command(name='checkalllevels')
+    @commands.has_permissions(administrator=True)
+    async def check_all_levels_command(ctx):
+        """Admin command to manually check all levels for removal"""
+        try:
+            from level_monitor import get_level_monitor
+            
+            monitor = get_level_monitor()
+            if not monitor:
+                await ctx.send("❌ Level monitor is not running. Start it first with `!startmonitor`.")
+                return
+                
+            await ctx.send("🔍 Starting manual check of all levels... This may take a while.")
+            
+            # Run the check in the background
+            asyncio.create_task(monitor.check_all_levels())
+            
+            await ctx.send("✅ Level check started! You'll be notified of any removed levels.")
+            
+        except Exception as e:
+            await ctx.send(f"❌ Error checking all levels: {str(e)}")
+
+    @bot.command(name='levelstats')
+    @commands.has_permissions(administrator=True)
+    async def level_stats_command(ctx):
+        """Show statistics about levels in the database"""
+        try:
+            # Count levels with and without level_id
+            total_levels = mongo_db.levels.count_documents({})
+            levels_with_id = mongo_db.levels.count_documents({"level_id": {"$exists": True, "$ne": None, "$ne": ""}})
+            levels_without_id = total_levels - levels_with_id
+            removed_levels = mongo_db.levels.count_documents({"is_removed": True})
+            main_levels = mongo_db.levels.count_documents({"is_legacy": {"$ne": True}})
+            legacy_levels = mongo_db.levels.count_documents({"is_legacy": True})
+            
+            embed = discord.Embed(
+                title="📊 Level Database Statistics",
+                color=0x0099ff,
+                timestamp=datetime.now(timezone.utc)
+            )
+            
+            embed.add_field(name="📈 Total Levels", value=str(total_levels), inline=True)
+            embed.add_field(name="🏆 Main List", value=str(main_levels), inline=True)
+            embed.add_field(name="🕰️ Legacy List", value=str(legacy_levels), inline=True)
+            
+            embed.add_field(name="🆔 With GD Level ID", value=str(levels_with_id), inline=True)
+            embed.add_field(name="❓ Without GD Level ID", value=str(levels_without_id), inline=True)
+            embed.add_field(name="🚫 Marked as Removed", value=str(removed_levels), inline=True)
+            
+            monitorable = levels_with_id - removed_levels
+            embed.add_field(name="🔍 Monitorable Levels", value=str(monitorable), inline=False)
+            
+            await ctx.send(embed=embed)
+            
+        except Exception as e:
+            await ctx.send(f"❌ Error getting level stats: {str(e)}")
 
 if __name__ == "__main__":
     # For testing the bot standalone

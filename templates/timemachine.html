@@ -14,7 +14,7 @@
                 <form method="GET" class="row g-3">
                     <div class="col-md-4">
                         <input type="date" class="form-control" name="date" value="{{ selected_date or '' }}" 
-                               min="2025-06-27" max="{{ today_date }}" required>
+                               min="2025-06-21" max="{{ today_date }}" required>
                     </div>
                     <div class="col-md-2">
                         <button type="submit" class="btn btn-primary">
@@ -24,7 +24,7 @@
                 </form>
                 <small class="text-muted mt-2 d-block">
                     <i class="fas fa-info-circle"></i> 
-                    Shows the top 10 levels from weekly rankings. Available data: June 27, 2025 - Present.
+                    Shows historical rankings from weekly data. Recent dates may show up to 150 levels. Available data: June 21, 2025 - Present.
                 </small>
             </div>
         </div>
@@ -32,7 +32,13 @@
         {% if selected_date %}
         <div class="card shadow-sm">
             <div class="card-header bg-secondary text-white">
-                <h3 class="mb-0">Top 10 Rankings for {{ selected_date }}</h3>
+                <h3 class="mb-0">
+                    {% if levels|length > 10 %}
+                        Top {{ levels|length }} Rankings for {{ selected_date }}
+                    {% else %}
+                        Top 10 Rankings for {{ selected_date }}
+                    {% endif %}
+                </h3>
                 <small class="text-light">Historical weekly rankings with accurate positions and points</small>
             </div>
             <div class="card-body p-0">
@@ -96,8 +102,25 @@
                             <p class="mb-1 text-muted">by {{ level.creator }}</p>
                             <small class="text-muted d-block">verified by {{ level.verifier }}</small>
                             {% if level.level_id %}
-                                <small class="text-muted d-block">ID: {{ level.level_id }}</small>
+                                <div class="d-flex align-items-center">
+                                    <small class="text-muted me-2">ID: {{ level.level_id }}</small>
+                                    <button class="btn btn-sm btn-outline-secondary copy-id-btn" 
+                                            data-id="{{ level.level_id }}" 
+                                            title="Copy Level ID">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
                             {% endif %}
+                            
+                            <!-- Points System Display -->
+                            <div class="mt-2">
+                                <small class="text-muted">
+                                    {% set position = level.historical_position %}
+                                    {% set points_100 = (250 * (0.9636214148582346 ** (position - 1)))|round(2) %}
+                                    {% set points_79 = (points_100 * 0.79)|round(2) %}
+                                    {{ format_points(points_79) }} (79%) — {{ format_points(points_100) }} (100%) points
+                                </small>
+                            </div>
                         </div>
                         <div class="text-end">
                             <div class="text-muted"><strong>{{ get_difficulty_text(level.get('difficulty', 5.0)) }}</strong></div>
@@ -141,12 +164,60 @@
 <script>
     // Add click event to level cards (only for non-placeholder levels)
     document.querySelectorAll('.level-card').forEach(card => {
-        card.addEventListener('click', function() {
+        card.addEventListener('click', function(e) {
+            // Don't navigate if clicking on copy button
+            if (e.target.closest('.copy-id-btn')) {
+                return;
+            }
             const levelId = this.getAttribute('data-level-id');
             // Don't navigate for placeholder levels
             if (!levelId.startsWith('placeholder_')) {
                 window.location = '/level/' + levelId;
             }
+        });
+    });
+
+    // Add copy functionality for level IDs
+    document.querySelectorAll('.copy-id-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent level card click
+            const levelId = this.getAttribute('data-id');
+            
+            navigator.clipboard.writeText(levelId).then(function() {
+                // Show success feedback
+                const icon = btn.querySelector('i');
+                const originalClass = icon.className;
+                icon.className = 'fas fa-check';
+                btn.classList.add('btn-success');
+                btn.classList.remove('btn-outline-secondary');
+                
+                setTimeout(function() {
+                    icon.className = originalClass;
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-outline-secondary');
+                }, 1500);
+            }).catch(function() {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = levelId;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                // Show success feedback
+                const icon = btn.querySelector('i');
+                const originalClass = icon.className;
+                icon.className = 'fas fa-check';
+                btn.classList.add('btn-success');
+                btn.classList.remove('btn-outline-secondary');
+                
+                setTimeout(function() {
+                    icon.className = originalClass;
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-outline-secondary');
+                }, 1500);
+            });
         });
     });
 </script>

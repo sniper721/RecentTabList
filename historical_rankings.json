@@ -1,6 +1,6 @@
 {
   "weekly_rankings": {
-    "2025-06-27": {
+    "2025-06-21": {
       "week": 1,
       "rankings": [
         {
@@ -45,7 +45,7 @@
         }
       ]
     },
-    "2025-07-04": {
+    "2025-06-28": {
       "week": 2,
       "rankings": [
         {
@@ -54,11 +54,11 @@
         },
         {
           "position": 2,
-          "name": "los pollos tv 3 (deleted)"
+          "name": "los pollos tv 3"
         },
         {
           "position": 3,
-          "name": "come with me (deleted)"
+          "name": "come with me"
         },
         {
           "position": 4,
@@ -90,7 +90,7 @@
         }
       ]
     },
-    "2025-07-11": {
+    "2025-07-05": {
       "week": 3,
       "rankings": [
         {
@@ -103,7 +103,7 @@
         },
         {
           "position": 3,
-          "name": "los pollos tv 3 (deleted)"
+          "name": "los pollos tv 3"
         },
         {
           "position": 4,
@@ -119,7 +119,7 @@
         },
         {
           "position": 7,
-          "name": "come with me (deleted)"
+          "name": "come with me"
         },
         {
           "position": 8,
@@ -135,7 +135,7 @@
         }
       ]
     },
-    "2025-07-18": {
+    "2025-07-12": {
       "week": 4,
       "rankings": [
         {
@@ -156,7 +156,7 @@
         },
         {
           "position": 5,
-          "name": "los pollos tv 3 (deleted)"
+          "name": "los pollos tv 3"
         },
         {
           "position": 6,
@@ -176,11 +176,11 @@
         },
         {
           "position": 10,
-          "name": "come with me (deleted)"
+          "name": "come with me"
         }
       ]
     },
-    "2025-07-25": {
+    "2025-07-19": {
       "week": 5,
       "rankings": [
         {
@@ -201,7 +201,7 @@
         },
         {
           "position": 5,
-          "name": "los pollos tv 3 (deleted)"
+          "name": "los pollos tv 3"
         },
         {
           "position": 6,
@@ -221,11 +221,11 @@
         },
         {
           "position": 10,
-          "name": "come with me (deleted)"
+          "name": "come with me"
         }
       ]
     },
-    "2025-08-01": {
+    "2025-07-26": {
       "week": 6,
       "rankings": [
         {
@@ -246,7 +246,7 @@
         },
         {
           "position": 5,
-          "name": "los pollos tv 3 (deleted)"
+          "name": "los pollos tv 3"
         },
         {
           "position": 6,
@@ -270,7 +270,7 @@
         }
       ]
     },
-    "2025-08-08": {
+    "2025-08-02": {
       "week": 7,
       "rankings": [
         {
@@ -291,7 +291,7 @@
         },
         {
           "position": 5,
-          "name": "los pollos tv 3 (deleted)"
+          "name": "los pollos tv 3"
         },
         {
           "position": 6,
@@ -315,7 +315,7 @@
         }
       ]
     },
-    "2025-08-15": {
+    "2025-08-09": {
       "week": 8,
       "rankings": [
         {
@@ -340,7 +340,7 @@
         },
         {
           "position": 6,
-          "name": "los pollos tv 3 (deleted)"
+          "name": "los pollos tv 3"
         },
         {
           "position": 7,
@@ -360,7 +360,7 @@
         }
       ]
     },
-    "2025-08-22": {
+    "2025-08-16": {
       "week": 9,
       "rankings": [
         {
@@ -393,7 +393,7 @@
         },
         {
           "position": 8,
-          "name": "los pollos tv 3 (deleted)"
+          "name": "los pollos tv 3"
         },
         {
           "position": 9,
@@ -405,7 +405,7 @@
         }
       ]
     },
-    "2025-08-29": {
+    "2025-08-23": {
       "week": 10,
       "rankings": [
         {
@@ -438,7 +438,7 @@
         },
         {
           "position": 8,
-          "name": "los pollos tv 3 (deleted)"
+          "name": "los pollos tv 3"
         },
         {
           "position": 9,
@@ -450,7 +450,7 @@
         }
       ]
     },
-    "2025-09-05": {
+    "2025-08-30": {
       "week": 11,
       "rankings": [
         {
@@ -495,7 +495,7 @@
         }
       ]
     },
-    "2025-09-12": {
+    "2025-09-06": {
       "week": 12,
       "rankings": [
         {
@@ -540,7 +540,7 @@
         }
       ]
     },
-    "2025-09-19": {
+    "2025-09-13": {
       "week": 13,
       "rankings": [
         {
@@ -585,7 +585,7 @@
         }
       ]
     },
-    "2025-09-26": {
+    "2025-09-20": {
       "week": 14,
       "rankings": [
         {
@@ -630,7 +630,7 @@
         }
       ]
     },
-    "2025-10-03": {
+    "2025-09-27": {
       "week": 15,
       "rankings": [
         {
@@ -675,7 +675,7 @@
         }
       ]
     },
-    "2025-10-10": {
+    "2025-10-04": {
       "week": 16,
       "rankings": [
         {
@@ -717,6 +717,3612 @@
         {
           "position": 10,
           "name": "Dawn Break 3"
+        }
+      ]
+    },
+    "2026-01-05": {
+      "week": "current",
+      "rankings": [
+        {
+          "position": 1,
+          "name": "LightSpeed"
+        },
+        {
+          "position": 2,
+          "name": "kaotik"
+        },
+        {
+          "position": 3,
+          "name": "projectflame"
+        },
+        {
+          "position": 4,
+          "name": "Joe Bidome"
+        },
+        {
+          "position": 5,
+          "name": "555"
+        },
+        {
+          "position": 6,
+          "name": "What You See"
+        },
+        {
+          "position": 7,
+          "name": "Loud ClubStep"
+        },
+        {
+          "position": 8,
+          "name": "Straight of God"
+        },
+        {
+          "position": 9,
+          "name": "Silent Snowcone"
+        },
+        {
+          "position": 10,
+          "name": "luithing"
+        },
+        {
+          "position": 11,
+          "name": "Dawn Break 3"
+        },
+        {
+          "position": 12,
+          "name": "Neon Flow"
+        },
+        {
+          "position": 13,
+          "name": "deimonx"
+        },
+        {
+          "position": 14,
+          "name": "Project 1"
+        },
+        {
+          "position": 15,
+          "name": "ChildBUFF"
+        },
+        {
+          "position": 16,
+          "name": "PSYCHOSOCIAL"
+        },
+        {
+          "position": 17,
+          "name": "supreme lawnmower"
+        },
+        {
+          "position": 18,
+          "name": "i bet you cant beat"
+        },
+        {
+          "position": 19,
+          "name": "old memories"
+        },
+        {
+          "position": 20,
+          "name": "fommy txt do verify"
+        },
+        {
+          "position": 21,
+          "name": "Solar Wind"
+        },
+        {
+          "position": 22,
+          "name": "wave challenge"
+        },
+        {
+          "position": 23,
+          "name": "UltraPulse"
+        },
+        {
+          "position": 24,
+          "name": "I HATE WHEN"
+        },
+        {
+          "position": 25,
+          "name": "HELL XI"
+        },
+        {
+          "position": 26,
+          "name": "the light circles"
+        },
+        {
+          "position": 27,
+          "name": "Ways"
+        },
+        {
+          "position": 28,
+          "name": "ANTANAGEN"
+        },
+        {
+          "position": 29,
+          "name": "HumbleBee"
+        },
+        {
+          "position": 30,
+          "name": "Bartus Grande"
+        },
+        {
+          "position": 31,
+          "name": "Black Sky"
+        },
+        {
+          "position": 32,
+          "name": "Warsaw"
+        },
+        {
+          "position": 33,
+          "name": "humpcore challenge"
+        },
+        {
+          "position": 34,
+          "name": "Beans and Onion"
+        },
+        {
+          "position": 35,
+          "name": "Hyperbreaker"
+        },
+        {
+          "position": 36,
+          "name": "Infinite"
+        },
+        {
+          "position": 37,
+          "name": "ochiru 2"
+        },
+        {
+          "position": 38,
+          "name": "Wave Thingy VI"
+        },
+        {
+          "position": 39,
+          "name": "fantasy love"
+        },
+        {
+          "position": 40,
+          "name": "Wavest Wave"
+        },
+        {
+          "position": 41,
+          "name": "NK"
+        },
+        {
+          "position": 42,
+          "name": "Saturnine"
+        },
+        {
+          "position": 43,
+          "name": "Dreamspace Circles"
+        },
+        {
+          "position": 44,
+          "name": "the ringer"
+        },
+        {
+          "position": 45,
+          "name": "papaingus sky Pro"
+        },
+        {
+          "position": 46,
+          "name": "the housing challeng"
+        },
+        {
+          "position": 47,
+          "name": "the dark kingdom"
+        },
+        {
+          "position": 48,
+          "name": "cruel world"
+        },
+        {
+          "position": 49,
+          "name": "wave challenge frien"
+        },
+        {
+          "position": 50,
+          "name": "the jordan"
+        },
+        {
+          "position": 51,
+          "name": "Wave Consistency"
+        },
+        {
+          "position": 52,
+          "name": "Think Space 0 Full"
+        },
+        {
+          "position": 53,
+          "name": "pale bread"
+        },
+        {
+          "position": 54,
+          "name": "FIVE CIRCLES"
+        },
+        {
+          "position": 55,
+          "name": "cry"
+        },
+        {
+          "position": 56,
+          "name": "alone"
+        },
+        {
+          "position": 57,
+          "name": "lobotomy travel"
+        },
+        {
+          "position": 58,
+          "name": "Malin I"
+        },
+        {
+          "position": 59,
+          "name": "Unnamed 60"
+        },
+        {
+          "position": 60,
+          "name": "gun powder 2"
+        },
+        {
+          "position": 61,
+          "name": "From The End"
+        },
+        {
+          "position": 62,
+          "name": "Hard Challenge"
+        },
+        {
+          "position": 63,
+          "name": "Golden"
+        },
+        {
+          "position": 64,
+          "name": "every mod"
+        },
+        {
+          "position": 65,
+          "name": "silent"
+        },
+        {
+          "position": 66,
+          "name": "Sakupen Meg"
+        },
+        {
+          "position": 67,
+          "name": "tower of void"
+        },
+        {
+          "position": 68,
+          "name": "oloxer"
+        },
+        {
+          "position": 69,
+          "name": "polyethylene"
+        },
+        {
+          "position": 70,
+          "name": "musicismyflo"
+        },
+        {
+          "position": 71,
+          "name": "Gelionze"
+        },
+        {
+          "position": 72,
+          "name": "Processing Blast"
+        },
+        {
+          "position": 73,
+          "name": "interstellar"
+        },
+        {
+          "position": 74,
+          "name": "OnlyPlane"
+        },
+        {
+          "position": 75,
+          "name": "skeletal v2"
+        },
+        {
+          "position": 76,
+          "name": "bone snapper"
+        },
+        {
+          "position": 77,
+          "name": "ForTheRealGang"
+        },
+        {
+          "position": 78,
+          "name": "wave d"
+        },
+        {
+          "position": 79,
+          "name": "Driftaway Challenge"
+        },
+        {
+          "position": 80,
+          "name": "IllurY"
+        },
+        {
+          "position": 81,
+          "name": "The Three Immortals"
+        },
+        {
+          "position": 82,
+          "name": "Are"
+        },
+        {
+          "position": 83,
+          "name": "azric circles"
+        },
+        {
+          "position": 84,
+          "name": "Clickazor"
+        },
+        {
+          "position": 85,
+          "name": "Klimatic 2"
+        },
+        {
+          "position": 86,
+          "name": "Robot Challenge"
+        },
+        {
+          "position": 87,
+          "name": "Rooms"
+        },
+        {
+          "position": 88,
+          "name": "Sonic Pulse"
+        },
+        {
+          "position": 89,
+          "name": "CloudForm v2"
+        },
+        {
+          "position": 90,
+          "name": "Kokmok Unlid Beta"
+        },
+        {
+          "position": 91,
+          "name": "Death Note"
+        },
+        {
+          "position": 92,
+          "name": "Femboy Temple"
+        },
+        {
+          "position": 93,
+          "name": "deep swim"
+        },
+        {
+          "position": 94,
+          "name": "Hellspire"
+        },
+        {
+          "position": 95,
+          "name": "dark spine"
+        },
+        {
+          "position": 96,
+          "name": "Wave Challenge I"
+        },
+        {
+          "position": 97,
+          "name": "1Note"
+        },
+        {
+          "position": 98,
+          "name": "Goofing Off"
+        },
+        {
+          "position": 99,
+          "name": "challenge HUJ1"
+        },
+        {
+          "position": 100,
+          "name": "Impossible ship"
+        },
+        {
+          "position": 101,
+          "name": "Helium"
+        },
+        {
+          "position": 102,
+          "name": "Un name"
+        },
+        {
+          "position": 103,
+          "name": "saMkopL"
+        },
+        {
+          "position": 105,
+          "name": "El Eco De La Muerte"
+        },
+        {
+          "position": 106,
+          "name": "phobiabath"
+        },
+        {
+          "position": 107,
+          "name": "Can You RIP"
+        },
+        {
+          "position": 108,
+          "name": "Blurndess"
+        },
+        {
+          "position": 109,
+          "name": "wave"
+        },
+        {
+          "position": 110,
+          "name": "hard but possible"
+        },
+        {
+          "position": 111,
+          "name": "Sigma challenge"
+        },
+        {
+          "position": 112,
+          "name": "losing my mind pre2"
+        },
+        {
+          "position": 113,
+          "name": "Multi Wave"
+        },
+        {
+          "position": 114,
+          "name": "challenge HUJ2"
+        },
+        {
+          "position": 115,
+          "name": "The Complex 0s"
+        },
+        {
+          "position": 116,
+          "name": "Let Go"
+        },
+        {
+          "position": 117,
+          "name": "Ice Cave"
+        },
+        {
+          "position": 118,
+          "name": "Drop"
+        },
+        {
+          "position": 119,
+          "name": "The Seven Seas"
+        },
+        {
+          "position": 120,
+          "name": "Crazy Hell"
+        },
+        {
+          "position": 121,
+          "name": "Blue Layout buff"
+        },
+        {
+          "position": 122,
+          "name": "Spam 2"
+        },
+        {
+          "position": 123,
+          "name": "my first level"
+        },
+        {
+          "position": 124,
+          "name": "Flowershop"
+        },
+        {
+          "position": 125,
+          "name": "The Void 2"
+        },
+        {
+          "position": 126,
+          "name": "Splash"
+        },
+        {
+          "position": 127,
+          "name": "noSheiSatDevat"
+        },
+        {
+          "position": 128,
+          "name": "deathcrib"
+        },
+        {
+          "position": 129,
+          "name": "challenge HUJ3"
+        },
+        {
+          "position": 130,
+          "name": "Destruccion"
+        },
+        {
+          "position": 131,
+          "name": "mango mango 2"
+        },
+        {
+          "position": 132,
+          "name": "super good pro build"
+        },
+        {
+          "position": 133,
+          "name": "Dima Loh"
+        },
+        {
+          "position": 134,
+          "name": "my ordinary life"
+        },
+        {
+          "position": 135,
+          "name": "Avernus Challenge"
+        },
+        {
+          "position": 136,
+          "name": "spam"
+        },
+        {
+          "position": 137,
+          "name": "ocean wave"
+        },
+        {
+          "position": 138,
+          "name": "Note Conit"
+        },
+        {
+          "position": 139,
+          "name": "ice world"
+        },
+        {
+          "position": 140,
+          "name": "XMAS LEVEL"
+        },
+        {
+          "position": 141,
+          "name": "its not eyse"
+        },
+        {
+          "position": 142,
+          "name": "Impossible 3"
+        },
+        {
+          "position": 143,
+          "name": "Epsidev"
+        },
+        {
+          "position": 144,
+          "name": "hart"
+        },
+        {
+          "position": 145,
+          "name": "ez"
+        },
+        {
+          "position": 146,
+          "name": "demon part 3"
+        },
+        {
+          "position": 147,
+          "name": "lusty"
+        },
+        {
+          "position": 148,
+          "name": "zonk challenge"
+        },
+        {
+          "position": 149,
+          "name": "Death Note"
+        },
+        {
+          "position": 150,
+          "name": "Unnamed 2"
+        }
+      ]
+    },
+    "2025-12-01": {
+      "week": "recent",
+      "rankings": [
+        {
+          "position": 1,
+          "name": "LightSpeed"
+        },
+        {
+          "position": 2,
+          "name": "kaotik"
+        },
+        {
+          "position": 3,
+          "name": "projectflame"
+        },
+        {
+          "position": 4,
+          "name": "Joe Bidome"
+        },
+        {
+          "position": 5,
+          "name": "555"
+        },
+        {
+          "position": 6,
+          "name": "What You See"
+        },
+        {
+          "position": 7,
+          "name": "Loud ClubStep"
+        },
+        {
+          "position": 8,
+          "name": "Straight of God"
+        },
+        {
+          "position": 9,
+          "name": "Silent Snowcone"
+        },
+        {
+          "position": 10,
+          "name": "luithing"
+        },
+        {
+          "position": 11,
+          "name": "Dawn Break 3"
+        },
+        {
+          "position": 12,
+          "name": "Neon Flow"
+        },
+        {
+          "position": 13,
+          "name": "deimonx"
+        },
+        {
+          "position": 14,
+          "name": "Project 1"
+        },
+        {
+          "position": 15,
+          "name": "ChildBUFF"
+        },
+        {
+          "position": 16,
+          "name": "PSYCHOSOCIAL"
+        },
+        {
+          "position": 17,
+          "name": "supreme lawnmower"
+        },
+        {
+          "position": 18,
+          "name": "i bet you cant beat"
+        },
+        {
+          "position": 19,
+          "name": "old memories"
+        },
+        {
+          "position": 20,
+          "name": "fommy txt do verify"
+        },
+        {
+          "position": 21,
+          "name": "Solar Wind"
+        },
+        {
+          "position": 22,
+          "name": "wave challenge"
+        },
+        {
+          "position": 23,
+          "name": "UltraPulse"
+        },
+        {
+          "position": 24,
+          "name": "I HATE WHEN"
+        },
+        {
+          "position": 25,
+          "name": "HELL XI"
+        },
+        {
+          "position": 26,
+          "name": "the light circles"
+        },
+        {
+          "position": 27,
+          "name": "Ways"
+        },
+        {
+          "position": 28,
+          "name": "ANTANAGEN"
+        },
+        {
+          "position": 29,
+          "name": "HumbleBee"
+        },
+        {
+          "position": 30,
+          "name": "Bartus Grande"
+        },
+        {
+          "position": 31,
+          "name": "Black Sky"
+        },
+        {
+          "position": 32,
+          "name": "Warsaw"
+        },
+        {
+          "position": 33,
+          "name": "humpcore challenge"
+        },
+        {
+          "position": 34,
+          "name": "Beans and Onion"
+        },
+        {
+          "position": 35,
+          "name": "Hyperbreaker"
+        },
+        {
+          "position": 36,
+          "name": "Infinite"
+        },
+        {
+          "position": 37,
+          "name": "ochiru 2"
+        },
+        {
+          "position": 38,
+          "name": "Wave Thingy VI"
+        },
+        {
+          "position": 39,
+          "name": "fantasy love"
+        },
+        {
+          "position": 40,
+          "name": "Wavest Wave"
+        },
+        {
+          "position": 41,
+          "name": "NK"
+        },
+        {
+          "position": 42,
+          "name": "Saturnine"
+        },
+        {
+          "position": 43,
+          "name": "Dreamspace Circles"
+        },
+        {
+          "position": 44,
+          "name": "the ringer"
+        },
+        {
+          "position": 45,
+          "name": "papaingus sky Pro"
+        },
+        {
+          "position": 46,
+          "name": "the housing challeng"
+        },
+        {
+          "position": 47,
+          "name": "the dark kingdom"
+        },
+        {
+          "position": 48,
+          "name": "cruel world"
+        },
+        {
+          "position": 49,
+          "name": "wave challenge frien"
+        },
+        {
+          "position": 50,
+          "name": "the jordan"
+        },
+        {
+          "position": 51,
+          "name": "Wave Consistency"
+        },
+        {
+          "position": 52,
+          "name": "Think Space 0 Full"
+        },
+        {
+          "position": 53,
+          "name": "pale bread"
+        },
+        {
+          "position": 54,
+          "name": "FIVE CIRCLES"
+        },
+        {
+          "position": 55,
+          "name": "cry"
+        },
+        {
+          "position": 56,
+          "name": "alone"
+        },
+        {
+          "position": 57,
+          "name": "lobotomy travel"
+        },
+        {
+          "position": 58,
+          "name": "Malin I"
+        },
+        {
+          "position": 59,
+          "name": "Unnamed 60"
+        },
+        {
+          "position": 60,
+          "name": "gun powder 2"
+        },
+        {
+          "position": 61,
+          "name": "From The End"
+        },
+        {
+          "position": 62,
+          "name": "Hard Challenge"
+        },
+        {
+          "position": 63,
+          "name": "Golden"
+        },
+        {
+          "position": 64,
+          "name": "every mod"
+        },
+        {
+          "position": 65,
+          "name": "silent"
+        },
+        {
+          "position": 66,
+          "name": "Sakupen Meg"
+        },
+        {
+          "position": 67,
+          "name": "tower of void"
+        },
+        {
+          "position": 68,
+          "name": "oloxer"
+        },
+        {
+          "position": 69,
+          "name": "polyethylene"
+        },
+        {
+          "position": 70,
+          "name": "musicismyflo"
+        },
+        {
+          "position": 71,
+          "name": "Gelionze"
+        },
+        {
+          "position": 72,
+          "name": "Processing Blast"
+        },
+        {
+          "position": 73,
+          "name": "interstellar"
+        },
+        {
+          "position": 74,
+          "name": "OnlyPlane"
+        },
+        {
+          "position": 75,
+          "name": "skeletal v2"
+        },
+        {
+          "position": 76,
+          "name": "bone snapper"
+        },
+        {
+          "position": 77,
+          "name": "ForTheRealGang"
+        },
+        {
+          "position": 78,
+          "name": "wave d"
+        },
+        {
+          "position": 79,
+          "name": "Driftaway Challenge"
+        },
+        {
+          "position": 80,
+          "name": "IllurY"
+        },
+        {
+          "position": 81,
+          "name": "The Three Immortals"
+        },
+        {
+          "position": 82,
+          "name": "Are"
+        },
+        {
+          "position": 83,
+          "name": "azric circles"
+        },
+        {
+          "position": 84,
+          "name": "Clickazor"
+        },
+        {
+          "position": 85,
+          "name": "Klimatic 2"
+        },
+        {
+          "position": 86,
+          "name": "Robot Challenge"
+        },
+        {
+          "position": 87,
+          "name": "Rooms"
+        },
+        {
+          "position": 88,
+          "name": "Sonic Pulse"
+        },
+        {
+          "position": 89,
+          "name": "CloudForm v2"
+        },
+        {
+          "position": 90,
+          "name": "Kokmok Unlid Beta"
+        },
+        {
+          "position": 91,
+          "name": "Death Note"
+        },
+        {
+          "position": 92,
+          "name": "Femboy Temple"
+        },
+        {
+          "position": 93,
+          "name": "deep swim"
+        },
+        {
+          "position": 94,
+          "name": "Hellspire"
+        },
+        {
+          "position": 95,
+          "name": "dark spine"
+        },
+        {
+          "position": 96,
+          "name": "Wave Challenge I"
+        },
+        {
+          "position": 97,
+          "name": "1Note"
+        },
+        {
+          "position": 98,
+          "name": "Goofing Off"
+        },
+        {
+          "position": 99,
+          "name": "challenge HUJ1"
+        },
+        {
+          "position": 100,
+          "name": "Impossible ship"
+        },
+        {
+          "position": 101,
+          "name": "Helium"
+        },
+        {
+          "position": 102,
+          "name": "Un name"
+        },
+        {
+          "position": 103,
+          "name": "saMkopL"
+        },
+        {
+          "position": 105,
+          "name": "El Eco De La Muerte"
+        },
+        {
+          "position": 106,
+          "name": "phobiabath"
+        },
+        {
+          "position": 107,
+          "name": "Can You RIP"
+        },
+        {
+          "position": 108,
+          "name": "Blurndess"
+        },
+        {
+          "position": 109,
+          "name": "wave"
+        },
+        {
+          "position": 110,
+          "name": "hard but possible"
+        },
+        {
+          "position": 111,
+          "name": "Sigma challenge"
+        },
+        {
+          "position": 112,
+          "name": "losing my mind pre2"
+        },
+        {
+          "position": 113,
+          "name": "Multi Wave"
+        },
+        {
+          "position": 114,
+          "name": "challenge HUJ2"
+        },
+        {
+          "position": 115,
+          "name": "The Complex 0s"
+        },
+        {
+          "position": 116,
+          "name": "Let Go"
+        },
+        {
+          "position": 117,
+          "name": "Ice Cave"
+        },
+        {
+          "position": 118,
+          "name": "Drop"
+        },
+        {
+          "position": 119,
+          "name": "The Seven Seas"
+        },
+        {
+          "position": 120,
+          "name": "Crazy Hell"
+        },
+        {
+          "position": 121,
+          "name": "Blue Layout buff"
+        },
+        {
+          "position": 122,
+          "name": "Spam 2"
+        },
+        {
+          "position": 123,
+          "name": "my first level"
+        },
+        {
+          "position": 124,
+          "name": "Flowershop"
+        },
+        {
+          "position": 125,
+          "name": "The Void 2"
+        },
+        {
+          "position": 126,
+          "name": "Splash"
+        },
+        {
+          "position": 127,
+          "name": "noSheiSatDevat"
+        },
+        {
+          "position": 128,
+          "name": "deathcrib"
+        },
+        {
+          "position": 129,
+          "name": "challenge HUJ3"
+        },
+        {
+          "position": 130,
+          "name": "Destruccion"
+        },
+        {
+          "position": 131,
+          "name": "mango mango 2"
+        },
+        {
+          "position": 132,
+          "name": "super good pro build"
+        },
+        {
+          "position": 133,
+          "name": "Dima Loh"
+        },
+        {
+          "position": 134,
+          "name": "my ordinary life"
+        },
+        {
+          "position": 135,
+          "name": "Avernus Challenge"
+        },
+        {
+          "position": 136,
+          "name": "spam"
+        },
+        {
+          "position": 137,
+          "name": "ocean wave"
+        },
+        {
+          "position": 138,
+          "name": "Note Conit"
+        },
+        {
+          "position": 139,
+          "name": "ice world"
+        },
+        {
+          "position": 140,
+          "name": "XMAS LEVEL"
+        },
+        {
+          "position": 141,
+          "name": "its not eyse"
+        },
+        {
+          "position": 142,
+          "name": "Impossible 3"
+        },
+        {
+          "position": 143,
+          "name": "Epsidev"
+        },
+        {
+          "position": 144,
+          "name": "hart"
+        },
+        {
+          "position": 145,
+          "name": "ez"
+        },
+        {
+          "position": 146,
+          "name": "demon part 3"
+        },
+        {
+          "position": 147,
+          "name": "lusty"
+        },
+        {
+          "position": 148,
+          "name": "zonk challenge"
+        },
+        {
+          "position": 149,
+          "name": "Death Note"
+        },
+        {
+          "position": 150,
+          "name": "Unnamed 2"
+        }
+      ]
+    },
+    "2025-12-08": {
+      "week": "recent",
+      "rankings": [
+        {
+          "position": 1,
+          "name": "LightSpeed"
+        },
+        {
+          "position": 2,
+          "name": "kaotik"
+        },
+        {
+          "position": 3,
+          "name": "projectflame"
+        },
+        {
+          "position": 4,
+          "name": "Joe Bidome"
+        },
+        {
+          "position": 5,
+          "name": "555"
+        },
+        {
+          "position": 6,
+          "name": "What You See"
+        },
+        {
+          "position": 7,
+          "name": "Loud ClubStep"
+        },
+        {
+          "position": 8,
+          "name": "Straight of God"
+        },
+        {
+          "position": 9,
+          "name": "Silent Snowcone"
+        },
+        {
+          "position": 10,
+          "name": "luithing"
+        },
+        {
+          "position": 11,
+          "name": "Dawn Break 3"
+        },
+        {
+          "position": 12,
+          "name": "Neon Flow"
+        },
+        {
+          "position": 13,
+          "name": "deimonx"
+        },
+        {
+          "position": 14,
+          "name": "Project 1"
+        },
+        {
+          "position": 15,
+          "name": "ChildBUFF"
+        },
+        {
+          "position": 16,
+          "name": "PSYCHOSOCIAL"
+        },
+        {
+          "position": 17,
+          "name": "supreme lawnmower"
+        },
+        {
+          "position": 18,
+          "name": "i bet you cant beat"
+        },
+        {
+          "position": 19,
+          "name": "old memories"
+        },
+        {
+          "position": 20,
+          "name": "fommy txt do verify"
+        },
+        {
+          "position": 21,
+          "name": "Solar Wind"
+        },
+        {
+          "position": 22,
+          "name": "wave challenge"
+        },
+        {
+          "position": 23,
+          "name": "UltraPulse"
+        },
+        {
+          "position": 24,
+          "name": "I HATE WHEN"
+        },
+        {
+          "position": 25,
+          "name": "HELL XI"
+        },
+        {
+          "position": 26,
+          "name": "the light circles"
+        },
+        {
+          "position": 27,
+          "name": "Ways"
+        },
+        {
+          "position": 28,
+          "name": "ANTANAGEN"
+        },
+        {
+          "position": 29,
+          "name": "HumbleBee"
+        },
+        {
+          "position": 30,
+          "name": "Bartus Grande"
+        },
+        {
+          "position": 31,
+          "name": "Black Sky"
+        },
+        {
+          "position": 32,
+          "name": "Warsaw"
+        },
+        {
+          "position": 33,
+          "name": "humpcore challenge"
+        },
+        {
+          "position": 34,
+          "name": "Beans and Onion"
+        },
+        {
+          "position": 35,
+          "name": "Hyperbreaker"
+        },
+        {
+          "position": 36,
+          "name": "Infinite"
+        },
+        {
+          "position": 37,
+          "name": "ochiru 2"
+        },
+        {
+          "position": 38,
+          "name": "Wave Thingy VI"
+        },
+        {
+          "position": 39,
+          "name": "fantasy love"
+        },
+        {
+          "position": 40,
+          "name": "Wavest Wave"
+        },
+        {
+          "position": 41,
+          "name": "NK"
+        },
+        {
+          "position": 42,
+          "name": "Saturnine"
+        },
+        {
+          "position": 43,
+          "name": "Dreamspace Circles"
+        },
+        {
+          "position": 44,
+          "name": "the ringer"
+        },
+        {
+          "position": 45,
+          "name": "papaingus sky Pro"
+        },
+        {
+          "position": 46,
+          "name": "the housing challeng"
+        },
+        {
+          "position": 47,
+          "name": "the dark kingdom"
+        },
+        {
+          "position": 48,
+          "name": "cruel world"
+        },
+        {
+          "position": 49,
+          "name": "wave challenge frien"
+        },
+        {
+          "position": 50,
+          "name": "the jordan"
+        },
+        {
+          "position": 51,
+          "name": "Wave Consistency"
+        },
+        {
+          "position": 52,
+          "name": "Think Space 0 Full"
+        },
+        {
+          "position": 53,
+          "name": "pale bread"
+        },
+        {
+          "position": 54,
+          "name": "FIVE CIRCLES"
+        },
+        {
+          "position": 55,
+          "name": "cry"
+        },
+        {
+          "position": 56,
+          "name": "alone"
+        },
+        {
+          "position": 57,
+          "name": "lobotomy travel"
+        },
+        {
+          "position": 58,
+          "name": "Malin I"
+        },
+        {
+          "position": 59,
+          "name": "Unnamed 60"
+        },
+        {
+          "position": 60,
+          "name": "gun powder 2"
+        },
+        {
+          "position": 61,
+          "name": "From The End"
+        },
+        {
+          "position": 62,
+          "name": "Hard Challenge"
+        },
+        {
+          "position": 63,
+          "name": "Golden"
+        },
+        {
+          "position": 64,
+          "name": "every mod"
+        },
+        {
+          "position": 65,
+          "name": "silent"
+        },
+        {
+          "position": 66,
+          "name": "Sakupen Meg"
+        },
+        {
+          "position": 67,
+          "name": "tower of void"
+        },
+        {
+          "position": 68,
+          "name": "oloxer"
+        },
+        {
+          "position": 69,
+          "name": "polyethylene"
+        },
+        {
+          "position": 70,
+          "name": "musicismyflo"
+        },
+        {
+          "position": 71,
+          "name": "Gelionze"
+        },
+        {
+          "position": 72,
+          "name": "Processing Blast"
+        },
+        {
+          "position": 73,
+          "name": "interstellar"
+        },
+        {
+          "position": 74,
+          "name": "OnlyPlane"
+        },
+        {
+          "position": 75,
+          "name": "skeletal v2"
+        },
+        {
+          "position": 76,
+          "name": "bone snapper"
+        },
+        {
+          "position": 77,
+          "name": "ForTheRealGang"
+        },
+        {
+          "position": 78,
+          "name": "wave d"
+        },
+        {
+          "position": 79,
+          "name": "Driftaway Challenge"
+        },
+        {
+          "position": 80,
+          "name": "IllurY"
+        },
+        {
+          "position": 81,
+          "name": "The Three Immortals"
+        },
+        {
+          "position": 82,
+          "name": "Are"
+        },
+        {
+          "position": 83,
+          "name": "azric circles"
+        },
+        {
+          "position": 84,
+          "name": "Clickazor"
+        },
+        {
+          "position": 85,
+          "name": "Klimatic 2"
+        },
+        {
+          "position": 86,
+          "name": "Robot Challenge"
+        },
+        {
+          "position": 87,
+          "name": "Rooms"
+        },
+        {
+          "position": 88,
+          "name": "Sonic Pulse"
+        },
+        {
+          "position": 89,
+          "name": "CloudForm v2"
+        },
+        {
+          "position": 90,
+          "name": "Kokmok Unlid Beta"
+        },
+        {
+          "position": 91,
+          "name": "Death Note"
+        },
+        {
+          "position": 92,
+          "name": "Femboy Temple"
+        },
+        {
+          "position": 93,
+          "name": "deep swim"
+        },
+        {
+          "position": 94,
+          "name": "Hellspire"
+        },
+        {
+          "position": 95,
+          "name": "dark spine"
+        },
+        {
+          "position": 96,
+          "name": "Wave Challenge I"
+        },
+        {
+          "position": 97,
+          "name": "1Note"
+        },
+        {
+          "position": 98,
+          "name": "Goofing Off"
+        },
+        {
+          "position": 99,
+          "name": "challenge HUJ1"
+        },
+        {
+          "position": 100,
+          "name": "Impossible ship"
+        },
+        {
+          "position": 101,
+          "name": "Helium"
+        },
+        {
+          "position": 102,
+          "name": "Un name"
+        },
+        {
+          "position": 103,
+          "name": "saMkopL"
+        },
+        {
+          "position": 105,
+          "name": "El Eco De La Muerte"
+        },
+        {
+          "position": 106,
+          "name": "phobiabath"
+        },
+        {
+          "position": 107,
+          "name": "Can You RIP"
+        },
+        {
+          "position": 108,
+          "name": "Blurndess"
+        },
+        {
+          "position": 109,
+          "name": "wave"
+        },
+        {
+          "position": 110,
+          "name": "hard but possible"
+        },
+        {
+          "position": 111,
+          "name": "Sigma challenge"
+        },
+        {
+          "position": 112,
+          "name": "losing my mind pre2"
+        },
+        {
+          "position": 113,
+          "name": "Multi Wave"
+        },
+        {
+          "position": 114,
+          "name": "challenge HUJ2"
+        },
+        {
+          "position": 115,
+          "name": "The Complex 0s"
+        },
+        {
+          "position": 116,
+          "name": "Let Go"
+        },
+        {
+          "position": 117,
+          "name": "Ice Cave"
+        },
+        {
+          "position": 118,
+          "name": "Drop"
+        },
+        {
+          "position": 119,
+          "name": "The Seven Seas"
+        },
+        {
+          "position": 120,
+          "name": "Crazy Hell"
+        },
+        {
+          "position": 121,
+          "name": "Blue Layout buff"
+        },
+        {
+          "position": 122,
+          "name": "Spam 2"
+        },
+        {
+          "position": 123,
+          "name": "my first level"
+        },
+        {
+          "position": 124,
+          "name": "Flowershop"
+        },
+        {
+          "position": 125,
+          "name": "The Void 2"
+        },
+        {
+          "position": 126,
+          "name": "Splash"
+        },
+        {
+          "position": 127,
+          "name": "noSheiSatDevat"
+        },
+        {
+          "position": 128,
+          "name": "deathcrib"
+        },
+        {
+          "position": 129,
+          "name": "challenge HUJ3"
+        },
+        {
+          "position": 130,
+          "name": "Destruccion"
+        },
+        {
+          "position": 131,
+          "name": "mango mango 2"
+        },
+        {
+          "position": 132,
+          "name": "super good pro build"
+        },
+        {
+          "position": 133,
+          "name": "Dima Loh"
+        },
+        {
+          "position": 134,
+          "name": "my ordinary life"
+        },
+        {
+          "position": 135,
+          "name": "Avernus Challenge"
+        },
+        {
+          "position": 136,
+          "name": "spam"
+        },
+        {
+          "position": 137,
+          "name": "ocean wave"
+        },
+        {
+          "position": 138,
+          "name": "Note Conit"
+        },
+        {
+          "position": 139,
+          "name": "ice world"
+        },
+        {
+          "position": 140,
+          "name": "XMAS LEVEL"
+        },
+        {
+          "position": 141,
+          "name": "its not eyse"
+        },
+        {
+          "position": 142,
+          "name": "Impossible 3"
+        },
+        {
+          "position": 143,
+          "name": "Epsidev"
+        },
+        {
+          "position": 144,
+          "name": "hart"
+        },
+        {
+          "position": 145,
+          "name": "ez"
+        },
+        {
+          "position": 146,
+          "name": "demon part 3"
+        },
+        {
+          "position": 147,
+          "name": "lusty"
+        },
+        {
+          "position": 148,
+          "name": "zonk challenge"
+        },
+        {
+          "position": 149,
+          "name": "Death Note"
+        },
+        {
+          "position": 150,
+          "name": "Unnamed 2"
+        }
+      ]
+    },
+    "2025-12-15": {
+      "week": "recent",
+      "rankings": [
+        {
+          "position": 1,
+          "name": "LightSpeed"
+        },
+        {
+          "position": 2,
+          "name": "kaotik"
+        },
+        {
+          "position": 3,
+          "name": "projectflame"
+        },
+        {
+          "position": 4,
+          "name": "Joe Bidome"
+        },
+        {
+          "position": 5,
+          "name": "555"
+        },
+        {
+          "position": 6,
+          "name": "What You See"
+        },
+        {
+          "position": 7,
+          "name": "Loud ClubStep"
+        },
+        {
+          "position": 8,
+          "name": "Straight of God"
+        },
+        {
+          "position": 9,
+          "name": "Silent Snowcone"
+        },
+        {
+          "position": 10,
+          "name": "luithing"
+        },
+        {
+          "position": 11,
+          "name": "Dawn Break 3"
+        },
+        {
+          "position": 12,
+          "name": "Neon Flow"
+        },
+        {
+          "position": 13,
+          "name": "deimonx"
+        },
+        {
+          "position": 14,
+          "name": "Project 1"
+        },
+        {
+          "position": 15,
+          "name": "ChildBUFF"
+        },
+        {
+          "position": 16,
+          "name": "PSYCHOSOCIAL"
+        },
+        {
+          "position": 17,
+          "name": "supreme lawnmower"
+        },
+        {
+          "position": 18,
+          "name": "i bet you cant beat"
+        },
+        {
+          "position": 19,
+          "name": "old memories"
+        },
+        {
+          "position": 20,
+          "name": "fommy txt do verify"
+        },
+        {
+          "position": 21,
+          "name": "Solar Wind"
+        },
+        {
+          "position": 22,
+          "name": "wave challenge"
+        },
+        {
+          "position": 23,
+          "name": "UltraPulse"
+        },
+        {
+          "position": 24,
+          "name": "I HATE WHEN"
+        },
+        {
+          "position": 25,
+          "name": "HELL XI"
+        },
+        {
+          "position": 26,
+          "name": "the light circles"
+        },
+        {
+          "position": 27,
+          "name": "Ways"
+        },
+        {
+          "position": 28,
+          "name": "ANTANAGEN"
+        },
+        {
+          "position": 29,
+          "name": "HumbleBee"
+        },
+        {
+          "position": 30,
+          "name": "Bartus Grande"
+        },
+        {
+          "position": 31,
+          "name": "Black Sky"
+        },
+        {
+          "position": 32,
+          "name": "Warsaw"
+        },
+        {
+          "position": 33,
+          "name": "humpcore challenge"
+        },
+        {
+          "position": 34,
+          "name": "Beans and Onion"
+        },
+        {
+          "position": 35,
+          "name": "Hyperbreaker"
+        },
+        {
+          "position": 36,
+          "name": "Infinite"
+        },
+        {
+          "position": 37,
+          "name": "ochiru 2"
+        },
+        {
+          "position": 38,
+          "name": "Wave Thingy VI"
+        },
+        {
+          "position": 39,
+          "name": "fantasy love"
+        },
+        {
+          "position": 40,
+          "name": "Wavest Wave"
+        },
+        {
+          "position": 41,
+          "name": "NK"
+        },
+        {
+          "position": 42,
+          "name": "Saturnine"
+        },
+        {
+          "position": 43,
+          "name": "Dreamspace Circles"
+        },
+        {
+          "position": 44,
+          "name": "the ringer"
+        },
+        {
+          "position": 45,
+          "name": "papaingus sky Pro"
+        },
+        {
+          "position": 46,
+          "name": "the housing challeng"
+        },
+        {
+          "position": 47,
+          "name": "the dark kingdom"
+        },
+        {
+          "position": 48,
+          "name": "cruel world"
+        },
+        {
+          "position": 49,
+          "name": "wave challenge frien"
+        },
+        {
+          "position": 50,
+          "name": "the jordan"
+        },
+        {
+          "position": 51,
+          "name": "Wave Consistency"
+        },
+        {
+          "position": 52,
+          "name": "Think Space 0 Full"
+        },
+        {
+          "position": 53,
+          "name": "pale bread"
+        },
+        {
+          "position": 54,
+          "name": "FIVE CIRCLES"
+        },
+        {
+          "position": 55,
+          "name": "cry"
+        },
+        {
+          "position": 56,
+          "name": "alone"
+        },
+        {
+          "position": 57,
+          "name": "lobotomy travel"
+        },
+        {
+          "position": 58,
+          "name": "Malin I"
+        },
+        {
+          "position": 59,
+          "name": "Unnamed 60"
+        },
+        {
+          "position": 60,
+          "name": "gun powder 2"
+        },
+        {
+          "position": 61,
+          "name": "From The End"
+        },
+        {
+          "position": 62,
+          "name": "Hard Challenge"
+        },
+        {
+          "position": 63,
+          "name": "Golden"
+        },
+        {
+          "position": 64,
+          "name": "every mod"
+        },
+        {
+          "position": 65,
+          "name": "silent"
+        },
+        {
+          "position": 66,
+          "name": "Sakupen Meg"
+        },
+        {
+          "position": 67,
+          "name": "tower of void"
+        },
+        {
+          "position": 68,
+          "name": "oloxer"
+        },
+        {
+          "position": 69,
+          "name": "polyethylene"
+        },
+        {
+          "position": 70,
+          "name": "musicismyflo"
+        },
+        {
+          "position": 71,
+          "name": "Gelionze"
+        },
+        {
+          "position": 72,
+          "name": "Processing Blast"
+        },
+        {
+          "position": 73,
+          "name": "interstellar"
+        },
+        {
+          "position": 74,
+          "name": "OnlyPlane"
+        },
+        {
+          "position": 75,
+          "name": "skeletal v2"
+        },
+        {
+          "position": 76,
+          "name": "bone snapper"
+        },
+        {
+          "position": 77,
+          "name": "ForTheRealGang"
+        },
+        {
+          "position": 78,
+          "name": "wave d"
+        },
+        {
+          "position": 79,
+          "name": "Driftaway Challenge"
+        },
+        {
+          "position": 80,
+          "name": "IllurY"
+        },
+        {
+          "position": 81,
+          "name": "The Three Immortals"
+        },
+        {
+          "position": 82,
+          "name": "Are"
+        },
+        {
+          "position": 83,
+          "name": "azric circles"
+        },
+        {
+          "position": 84,
+          "name": "Clickazor"
+        },
+        {
+          "position": 85,
+          "name": "Klimatic 2"
+        },
+        {
+          "position": 86,
+          "name": "Robot Challenge"
+        },
+        {
+          "position": 87,
+          "name": "Rooms"
+        },
+        {
+          "position": 88,
+          "name": "Sonic Pulse"
+        },
+        {
+          "position": 89,
+          "name": "CloudForm v2"
+        },
+        {
+          "position": 90,
+          "name": "Kokmok Unlid Beta"
+        },
+        {
+          "position": 91,
+          "name": "Death Note"
+        },
+        {
+          "position": 92,
+          "name": "Femboy Temple"
+        },
+        {
+          "position": 93,
+          "name": "deep swim"
+        },
+        {
+          "position": 94,
+          "name": "Hellspire"
+        },
+        {
+          "position": 95,
+          "name": "dark spine"
+        },
+        {
+          "position": 96,
+          "name": "Wave Challenge I"
+        },
+        {
+          "position": 97,
+          "name": "1Note"
+        },
+        {
+          "position": 98,
+          "name": "Goofing Off"
+        },
+        {
+          "position": 99,
+          "name": "challenge HUJ1"
+        },
+        {
+          "position": 100,
+          "name": "Impossible ship"
+        },
+        {
+          "position": 101,
+          "name": "Helium"
+        },
+        {
+          "position": 102,
+          "name": "Un name"
+        },
+        {
+          "position": 103,
+          "name": "saMkopL"
+        },
+        {
+          "position": 105,
+          "name": "El Eco De La Muerte"
+        },
+        {
+          "position": 106,
+          "name": "phobiabath"
+        },
+        {
+          "position": 107,
+          "name": "Can You RIP"
+        },
+        {
+          "position": 108,
+          "name": "Blurndess"
+        },
+        {
+          "position": 109,
+          "name": "wave"
+        },
+        {
+          "position": 110,
+          "name": "hard but possible"
+        },
+        {
+          "position": 111,
+          "name": "Sigma challenge"
+        },
+        {
+          "position": 112,
+          "name": "losing my mind pre2"
+        },
+        {
+          "position": 113,
+          "name": "Multi Wave"
+        },
+        {
+          "position": 114,
+          "name": "challenge HUJ2"
+        },
+        {
+          "position": 115,
+          "name": "The Complex 0s"
+        },
+        {
+          "position": 116,
+          "name": "Let Go"
+        },
+        {
+          "position": 117,
+          "name": "Ice Cave"
+        },
+        {
+          "position": 118,
+          "name": "Drop"
+        },
+        {
+          "position": 119,
+          "name": "The Seven Seas"
+        },
+        {
+          "position": 120,
+          "name": "Crazy Hell"
+        },
+        {
+          "position": 121,
+          "name": "Blue Layout buff"
+        },
+        {
+          "position": 122,
+          "name": "Spam 2"
+        },
+        {
+          "position": 123,
+          "name": "my first level"
+        },
+        {
+          "position": 124,
+          "name": "Flowershop"
+        },
+        {
+          "position": 125,
+          "name": "The Void 2"
+        },
+        {
+          "position": 126,
+          "name": "Splash"
+        },
+        {
+          "position": 127,
+          "name": "noSheiSatDevat"
+        },
+        {
+          "position": 128,
+          "name": "deathcrib"
+        },
+        {
+          "position": 129,
+          "name": "challenge HUJ3"
+        },
+        {
+          "position": 130,
+          "name": "Destruccion"
+        },
+        {
+          "position": 131,
+          "name": "mango mango 2"
+        },
+        {
+          "position": 132,
+          "name": "super good pro build"
+        },
+        {
+          "position": 133,
+          "name": "Dima Loh"
+        },
+        {
+          "position": 134,
+          "name": "my ordinary life"
+        },
+        {
+          "position": 135,
+          "name": "Avernus Challenge"
+        },
+        {
+          "position": 136,
+          "name": "spam"
+        },
+        {
+          "position": 137,
+          "name": "ocean wave"
+        },
+        {
+          "position": 138,
+          "name": "Note Conit"
+        },
+        {
+          "position": 139,
+          "name": "ice world"
+        },
+        {
+          "position": 140,
+          "name": "XMAS LEVEL"
+        },
+        {
+          "position": 141,
+          "name": "its not eyse"
+        },
+        {
+          "position": 142,
+          "name": "Impossible 3"
+        },
+        {
+          "position": 143,
+          "name": "Epsidev"
+        },
+        {
+          "position": 144,
+          "name": "hart"
+        },
+        {
+          "position": 145,
+          "name": "ez"
+        },
+        {
+          "position": 146,
+          "name": "demon part 3"
+        },
+        {
+          "position": 147,
+          "name": "lusty"
+        },
+        {
+          "position": 148,
+          "name": "zonk challenge"
+        },
+        {
+          "position": 149,
+          "name": "Death Note"
+        },
+        {
+          "position": 150,
+          "name": "Unnamed 2"
+        }
+      ]
+    },
+    "2025-12-22": {
+      "week": "recent",
+      "rankings": [
+        {
+          "position": 1,
+          "name": "LightSpeed"
+        },
+        {
+          "position": 2,
+          "name": "kaotik"
+        },
+        {
+          "position": 3,
+          "name": "projectflame"
+        },
+        {
+          "position": 4,
+          "name": "Joe Bidome"
+        },
+        {
+          "position": 5,
+          "name": "555"
+        },
+        {
+          "position": 6,
+          "name": "What You See"
+        },
+        {
+          "position": 7,
+          "name": "Loud ClubStep"
+        },
+        {
+          "position": 8,
+          "name": "Straight of God"
+        },
+        {
+          "position": 9,
+          "name": "Silent Snowcone"
+        },
+        {
+          "position": 10,
+          "name": "luithing"
+        },
+        {
+          "position": 11,
+          "name": "Dawn Break 3"
+        },
+        {
+          "position": 12,
+          "name": "Neon Flow"
+        },
+        {
+          "position": 13,
+          "name": "deimonx"
+        },
+        {
+          "position": 14,
+          "name": "Project 1"
+        },
+        {
+          "position": 15,
+          "name": "ChildBUFF"
+        },
+        {
+          "position": 16,
+          "name": "PSYCHOSOCIAL"
+        },
+        {
+          "position": 17,
+          "name": "supreme lawnmower"
+        },
+        {
+          "position": 18,
+          "name": "i bet you cant beat"
+        },
+        {
+          "position": 19,
+          "name": "old memories"
+        },
+        {
+          "position": 20,
+          "name": "fommy txt do verify"
+        },
+        {
+          "position": 21,
+          "name": "Solar Wind"
+        },
+        {
+          "position": 22,
+          "name": "wave challenge"
+        },
+        {
+          "position": 23,
+          "name": "UltraPulse"
+        },
+        {
+          "position": 24,
+          "name": "I HATE WHEN"
+        },
+        {
+          "position": 25,
+          "name": "HELL XI"
+        },
+        {
+          "position": 26,
+          "name": "the light circles"
+        },
+        {
+          "position": 27,
+          "name": "Ways"
+        },
+        {
+          "position": 28,
+          "name": "ANTANAGEN"
+        },
+        {
+          "position": 29,
+          "name": "HumbleBee"
+        },
+        {
+          "position": 30,
+          "name": "Bartus Grande"
+        },
+        {
+          "position": 31,
+          "name": "Black Sky"
+        },
+        {
+          "position": 32,
+          "name": "Warsaw"
+        },
+        {
+          "position": 33,
+          "name": "humpcore challenge"
+        },
+        {
+          "position": 34,
+          "name": "Beans and Onion"
+        },
+        {
+          "position": 35,
+          "name": "Hyperbreaker"
+        },
+        {
+          "position": 36,
+          "name": "Infinite"
+        },
+        {
+          "position": 37,
+          "name": "ochiru 2"
+        },
+        {
+          "position": 38,
+          "name": "Wave Thingy VI"
+        },
+        {
+          "position": 39,
+          "name": "fantasy love"
+        },
+        {
+          "position": 40,
+          "name": "Wavest Wave"
+        },
+        {
+          "position": 41,
+          "name": "NK"
+        },
+        {
+          "position": 42,
+          "name": "Saturnine"
+        },
+        {
+          "position": 43,
+          "name": "Dreamspace Circles"
+        },
+        {
+          "position": 44,
+          "name": "the ringer"
+        },
+        {
+          "position": 45,
+          "name": "papaingus sky Pro"
+        },
+        {
+          "position": 46,
+          "name": "the housing challeng"
+        },
+        {
+          "position": 47,
+          "name": "the dark kingdom"
+        },
+        {
+          "position": 48,
+          "name": "cruel world"
+        },
+        {
+          "position": 49,
+          "name": "wave challenge frien"
+        },
+        {
+          "position": 50,
+          "name": "the jordan"
+        },
+        {
+          "position": 51,
+          "name": "Wave Consistency"
+        },
+        {
+          "position": 52,
+          "name": "Think Space 0 Full"
+        },
+        {
+          "position": 53,
+          "name": "pale bread"
+        },
+        {
+          "position": 54,
+          "name": "FIVE CIRCLES"
+        },
+        {
+          "position": 55,
+          "name": "cry"
+        },
+        {
+          "position": 56,
+          "name": "alone"
+        },
+        {
+          "position": 57,
+          "name": "lobotomy travel"
+        },
+        {
+          "position": 58,
+          "name": "Malin I"
+        },
+        {
+          "position": 59,
+          "name": "Unnamed 60"
+        },
+        {
+          "position": 60,
+          "name": "gun powder 2"
+        },
+        {
+          "position": 61,
+          "name": "From The End"
+        },
+        {
+          "position": 62,
+          "name": "Hard Challenge"
+        },
+        {
+          "position": 63,
+          "name": "Golden"
+        },
+        {
+          "position": 64,
+          "name": "every mod"
+        },
+        {
+          "position": 65,
+          "name": "silent"
+        },
+        {
+          "position": 66,
+          "name": "Sakupen Meg"
+        },
+        {
+          "position": 67,
+          "name": "tower of void"
+        },
+        {
+          "position": 68,
+          "name": "oloxer"
+        },
+        {
+          "position": 69,
+          "name": "polyethylene"
+        },
+        {
+          "position": 70,
+          "name": "musicismyflo"
+        },
+        {
+          "position": 71,
+          "name": "Gelionze"
+        },
+        {
+          "position": 72,
+          "name": "Processing Blast"
+        },
+        {
+          "position": 73,
+          "name": "interstellar"
+        },
+        {
+          "position": 74,
+          "name": "OnlyPlane"
+        },
+        {
+          "position": 75,
+          "name": "skeletal v2"
+        },
+        {
+          "position": 76,
+          "name": "bone snapper"
+        },
+        {
+          "position": 77,
+          "name": "ForTheRealGang"
+        },
+        {
+          "position": 78,
+          "name": "wave d"
+        },
+        {
+          "position": 79,
+          "name": "Driftaway Challenge"
+        },
+        {
+          "position": 80,
+          "name": "IllurY"
+        },
+        {
+          "position": 81,
+          "name": "The Three Immortals"
+        },
+        {
+          "position": 82,
+          "name": "Are"
+        },
+        {
+          "position": 83,
+          "name": "azric circles"
+        },
+        {
+          "position": 84,
+          "name": "Clickazor"
+        },
+        {
+          "position": 85,
+          "name": "Klimatic 2"
+        },
+        {
+          "position": 86,
+          "name": "Robot Challenge"
+        },
+        {
+          "position": 87,
+          "name": "Rooms"
+        },
+        {
+          "position": 88,
+          "name": "Sonic Pulse"
+        },
+        {
+          "position": 89,
+          "name": "CloudForm v2"
+        },
+        {
+          "position": 90,
+          "name": "Kokmok Unlid Beta"
+        },
+        {
+          "position": 91,
+          "name": "Death Note"
+        },
+        {
+          "position": 92,
+          "name": "Femboy Temple"
+        },
+        {
+          "position": 93,
+          "name": "deep swim"
+        },
+        {
+          "position": 94,
+          "name": "Hellspire"
+        },
+        {
+          "position": 95,
+          "name": "dark spine"
+        },
+        {
+          "position": 96,
+          "name": "Wave Challenge I"
+        },
+        {
+          "position": 97,
+          "name": "1Note"
+        },
+        {
+          "position": 98,
+          "name": "Goofing Off"
+        },
+        {
+          "position": 99,
+          "name": "challenge HUJ1"
+        },
+        {
+          "position": 100,
+          "name": "Impossible ship"
+        },
+        {
+          "position": 101,
+          "name": "Helium"
+        },
+        {
+          "position": 102,
+          "name": "Un name"
+        },
+        {
+          "position": 103,
+          "name": "saMkopL"
+        },
+        {
+          "position": 105,
+          "name": "El Eco De La Muerte"
+        },
+        {
+          "position": 106,
+          "name": "phobiabath"
+        },
+        {
+          "position": 107,
+          "name": "Can You RIP"
+        },
+        {
+          "position": 108,
+          "name": "Blurndess"
+        },
+        {
+          "position": 109,
+          "name": "wave"
+        },
+        {
+          "position": 110,
+          "name": "hard but possible"
+        },
+        {
+          "position": 111,
+          "name": "Sigma challenge"
+        },
+        {
+          "position": 112,
+          "name": "losing my mind pre2"
+        },
+        {
+          "position": 113,
+          "name": "Multi Wave"
+        },
+        {
+          "position": 114,
+          "name": "challenge HUJ2"
+        },
+        {
+          "position": 115,
+          "name": "The Complex 0s"
+        },
+        {
+          "position": 116,
+          "name": "Let Go"
+        },
+        {
+          "position": 117,
+          "name": "Ice Cave"
+        },
+        {
+          "position": 118,
+          "name": "Drop"
+        },
+        {
+          "position": 119,
+          "name": "The Seven Seas"
+        },
+        {
+          "position": 120,
+          "name": "Crazy Hell"
+        },
+        {
+          "position": 121,
+          "name": "Blue Layout buff"
+        },
+        {
+          "position": 122,
+          "name": "Spam 2"
+        },
+        {
+          "position": 123,
+          "name": "my first level"
+        },
+        {
+          "position": 124,
+          "name": "Flowershop"
+        },
+        {
+          "position": 125,
+          "name": "The Void 2"
+        },
+        {
+          "position": 126,
+          "name": "Splash"
+        },
+        {
+          "position": 127,
+          "name": "noSheiSatDevat"
+        },
+        {
+          "position": 128,
+          "name": "deathcrib"
+        },
+        {
+          "position": 129,
+          "name": "challenge HUJ3"
+        },
+        {
+          "position": 130,
+          "name": "Destruccion"
+        },
+        {
+          "position": 131,
+          "name": "mango mango 2"
+        },
+        {
+          "position": 132,
+          "name": "super good pro build"
+        },
+        {
+          "position": 133,
+          "name": "Dima Loh"
+        },
+        {
+          "position": 134,
+          "name": "my ordinary life"
+        },
+        {
+          "position": 135,
+          "name": "Avernus Challenge"
+        },
+        {
+          "position": 136,
+          "name": "spam"
+        },
+        {
+          "position": 137,
+          "name": "ocean wave"
+        },
+        {
+          "position": 138,
+          "name": "Note Conit"
+        },
+        {
+          "position": 139,
+          "name": "ice world"
+        },
+        {
+          "position": 140,
+          "name": "XMAS LEVEL"
+        },
+        {
+          "position": 141,
+          "name": "its not eyse"
+        },
+        {
+          "position": 142,
+          "name": "Impossible 3"
+        },
+        {
+          "position": 143,
+          "name": "Epsidev"
+        },
+        {
+          "position": 144,
+          "name": "hart"
+        },
+        {
+          "position": 145,
+          "name": "ez"
+        },
+        {
+          "position": 146,
+          "name": "demon part 3"
+        },
+        {
+          "position": 147,
+          "name": "lusty"
+        },
+        {
+          "position": 148,
+          "name": "zonk challenge"
+        },
+        {
+          "position": 149,
+          "name": "Death Note"
+        },
+        {
+          "position": 150,
+          "name": "Unnamed 2"
+        }
+      ]
+    },
+    "2025-12-29": {
+      "week": "recent",
+      "rankings": [
+        {
+          "position": 1,
+          "name": "LightSpeed"
+        },
+        {
+          "position": 2,
+          "name": "kaotik"
+        },
+        {
+          "position": 3,
+          "name": "projectflame"
+        },
+        {
+          "position": 4,
+          "name": "Joe Bidome"
+        },
+        {
+          "position": 5,
+          "name": "555"
+        },
+        {
+          "position": 6,
+          "name": "What You See"
+        },
+        {
+          "position": 7,
+          "name": "Loud ClubStep"
+        },
+        {
+          "position": 8,
+          "name": "Straight of God"
+        },
+        {
+          "position": 9,
+          "name": "Silent Snowcone"
+        },
+        {
+          "position": 10,
+          "name": "luithing"
+        },
+        {
+          "position": 11,
+          "name": "Dawn Break 3"
+        },
+        {
+          "position": 12,
+          "name": "Neon Flow"
+        },
+        {
+          "position": 13,
+          "name": "deimonx"
+        },
+        {
+          "position": 14,
+          "name": "Project 1"
+        },
+        {
+          "position": 15,
+          "name": "ChildBUFF"
+        },
+        {
+          "position": 16,
+          "name": "PSYCHOSOCIAL"
+        },
+        {
+          "position": 17,
+          "name": "supreme lawnmower"
+        },
+        {
+          "position": 18,
+          "name": "i bet you cant beat"
+        },
+        {
+          "position": 19,
+          "name": "old memories"
+        },
+        {
+          "position": 20,
+          "name": "fommy txt do verify"
+        },
+        {
+          "position": 21,
+          "name": "Solar Wind"
+        },
+        {
+          "position": 22,
+          "name": "wave challenge"
+        },
+        {
+          "position": 23,
+          "name": "UltraPulse"
+        },
+        {
+          "position": 24,
+          "name": "I HATE WHEN"
+        },
+        {
+          "position": 25,
+          "name": "HELL XI"
+        },
+        {
+          "position": 26,
+          "name": "the light circles"
+        },
+        {
+          "position": 27,
+          "name": "Ways"
+        },
+        {
+          "position": 28,
+          "name": "ANTANAGEN"
+        },
+        {
+          "position": 29,
+          "name": "HumbleBee"
+        },
+        {
+          "position": 30,
+          "name": "Bartus Grande"
+        },
+        {
+          "position": 31,
+          "name": "Black Sky"
+        },
+        {
+          "position": 32,
+          "name": "Warsaw"
+        },
+        {
+          "position": 33,
+          "name": "humpcore challenge"
+        },
+        {
+          "position": 34,
+          "name": "Beans and Onion"
+        },
+        {
+          "position": 35,
+          "name": "Hyperbreaker"
+        },
+        {
+          "position": 36,
+          "name": "Infinite"
+        },
+        {
+          "position": 37,
+          "name": "ochiru 2"
+        },
+        {
+          "position": 38,
+          "name": "Wave Thingy VI"
+        },
+        {
+          "position": 39,
+          "name": "fantasy love"
+        },
+        {
+          "position": 40,
+          "name": "Wavest Wave"
+        },
+        {
+          "position": 41,
+          "name": "NK"
+        },
+        {
+          "position": 42,
+          "name": "Saturnine"
+        },
+        {
+          "position": 43,
+          "name": "Dreamspace Circles"
+        },
+        {
+          "position": 44,
+          "name": "the ringer"
+        },
+        {
+          "position": 45,
+          "name": "papaingus sky Pro"
+        },
+        {
+          "position": 46,
+          "name": "the housing challeng"
+        },
+        {
+          "position": 47,
+          "name": "the dark kingdom"
+        },
+        {
+          "position": 48,
+          "name": "cruel world"
+        },
+        {
+          "position": 49,
+          "name": "wave challenge frien"
+        },
+        {
+          "position": 50,
+          "name": "the jordan"
+        },
+        {
+          "position": 51,
+          "name": "Wave Consistency"
+        },
+        {
+          "position": 52,
+          "name": "Think Space 0 Full"
+        },
+        {
+          "position": 53,
+          "name": "pale bread"
+        },
+        {
+          "position": 54,
+          "name": "FIVE CIRCLES"
+        },
+        {
+          "position": 55,
+          "name": "cry"
+        },
+        {
+          "position": 56,
+          "name": "alone"
+        },
+        {
+          "position": 57,
+          "name": "lobotomy travel"
+        },
+        {
+          "position": 58,
+          "name": "Malin I"
+        },
+        {
+          "position": 59,
+          "name": "Unnamed 60"
+        },
+        {
+          "position": 60,
+          "name": "gun powder 2"
+        },
+        {
+          "position": 61,
+          "name": "From The End"
+        },
+        {
+          "position": 62,
+          "name": "Hard Challenge"
+        },
+        {
+          "position": 63,
+          "name": "Golden"
+        },
+        {
+          "position": 64,
+          "name": "every mod"
+        },
+        {
+          "position": 65,
+          "name": "silent"
+        },
+        {
+          "position": 66,
+          "name": "Sakupen Meg"
+        },
+        {
+          "position": 67,
+          "name": "tower of void"
+        },
+        {
+          "position": 68,
+          "name": "oloxer"
+        },
+        {
+          "position": 69,
+          "name": "polyethylene"
+        },
+        {
+          "position": 70,
+          "name": "musicismyflo"
+        },
+        {
+          "position": 71,
+          "name": "Gelionze"
+        },
+        {
+          "position": 72,
+          "name": "Processing Blast"
+        },
+        {
+          "position": 73,
+          "name": "interstellar"
+        },
+        {
+          "position": 74,
+          "name": "OnlyPlane"
+        },
+        {
+          "position": 75,
+          "name": "skeletal v2"
+        },
+        {
+          "position": 76,
+          "name": "bone snapper"
+        },
+        {
+          "position": 77,
+          "name": "ForTheRealGang"
+        },
+        {
+          "position": 78,
+          "name": "wave d"
+        },
+        {
+          "position": 79,
+          "name": "Driftaway Challenge"
+        },
+        {
+          "position": 80,
+          "name": "IllurY"
+        },
+        {
+          "position": 81,
+          "name": "The Three Immortals"
+        },
+        {
+          "position": 82,
+          "name": "Are"
+        },
+        {
+          "position": 83,
+          "name": "azric circles"
+        },
+        {
+          "position": 84,
+          "name": "Clickazor"
+        },
+        {
+          "position": 85,
+          "name": "Klimatic 2"
+        },
+        {
+          "position": 86,
+          "name": "Robot Challenge"
+        },
+        {
+          "position": 87,
+          "name": "Rooms"
+        },
+        {
+          "position": 88,
+          "name": "Sonic Pulse"
+        },
+        {
+          "position": 89,
+          "name": "CloudForm v2"
+        },
+        {
+          "position": 90,
+          "name": "Kokmok Unlid Beta"
+        },
+        {
+          "position": 91,
+          "name": "Death Note"
+        },
+        {
+          "position": 92,
+          "name": "Femboy Temple"
+        },
+        {
+          "position": 93,
+          "name": "deep swim"
+        },
+        {
+          "position": 94,
+          "name": "Hellspire"
+        },
+        {
+          "position": 95,
+          "name": "dark spine"
+        },
+        {
+          "position": 96,
+          "name": "Wave Challenge I"
+        },
+        {
+          "position": 97,
+          "name": "1Note"
+        },
+        {
+          "position": 98,
+          "name": "Goofing Off"
+        },
+        {
+          "position": 99,
+          "name": "challenge HUJ1"
+        },
+        {
+          "position": 100,
+          "name": "Impossible ship"
+        },
+        {
+          "position": 101,
+          "name": "Helium"
+        },
+        {
+          "position": 102,
+          "name": "Un name"
+        },
+        {
+          "position": 103,
+          "name": "saMkopL"
+        },
+        {
+          "position": 105,
+          "name": "El Eco De La Muerte"
+        },
+        {
+          "position": 106,
+          "name": "phobiabath"
+        },
+        {
+          "position": 107,
+          "name": "Can You RIP"
+        },
+        {
+          "position": 108,
+          "name": "Blurndess"
+        },
+        {
+          "position": 109,
+          "name": "wave"
+        },
+        {
+          "position": 110,
+          "name": "hard but possible"
+        },
+        {
+          "position": 111,
+          "name": "Sigma challenge"
+        },
+        {
+          "position": 112,
+          "name": "losing my mind pre2"
+        },
+        {
+          "position": 113,
+          "name": "Multi Wave"
+        },
+        {
+          "position": 114,
+          "name": "challenge HUJ2"
+        },
+        {
+          "position": 115,
+          "name": "The Complex 0s"
+        },
+        {
+          "position": 116,
+          "name": "Let Go"
+        },
+        {
+          "position": 117,
+          "name": "Ice Cave"
+        },
+        {
+          "position": 118,
+          "name": "Drop"
+        },
+        {
+          "position": 119,
+          "name": "The Seven Seas"
+        },
+        {
+          "position": 120,
+          "name": "Crazy Hell"
+        },
+        {
+          "position": 121,
+          "name": "Blue Layout buff"
+        },
+        {
+          "position": 122,
+          "name": "Spam 2"
+        },
+        {
+          "position": 123,
+          "name": "my first level"
+        },
+        {
+          "position": 124,
+          "name": "Flowershop"
+        },
+        {
+          "position": 125,
+          "name": "The Void 2"
+        },
+        {
+          "position": 126,
+          "name": "Splash"
+        },
+        {
+          "position": 127,
+          "name": "noSheiSatDevat"
+        },
+        {
+          "position": 128,
+          "name": "deathcrib"
+        },
+        {
+          "position": 129,
+          "name": "challenge HUJ3"
+        },
+        {
+          "position": 130,
+          "name": "Destruccion"
+        },
+        {
+          "position": 131,
+          "name": "mango mango 2"
+        },
+        {
+          "position": 132,
+          "name": "super good pro build"
+        },
+        {
+          "position": 133,
+          "name": "Dima Loh"
+        },
+        {
+          "position": 134,
+          "name": "my ordinary life"
+        },
+        {
+          "position": 135,
+          "name": "Avernus Challenge"
+        },
+        {
+          "position": 136,
+          "name": "spam"
+        },
+        {
+          "position": 137,
+          "name": "ocean wave"
+        },
+        {
+          "position": 138,
+          "name": "Note Conit"
+        },
+        {
+          "position": 139,
+          "name": "ice world"
+        },
+        {
+          "position": 140,
+          "name": "XMAS LEVEL"
+        },
+        {
+          "position": 141,
+          "name": "its not eyse"
+        },
+        {
+          "position": 142,
+          "name": "Impossible 3"
+        },
+        {
+          "position": 143,
+          "name": "Epsidev"
+        },
+        {
+          "position": 144,
+          "name": "hart"
+        },
+        {
+          "position": 145,
+          "name": "ez"
+        },
+        {
+          "position": 146,
+          "name": "demon part 3"
+        },
+        {
+          "position": 147,
+          "name": "lusty"
+        },
+        {
+          "position": 148,
+          "name": "zonk challenge"
+        },
+        {
+          "position": 149,
+          "name": "Death Note"
+        },
+        {
+          "position": 150,
+          "name": "Unnamed 2"
         }
       ]
     }

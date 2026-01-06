@@ -32,14 +32,14 @@
             <div class="card-header bg-primary text-white">
                 <div class="row align-items-center">
                     <div class="col-md-6">
-                        <h4 class="mb-0">📋 Main List</h4>
+                        <h4 class="mb-0">📋 {{ get_translation('main_list') }}</h4>
                     </div>
                     <div class="col-md-6">
                         <form action="{{ url_for('search_levels') }}" method="GET" class="d-flex">
                             <div class="input-group input-group-sm">
                                 <span class="input-group-text bg-white">🔍</span>
-                                <input type="text" name="q" class="form-control" placeholder="Search all levels..." value="{{ request.args.get('q', '') }}">
-                                <button class="btn btn-outline-light" type="submit">Search</button>
+                                <input type="text" name="q" class="form-control" placeholder="{{ get_translation('search_all_levels') }}" value="{{ request.args.get('q', '') }}">
+                                <button class="btn btn-outline-light" type="submit">{{ get_translation('search') }}</button>
 
                             </div>
                         </form>
@@ -120,11 +120,28 @@
                     </div>
                     <div class="flex-grow-1">
                         <h5 class="mb-1">{{ level.get('name', 'Unknown') }}</h5>
-                        <p class="mb-1 text-muted">by {{ level.get('creator', 'Unknown') }}</p>
-                        <small class="text-muted d-block">verified by {{ level.get('verifier', 'Unknown') }}</small>
+                        <p class="mb-1 text-muted">{{ get_translation('by') }} {{ level.get('creator', 'Unknown') }}</p>
+                        <small class="text-muted d-block">{{ get_translation('verified_by') }} {{ level.get('verifier', 'Unknown') }}</small>
                         {% if level.get('level_id') %}
-                            <small class="text-muted d-block">ID: {{ level.get('level_id') }}</small>
+                            <div class="d-flex align-items-center">
+                                <small class="text-muted me-2">ID: {{ level.get('level_id') }}</small>
+                                <button class="btn btn-sm btn-outline-secondary copy-id-btn" 
+                                        data-id="{{ level.get('level_id') }}" 
+                                        title="Copy Level ID">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
                         {% endif %}
+                        
+                        <!-- Points System Display -->
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                {% set position = level.get('position', 0) %}
+                                {% set points_100 = (250 * (0.9636214148582346 ** (position - 1)))|round(2) %}
+                                {% set points_79 = (points_100 * 0.79)|round(2) %}
+                                {{ format_points(points_79) }} (79%) — {{ format_points(points_100) }} (100%) points
+                            </small>
+                        </div>
                     </div>
                     <div class="text-end">
                         {% set difficulty = (level.difficulty|default(5.0)|float)|round|int if level is not mapping else (level['difficulty']|default(5.0)|float)|round|int %}
@@ -146,7 +163,7 @@
             <div class="card-footer">
                 <div class="text-center">
                     <small class="text-muted">
-                        Showing all {{ total_levels }} levels
+                        {{ get_translation('showing_all_levels') }} {{ total_levels }} {{ get_translation('levels') }}
                     </small>
                 </div>
             </div>
@@ -156,11 +173,11 @@
     <div class="col-lg-4">
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-secondary text-white">
-                <h4 class="mb-0">About</h4>
+                <h4 class="mb-0">{{ get_translation('about') }}</h4>
             </div>
             <div class="card-body">
-                <p>Welcome to the GD Recent Tab List! This is a community-driven list that ranks recent tab levels by difficulty.</p>
-                <p>Click on any level to view more details, including records and information about the level.</p>
+                <p>{{ get_translation('about_text_1') }}</p>
+                <p>{{ get_translation('about_text_2') }}</p>
             </div>
         </div>
         
@@ -169,33 +186,195 @@
         <!-- Simple Discord Invite -->
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-primary text-white">
-                <h4 class="mb-0"><i class="fab fa-discord me-2"></i>Discord Server</h4>
+                <h4 class="mb-0"><i class="fab fa-discord me-2"></i>{{ get_translation('discord_server') }}</h4>
             </div>
             <div class="card-body text-center">
-                <p class="mb-3">Join our community for discussions and level submissions!</p>
+                <p class="mb-3">{{ get_translation('discord_text') }}</p>
                 <a href="https://discord.gg/TSjXSecuaz" target="_blank" class="btn btn-primary">
-                    <i class="fab fa-discord me-2"></i>Join Discord Server
+                    <i class="fab fa-discord me-2"></i>{{ get_translation('join_discord') }}
                 </a>
             </div>
         </div>
         
         <div class="card shadow-sm">
             <div class="card-header bg-success text-white">
-                <h4 class="mb-0">Credits</h4>
+                <h4 class="mb-0">{{ get_translation('credits') }}</h4>
             </div>
             <div class="card-body">
-                <p><strong>List Admin:</strong> <span class="credit-name" data-person="miifin">Miifin</span></p>
-                <p><strong>List Moderators:</strong> 
-                    <span class="credit-name" data-person="kye">Kye</span>, 
+                <p><strong>{{ get_translation('list_admin') }}:</strong> <span class="credit-name" data-person="miifin">Miifin</span></p>
+                <p><strong>{{ get_translation('list_moderators') }}:</strong> 
                     <span class="credit-name" data-person="monika">Monika</span>, 
                     <span class="credit-name" data-person="applepi">ApplePi</span>, 
                     <span class="credit-name" data-person="dairyfarmer">DairyFarmer</span>, 
                     <span class="credit-name" data-person="scorch">Scorch</span>
                 </p>
-                <p><strong>List Coders:</strong> <span class="credit-name" data-person="engine">ENGINE</span>, <span class="credit-name" data-person="scorch">Scorch</span></p>
-                <p><strong>Server Moderator:</strong> <span class="credit-name" data-person="cesium">Cesium</span></p>
+                <p><strong>{{ get_translation('list_coders') }}:</strong> <span class="credit-name" data-person="engine">ENGINE</span>, <span class="credit-name" data-person="scorch">Scorch</span></p>
+                <p><strong>{{ get_translation('server_moderator') }}:</strong> <span class="credit-name" data-person="cesium">Cesium</span></p>
             </div>
         </div>
+
+        <!-- Action Cards - Vertical Layout -->
+        <div class="mt-4">
+            <div class="mb-3">
+                <div class="card action-card">
+                    <div class="card-header text-center">
+                        <h3 class="card-title mb-0">{{ get_translation('guidelines') }}</h3>
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <div class="card-content flex-grow-1">
+                            <p class="card-text">{{ get_translation('guidelines_text') }}</p>
+                        </div>
+                        <div class="card-button mt-auto">
+                            <a href="{{ url_for('guidelines') }}" class="btn btn-action w-100">
+                                📖 {{ get_translation('read_guidelines') }}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="mb-3">
+                <div class="card action-card">
+                    <div class="card-header text-center">
+                        <h3 class="card-title mb-0">{{ get_translation('submit_records') }}</h3>
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <div class="card-content flex-grow-1">
+                            <p class="card-text">{{ get_translation('submit_text') }}</p>
+                        </div>
+                        <div class="card-button mt-auto">
+                            <a href="{{ url_for('submit_record') }}" class="btn btn-action w-100">
+                                🏆 {{ get_translation('submit_record_btn') }}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="mb-3">
+                <div class="card action-card">
+                    <div class="card-header text-center">
+                        <h3 class="card-title mb-0">{{ get_translation('stats_viewer') }}</h3>
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <div class="card-content flex-grow-1">
+                            <p class="card-text">{{ get_translation('stats_text') }}</p>
+                        </div>
+                        <div class="card-button mt-auto">
+                            <a href="{{ url_for('stats_viewer') }}" class="btn btn-action w-100">
+                                🏆 {{ get_translation('open_stats') }}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <style>
+        .action-card {
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            min-height: 300px;
+            width: 100%;
+        }
+        
+        .action-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .action-card:nth-child(1) .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .action-card:nth-child(1) .btn-action {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .action-card:nth-child(2) .card-header {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        
+        .action-card:nth-child(2) .btn-action {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        .action-card:nth-child(3) .card-header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+        
+        .action-card:nth-child(3) .btn-action {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        
+        .action-card .card-header {
+            border-radius: 15px 15px 0 0;
+            padding: 20px;
+            border: none;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .action-card .card-body {
+            padding: 25px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            height: calc(100% - 80px);
+        }
+        
+        .action-card .card-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            line-height: 1.2;
+        }
+        
+        .action-card .card-text {
+            font-size: 0.95rem;
+            line-height: 1.5;
+            color: #666;
+            margin-bottom: 0;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        
+        .action-card .btn-action {
+            border: none;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 25px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+        
+        .action-card .btn-action:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        @media (max-width: 768px) {
+            .action-card {
+                min-height: 250px;
+            }
+            
+            .action-card .card-title {
+                font-size: 1.2rem;
+            }
+            
+            .action-card .card-text {
+                font-size: 0.9rem;
+            }
+        }
+        </style>
 
         <!-- Social Media Modal -->
         <div id="socialModal" class="social-modal" style="display: none;">
@@ -217,9 +396,57 @@
 <script>
     // Add click event to level cards
     document.querySelectorAll('.level-card').forEach(card => {
-        card.addEventListener('click', function() {
+        card.addEventListener('click', function(e) {
+            // Don't navigate if clicking on copy button
+            if (e.target.closest('.copy-id-btn')) {
+                return;
+            }
             const levelId = this.getAttribute('data-level-id');
             window.location = '/level/' + levelId;
+        });
+    });
+
+    // Add copy functionality for level IDs
+    document.querySelectorAll('.copy-id-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent level card click
+            const levelId = this.getAttribute('data-id');
+            
+            navigator.clipboard.writeText(levelId).then(function() {
+                // Show success feedback
+                const icon = btn.querySelector('i');
+                const originalClass = icon.className;
+                icon.className = 'fas fa-check';
+                btn.classList.add('btn-success');
+                btn.classList.remove('btn-outline-secondary');
+                
+                setTimeout(function() {
+                    icon.className = originalClass;
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-outline-secondary');
+                }, 1500);
+            }).catch(function() {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = levelId;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                // Show success feedback
+                const icon = btn.querySelector('i');
+                const originalClass = icon.className;
+                icon.className = 'fas fa-check';
+                btn.classList.add('btn-success');
+                btn.classList.remove('btn-outline-secondary');
+                
+                setTimeout(function() {
+                    icon.className = originalClass;
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-outline-secondary');
+                }, 1500);
+            });
         });
     });
 
@@ -278,27 +505,6 @@
                 {
                     platform: 'Discord',
                     username: 'engine009',
-                    icon: '/static/images/discord-icon.svg',
-                    copyable: true
-                }
-            ]
-        },
-        'kye': {
-            name: 'Kye',
-            socials: [
-                {
-                    platform: 'YouTube',
-                    url: 'https://www.youtube.com/@Kye0928',
-                    icon: '/static/images/youtube-icon.svg'
-                },
-                {
-                    platform: 'Twitter',
-                    url: 'https://x.com/Kye092802',
-                    icon: '/static/images/twitter-icon.svg'
-                },
-                {
-                    platform: 'Discord',
-                    username: 'kye0928',
                     icon: '/static/images/discord-icon.svg',
                     copyable: true
                 }
