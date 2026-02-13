@@ -191,9 +191,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 if (!videoUrl.includes('youtube.com') && !videoUrl.includes('youtu.be') && 
                     !videoUrl.includes('streamable.com') && !videoUrl.includes('vimeo.com') && 
-                    !videoUrl.includes('tiktok.com') && !videoUrl.includes('twitch.tv')) {
+                    !videoUrl.includes('tiktok.com') && !videoUrl.includes('twitch.tv') && 
+                    !videoUrl.includes('medal.tv')) {
                     e.preventDefault();
-                    alert('Please provide a valid video URL (YouTube, Streamable, Vimeo, TikTok, or Twitch)');
+                    alert('Please provide a valid video URL (YouTube, Streamable, Vimeo, TikTok, Twitch, or Medal.tv)');
                     return;
                 }
             }
