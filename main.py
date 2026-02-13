@@ -504,6 +504,21 @@ def get_video_embed_info(video_url):
             'video_id': video_id
         }
     
+    # Medal.tv support
+    elif 'medal.tv' in video_url:
+        # Extract video ID from Medal.tv URL
+        # Medal.tv URLs are typically: https://medal.tv/games/[game]/clips/[clip_id]
+        # or https://medal.tv/clips/[clip_id]
+        if '/clips/' in video_url:
+            video_id = video_url.split('/clips/')[-1].split('?')[0].split('/')[0]
+        else:
+            return None
+        return {
+            'platform': 'medal',
+            'embed_url': f'https://medal.tv/clips/{video_id}',
+            'video_id': video_id
+        }
+    
     return None
 
 # Context processor
@@ -7717,6 +7732,27 @@ def admin_delete_news(article_id):
     flash('News deletion system is not yet implemented', 'info')
     return redirect(url_for('admin_dashboard'))
 
+@app.route('/news/<article_id>')
+def news_article(article_id):
+    """Display a single news article"""
+    try:
+        # Try to find the article in the database
+        article = mongo_db.news_articles.find_one({"_id": ObjectId(article_id), "status": "published"})
+        
+        if not article:
+            flash('Article not found', 'danger')
+            return redirect(url_for('index'))
+        
+        # For now, since the news system is not fully implemented, 
+        # redirect to index with a message
+        flash('News article system is not yet fully implemented', 'info')
+        return redirect(url_for('index'))
+        
+    except Exception as e:
+        print(f"Error loading news article: {e}")
+        flash('Error loading article', 'danger')
+        return redirect(url_for('index'))
+
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
     if 'user_id' not in session:
@@ -10435,7 +10471,6 @@ def admin_approve_record(record_id):
                         # Get updated points
                         updated_user = mongo_db.users.find_one({"_id": record['user_id']})
                         new_points = updated_user.get('points', 0) if updated_user else 0
-                        flash(f'🏆 Verifier points awarded! ', 'success')
         
         # Log admin action with more details
         log_admin_action(

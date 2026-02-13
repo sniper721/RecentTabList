@@ -66,6 +66,10 @@
                             <iframe src="{{ video_info.embed_url }}" title="{{ name }}" allowfullscreen></iframe>
                         {% elif video_info.platform == 'twitch' %}
                             <iframe src="{{ video_info.embed_url }}" title="{{ name }}" allowfullscreen></iframe>
+                        {% elif video_info.platform == 'medal' %}
+                            <iframe src="{{ video_info.embed_url }}" title="{{ name }}" allowfullscreen></iframe>
+                        {% elif video_info.platform == 'vimeo' %}
+                            <iframe src="{{ video_info.embed_url }}" title="{{ name }}" allowfullscreen></iframe>
                         {% endif %}
                     {% else %}
                         <div class="d-flex justify-content-center align-items-center bg-light">
@@ -156,6 +160,14 @@
                                                     <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-purple" title="Twitch">
                                                         <i class="fab fa-twitch"></i>
                                                     </a>
+                                                {% elif video_info.platform == 'medal' %}
+                                                    <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-warning" title="Medal.tv">
+                                                        <i class="fas fa-medal"></i>
+                                                    </a>
+                                                {% elif video_info.platform == 'vimeo' %}
+                                                    <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-info" title="Vimeo">
+                                                        <i class="fab fa-vimeo"></i>
+                                                    </a>
                                                 {% endif %}
                                             {% else %}
                                                 <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-secondary" title="Video">
@@ -230,6 +242,14 @@
                                                     {% elif video_info.platform == 'twitch' %}
                                                         <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-purple" title="Twitch">
                                                             <i class="fab fa-twitch"></i>
+                                                        </a>
+                                                    {% elif video_info.platform == 'medal' %}
+                                                        <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-warning" title="Medal.tv">
+                                                            <i class="fas fa-medal"></i>
+                                                        </a>
+                                                    {% elif video_info.platform == 'vimeo' %}
+                                                        <a href="{{ video_url }}" target="_blank" class="btn btn-sm btn-info" title="Vimeo">
+                                                            <i class="fab fa-vimeo"></i>
                                                         </a>
                                                     {% endif %}
                                                 {% else %}

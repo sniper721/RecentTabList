@@ -373,33 +373,9 @@
         });
     });
 
-    // Fix for PC button interaction issues
-    document.addEventListener('DOMContentLoaded', function() {
-        // Ensure all approve/reject buttons are properly clickable
-        const approveButtons = document.querySelectorAll('.approve-btn');
-        const rejectButtons = document.querySelectorAll('.reject-btn');
-        
-        approveButtons.forEach(button => {
-            button.addEventListener('click', function(e) {
-                e.stopPropagation();
-                // The form submission will be handled by the onsubmit event
-            });
-        });
-        
-        rejectButtons.forEach(button => {
-            button.addEventListener('click', function(e) {
-                e.stopPropagation();
-                // The form submission will be handled by the onsubmit event
-            });
-        });
-        
-        // Debug: Log button clicks
-        document.querySelectorAll('.approve-btn, .reject-btn').forEach(button => {
-            button.addEventListener('click', function() {
-                console.log('Button clicked:', this.className, this.title);
-            });
-        });
-    });
+    // Fix for PC button interaction issues - REMOVED DUPLICATE EVENT HANDLERS
+    // The approve/reject buttons already have onsubmit handlers on their forms
+    // Adding additional click handlers was causing duplicate submissions
 
     // Bulk operations functionality
     const selectAllCheckbox = document.getElementById('selectAll');
