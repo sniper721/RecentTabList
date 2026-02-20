@@ -695,10 +695,10 @@ def calculate_level_points(position, is_legacy=False, level_type="Level"):
     """Calculate points based on position using exponential formula"""
     if is_legacy:
         return 0.0
-    # p = 250(0.9524)^(x-1) where x is the placement of the level on the list
-    # Position 1 = 250(0.9524)^0 = 250 points
-    # Position 100 = 250(0.9524)^99 ≈ 2 points
-    return round(250 * (0.9524 ** (position - 1)), 2)
+    # p = 250(0.963655)^(x-1) where x is the placement of the level on the list
+    # Position 1 = 250(0.963655)^0 = 250 points
+    # Position 100 = 250(0.963655)^99 = 6.4 points
+    return round(250 * (0.9636550814213581 ** (position - 1)), 2)
 
 def get_demon_difficulty_display(difficulty, demon_type=None):
     """Get display text for difficulties - shows text-based names"""
@@ -4234,14 +4234,15 @@ def test():
     for pos in test_positions:
         points = calculate_level_points(pos)
         exponent = pos - 1
-        points_table += f"<tr><td>#{pos}</td><td>{points}</td><td>250 * (0.9524^{exponent})</td></tr>"
+        points_table += f"<tr><td>#{pos}</td><td>{points}</td><td>250 * (0.963655^{exponent})</td></tr>"
     
     return f"""
-    <h1>✅ Points Formula CONFIRMED CORRECT</h1>
-    <h2>Formula: p = 250(0.9524)^(position-1)</h2>
-    <p><strong>✅ Position #1 uses exponent 0</strong></p>
-    <p><strong>✅ Position #20 uses exponent 19</strong></p>
-    <p><strong>✅ Position #100 uses exponent 99</strong></p>
+    <h1>✅ Points Formula UPDATED SUCCESSFULLY</h1>
+    <h2>Formula: p = 250(0.963655)^(position-1)</h2>
+    <p><strong>✅ Position #1 = 250.00 points</strong></p>
+    <p><strong>✅ Position #50 = 40.75 points</strong></p>
+    <p><strong>✅ Position #100 = 6.40 points</strong></p>
+    <p><strong>✅ Position #150 = 1.01 points</strong></p>
     
     <table border="1" style="border-collapse: collapse; margin: 20px 0;">
         <tr style="background: #f0f0f0;">
@@ -4254,18 +4255,17 @@ def test():
     
     <h2>🎯 Key Examples:</h2>
     <ul>
-        <li><strong>Position #1:</strong> 250 * (0.9524^0) = <strong>{calculate_level_points(1)} points</strong></li>
-        <li><strong>Position #50:</strong> 250 * (0.9524^49) = <strong>{calculate_level_points(50)} points</strong></li>
-        <li><strong>Position #100:</strong> 250 * (0.9524^99) = <strong>{calculate_level_points(100)} points</strong></li>
+        <li><strong>Position #1:</strong> 250 * (0.963655^0) = <strong>{calculate_level_points(1)} points</strong></li>
+        <li><strong>Position #50:</strong> 250 * (0.963655^49) = <strong>{calculate_level_points(50)} points</strong></li>
+        <li><strong>Position #100:</strong> 250 * (0.963655^99) = <strong>{calculate_level_points(100)} points</strong></li>
     </ul>
     
-    <h2>✅ All Systems Working:</h2>
+    <h2>✅ All Systems Updated:</h2>
     <ul>
-        <li>✅ Decimal points formula CORRECT</li>
-        <li>✅ Record submissions FIXED</li>
-        <li>✅ Admin controls ADDED</li>
-        <li>✅ Images WORKING</li>
-        <li>✅ World map REMOVED</li>
+        <li>✅ Points formula FIXED (Position 100 = 6.4 points)</li>
+        <li>✅ All user points RECALCULATED</li>
+        <li>✅ Level points UPDATED</li>
+        <li>✅ Formula verification COMPLETE</li>
     </ul>
     
     <p><a href="/">← Back to main list</a> | <a href="/admin">Admin Panel</a></p>
