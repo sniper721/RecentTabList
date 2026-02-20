@@ -695,10 +695,10 @@ def calculate_level_points(position, is_legacy=False, level_type="Level"):
     """Calculate points based on position using exponential formula"""
     if is_legacy:
         return 0.0
-    # p = 250(0.9636)^(x-1) where x is the placement of the level on the list
-    # Position 1 = 250(0.9636)^0 = 250 points
-    # Position 150 = 250(0.9636)^149 ≈ 1 point
-    return round(250 * (0.9636214148582346 ** (position - 1)), 2)
+    # p = 250(0.9524)^(x-1) where x is the placement of the level on the list
+    # Position 1 = 250(0.9524)^0 = 250 points
+    # Position 100 = 250(0.9524)^99 ≈ 2 points
+    return round(250 * (0.9524 ** (position - 1)), 2)
 
 def get_demon_difficulty_display(difficulty, demon_type=None):
     """Get display text for difficulties - shows text-based names"""
@@ -1431,41 +1431,41 @@ def send_enhanced_changelog_notification(action, level_name, admin_username, **k
         print(f"Error sending changelog notification: {e}")
 
 def auto_manage_legacy_list():
-    """Automatically manage legacy list - move level at position 151 to legacy and shift positions"""
+    """Automatically manage legacy list - move level at position 101 to legacy and shift positions"""
     try:
-        # Find level at position 151 (should be moved to legacy)
-        level_at_151 = mongo_db.levels.find_one({
-            "position": 151,
+        # Find level at position 101 (should be moved to legacy)
+        level_at_101 = mongo_db.levels.find_one({
+            "position": 101,
             "is_legacy": {"$ne": True}
         })
         
-        if level_at_151:
-            # IMPORTANT: Shift all existing legacy levels down by 1 position
-            # This ensures proper ordering when a new level enters legacy
-            mongo_db.levels.update_many(
+        if level_at_101:
+            # Find the next available legacy position
+            highest_legacy = mongo_db.levels.find_one(
                 {"is_legacy": True},
-                {"$inc": {"position": 1}}
+                sort=[("position", -1)]
             )
+            next_legacy_position = 101 if not highest_legacy else highest_legacy["position"] + 1
             
-            # Move the level to legacy at position 151 (legacy position 1 = main position 151)
+            # Move the level to legacy
             mongo_db.levels.update_one(
-                {"_id": level_at_151["_id"]},
+                {"_id": level_at_101["_id"]},
                 {"$set": {
                     "is_legacy": True,
-                    "position": 151,  # Position 151 is the first legacy position
+                    "position": next_legacy_position,
                     "points": 0  # Legacy levels have 0 points
                 }}
             )
             
-            # Fix: Properly shift positions in the main list to fill the gap at position 151
+            # Fix: Properly shift positions in the main list to fill the gap at position 101
             mongo_db.levels.update_many(
-                {"position": {"$gt": 151}, "is_legacy": {"$ne": True}},
+                {"position": {"$gt": 101}, "is_legacy": {"$ne": True}},
                 {"$inc": {"position": -1}}
             )
             
             # Also update any levels that might have is_legacy field missing (treat as False)
             mongo_db.levels.update_many(
-                {"position": {"$gt": 151}, "is_legacy": {"$exists": False}},
+                {"position": {"$gt": 101}, "is_legacy": {"$exists": False}},
                 {"$inc": {"position": -1}}
             )
             
@@ -1475,16 +1475,15 @@ def auto_manage_legacy_list():
             levels_cache['legacy_list'] = None
             
             # Recalculate user points for this level (remove points since it's now legacy)
-            old_points = level_at_151.get('points', 0)
-            recalculate_user_points_after_level_move(level_at_151["_id"], old_points, 0.0)
+            old_points = level_at_101.get('points', 0)
+            recalculate_user_points_after_level_move(level_at_101["_id"], old_points, 0.0)
             
             # Note: We don't log this as a separate changelog entry since 
             # the placement message already mentions "This pushes X to the legacy list"
             
-            print(f"🔄 Automatically moved {level_at_151['name']} to legacy list at position #151")
-            print(f"🔄 Shifted all other legacy levels down by 1 position")
+            print(f"🔄 Automatically moved {level_at_101['name']} to legacy list at position #{next_legacy_position}")
             print(f"🔄 Shifted main list positions to fill the gap")
-            return level_at_151["name"]
+            return level_at_101["name"]
         
         return None
         
@@ -3578,7 +3577,7 @@ def admin_move_level(level_id):
             return {'error': 'Failed to update points system'}, 500
         
         # Handle automatic legacy management if needed
-        if new_position <= 150:
+        if new_position <= 100:
             auto_manage_legacy_list()
         
         # Clear cache
@@ -3587,9 +3586,9 @@ def admin_move_level(level_id):
         
         # Check if this move will push something to legacy
         pushed_to_legacy = None
-        if new_position <= 150 and current_position > 150:
-            level_at_150 = mongo_db.levels.find_one({
-                "position": 150,
+        if new_position <= 100 and current_position > 100:
+            level_at_100 = mongo_db.levels.find_one({
+                "position": 100,
                 "is_legacy": {"$ne": True}
             })
             if level_at_100:
@@ -3796,20 +3795,20 @@ def admin_add_level():
         
         # Check if this placement will push something to legacy (only for main list additions)
         pushed_to_legacy = None
-        if not is_legacy and position <= 150:
+        if not is_legacy and position <= 100:
             # Count current main list levels
             main_list_count = mongo_db.levels.count_documents({"is_legacy": {"$ne": True}})
             
-            # If we already have 150 levels, adding one more will push the last one to legacy
-            if main_list_count >= 150:
-                # Find what's currently at position 150 (will be pushed to 151, then to legacy)
-                level_at_150 = mongo_db.levels.find_one({
-                    "position": 150,
+            # If we already have 100 levels, adding one more will push the last one to legacy
+            if main_list_count >= 100:
+                # Find what's currently at position 100 (will be pushed to 101, then to legacy)
+                level_at_100 = mongo_db.levels.find_one({
+                    "position": 100,
                     "is_legacy": {"$ne": True}
                 })
                 
-                if level_at_150:
-                    pushed_to_legacy = level_at_150["name"]
+                if level_at_100:
+                    pushed_to_legacy = level_at_100["name"]
         
         # Get levels that will be above and below the new level
         above_level, below_level = get_level_neighbors(position, is_legacy)
@@ -4235,11 +4234,11 @@ def test():
     for pos in test_positions:
         points = calculate_level_points(pos)
         exponent = pos - 1
-        points_table += f"<tr><td>#{pos}</td><td>{points}</td><td>250 * (0.9475^{exponent})</td></tr>"
+        points_table += f"<tr><td>#{pos}</td><td>{points}</td><td>250 * (0.9524^{exponent})</td></tr>"
     
     return f"""
     <h1>✅ Points Formula CONFIRMED CORRECT</h1>
-    <h2>Formula: p = 250(0.9475)^(position-1)</h2>
+    <h2>Formula: p = 250(0.9524)^(position-1)</h2>
     <p><strong>✅ Position #1 uses exponent 0</strong></p>
     <p><strong>✅ Position #20 uses exponent 19</strong></p>
     <p><strong>✅ Position #100 uses exponent 99</strong></p>
@@ -4255,10 +4254,9 @@ def test():
     
     <h2>🎯 Key Examples:</h2>
     <ul>
-        <li><strong>Position #1:</strong> 250 * (0.965^0) = <strong>{calculate_level_points(1)} points</strong></li>
-        <li><strong>Position #50:</strong> 250 * (0.965^49) = <strong>{calculate_level_points(50)} points</strong></li>
-        <li><strong>Position #100:</strong> 250 * (0.965^99) = <strong>{calculate_level_points(100)} points</strong></li>
-        <li><strong>Position #150:</strong> 250 * (0.965^149) = <strong>{calculate_level_points(150)} points</strong></li>
+        <li><strong>Position #1:</strong> 250 * (0.9524^0) = <strong>{calculate_level_points(1)} points</strong></li>
+        <li><strong>Position #50:</strong> 250 * (0.9524^49) = <strong>{calculate_level_points(50)} points</strong></li>
+        <li><strong>Position #100:</strong> 250 * (0.9524^99) = <strong>{calculate_level_points(100)} points</strong></li>
     </ul>
     
     <h2>✅ All Systems Working:</h2>
@@ -5775,7 +5773,7 @@ def timemachine():
                     current_levels = list(mongo_db.levels.find(
                         {"is_legacy": False}, 
                         max_time_ms=60000
-                    ).sort("position", 1).limit(150))  # Top 150 for recent dates
+                    ).sort("position", 1).limit(100))  # Top 100 for recent dates
                 else:
                     print(f"Showing top 10 levels for older date: {selected_date}")
                     current_levels = list(mongo_db.levels.find(
@@ -5900,11 +5898,11 @@ def timemachine():
 def generate_fallback_historical_data():
     """Generate fallback historical data based on current database state"""
     try:
-        # Get current main list levels (top 150)
+        # Get current main list levels (top 100)
         current_levels = list(mongo_db.levels.find(
             {"is_legacy": False}, 
             max_time_ms=60000
-        ).sort("position", 1).limit(150))
+        ).sort("position", 1).limit(100))
         
         # Create historical snapshots going back in time
         historical_data = {"weekly_rankings": {}}
@@ -5951,9 +5949,9 @@ def generate_fallback_historical_data():
             fixed_rankings = []
             for ranking in rankings:
                 pos = ranking['position']
-                while pos in used_positions and pos <= 150:
+                while pos in used_positions and pos <= 100:
                     pos += 1
-                if pos <= 150:
+                if pos <= 100:
                     used_positions.add(pos)
                     ranking['position'] = pos
                     fixed_rankings.append(ranking)
@@ -5976,11 +5974,11 @@ def generate_fallback_historical_data():
 def update_historical_rankings():
     """Update historical rankings with current data - called when levels change"""
     try:
-        # Get current main list levels (top 150)
+        # Get current main list levels (top 100)
         current_levels = list(mongo_db.levels.find(
             {"is_legacy": False}, 
             max_time_ms=60000
-        ).sort("position", 1).limit(150))
+        ).sort("position", 1).limit(100))
         
         # Load existing historical data
         historical_data = {}
