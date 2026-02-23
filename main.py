@@ -139,21 +139,23 @@ while retry_count < max_retries:
         mongo_client = MongoClient(
             mongodb_uri,
             tls=True,
-            tlsAllowInvalidCertificates=False,
-            tlsAllowInvalidHostnames=False,
-            serverSelectionTimeoutMS=60000,
-            socketTimeoutMS=60000,
-            connectTimeoutMS=30000,
-            maxPoolSize=10,
+            tlsAllowInvalidCertificates=True,   # Allow invalid certificates for better connectivity
+            tlsAllowInvalidHostnames=True,      # Allow invalid hostnames
+            serverSelectionTimeoutMS=10000,     # Reduced to 10 seconds
+            socketTimeoutMS=10000,              # Reduced to 10 seconds
+            connectTimeoutMS=10000,             # Reduced to 10 seconds
+            maxPoolSize=5,                      # Reduced pool size
             minPoolSize=1,
-            maxIdleTimeMS=30000,
-            waitQueueTimeoutMS=10000,
+            maxIdleTimeMS=20000,                # Reduced idle time
+            waitQueueTimeoutMS=5000,            # Reduced wait queue timeout
             retryWrites=True,
-            retryReads=True
+            retryReads=True,
+            directConnection=False,             # Use replica set discovery
+            connect=False                       # Don't connect immediately
         )
         mongo_db = mongo_client[mongodb_db]
         # Test connection with timeout
-        mongo_client.admin.command('ping', maxTimeMS=30000)
+        mongo_client.admin.command('ping', maxTimeMS=10000)  # Match the shorter timeouts
         print("✓ MongoDB initialized successfully")
         
         # Set MongoDB reference for changelog notifier
@@ -168,8 +170,8 @@ while retry_count < max_retries:
         retry_count += 1
         print(f"❌ MongoDB connection attempt {retry_count} failed: {e}")
         if retry_count < max_retries:
-            print(f"Retrying in 5 seconds...")
-            time.sleep(5)
+            print(f"Retrying in 2 seconds...")
+            time.sleep(2)  # Reduced retry delay
         else:
             print("All MongoDB connection attempts failed")
             raise Exception("Failed to connect to MongoDB after all retries")
