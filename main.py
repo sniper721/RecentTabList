@@ -5,7 +5,7 @@ from authlib.integrations.flask_client import OAuth
 import os
 from datetime import datetime, timezone, timedelta
 
-# Try to import Discord integration, but don't fail if it's missing
+# 1Try to import Discord integration, but don't fail if it's missing
 try:
     from discord_integration import notify_record_submitted, notify_record_approved, notify_record_rejected, notify_admin_action
     DISCORD_AVAILABLE = True
