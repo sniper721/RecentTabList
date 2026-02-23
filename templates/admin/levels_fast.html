@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RTL Level Management - Ultra-Fast</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f0f0f0; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header { background: #28a745; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .controls { background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 15px; flex-wrap: wrap; }
+        .filter-btn { padding: 8px 15px; border: 1px solid #007bff; background: white; color: #007bff; border-radius: 5px; cursor: pointer; }
+        .filter-btn.active { background: #007bff; color: white; }
+        .pagination { background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+        .pagination a { margin: 0 5px; padding: 8px 12px; background: #007bff; color: white; text-decoration: none; border-radius: 3px; }
+        .pagination a:hover { background: #0056b3; }
+        .pagination .current { background: #28a745; }
+        .levels-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
+        .level-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .level-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .level-position { font-weight: bold; color: #007bff; font-size: 1.2em; }
+        .level-name { font-size: 1.1em; margin: 5px 0; }
+        .level-meta { color: #666; font-size: 0.9em; }
+        .level-actions { display: flex; gap: 5px; margin-top: 10px; }
+        .btn { padding: 5px 10px; border: none; border-radius: 3px; cursor: pointer; font-size: 0.9em; }
+        .btn-move { background: #17a2b8; color: white; }
+        .btn-delete { background: #dc3545; color: white; }
+        .btn-edit { background: #ffc107; color: black; }
+        .loading { text-align: center; padding: 50px; color: #666; }
+        .stats { background: #e9f7ef; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .add-form { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .form-row { display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
+        .form-group { flex: 1; min-width: 200px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input, .form-group select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        .btn-primary { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
+        .btn-primary:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 Level Management</h1>
+            <p>Ultra-Fast Performance Mode - {{ total_count }} Total Levels</p>
+        </div>
+        
+        <div class="controls">
+            <button class="filter-btn {{ 'active' if not is_legacy_filter else '' }}" 
+                    onclick="window.location.href='?filter=main'">Main List</button>
+            <button class="filter-btn {{ 'active' if is_legacy_filter else '' }}" 
+                    onclick="window.location.href='?filter=legacy'">Legacy List</button>
+            <button onclick="toggleAddForm()">➕ Add New Level</button>
+            <button onclick="window.location.href='/admin'">🏠 Admin Dashboard</button>
+        </div>
+        
+        <div class="stats">
+            <strong>⚡ Performance Mode:</strong> 
+            Paginated loading ({{ per_page }} per page), cached data, instant operations.
+            Page {{ current_page }} of {{ total_pages }}
+        </div>
+        
+        <div class="add-form" id="addForm" style="display: none;">
+            <h3>➕ Add New Level</h3>
+            <form id="addLevelForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="name">Level Name:</label>
+                        <input type="text" id="name" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="creator">Creator:</label>
+                        <input type="text" id="creator" name="creator" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="position">Position:</label>
+                        <input type="number" id="position" name="position" value="1" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="is_legacy">List:</label>
+                        <select id="is_legacy" name="is_legacy">
+                            <option value="false">Main List</option>
+                            <option value="true">Legacy List</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary">➕ Add Level</button>
+                <button type="button" onclick="toggleAddForm()">Cancel</button>
+            </form>
+        </div>
+        
+        <div class="pagination">
+            {% if current_page > 1 %}
+                <a href="?page={{ current_page - 1 }}&filter={{ 'legacy' if is_legacy_filter else 'main' }}&per_page={{ per_page }}">Previous</a>
+            {% endif %}
+            
+            Page {{ current_page }} of {{ total_pages }}
+            
+            {% if current_page < total_pages %}
+                <a href="?page={{ current_page + 1 }}&filter={{ 'legacy' if is_legacy_filter else 'main' }}&per_page={{ per_page }}">Next</a>
+            {% endif %}
+        </div>
+        
+        <div class="levels-grid">
+            {% for level in levels %}
+            <div class="level-card" data-level-id="{{ level._id }}">
+                <div class="level-header">
+                    <span class="level-position">#{{ level.position }}</span>
+                    <span class="level-meta">{{ level.points }} pts</span>
+                </div>
+                <div class="level-name">{{ level.name }}</div>
+                <div class="level-meta">by {{ level.creator }}</div>
+                <div class="level-meta">Difficulty: {{ level.difficulty }}</div>
+                
+                <div class="level-actions">
+                    <button class="btn btn-move" onclick="moveLevel('{{ level._id }}', 'up')">⬆️ Up</button>
+                    <button class="btn btn-move" onclick="moveLevel('{{ level._id }}', 'down')">⬇️ Down</button>
+                    <button class="btn btn-edit" onclick="editLevel('{{ level._id }}')">✏️ Edit</button>
+                    <button class="btn btn-delete" onclick="deleteLevel('{{ level._id }}')">🗑️ Delete</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div class="pagination">
+            {% if current_page > 1 %}
+                <a href="?page={{ current_page - 1 }}&filter={{ 'legacy' if is_legacy_filter else 'main' }}&per_page={{ per_page }}">Previous</a>
+            {% endif %}
+            
+            Page {{ current_page }} of {{ total_pages }}
+            
+            {% if current_page < total_pages %}
+                <a href="?page={{ current_page + 1 }}&filter={{ 'legacy' if is_legacy_filter else 'main' }}&per_page={{ per_page }}">Next</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        function toggleAddForm() {
+            const form = document.getElementById('addForm');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        document.getElementById('addLevelForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const data = {};
+            for (let [key, value] of formData.entries()) {
+                data[key] = value;
+            }
+            
+            try {
+                const response = await fetch('/admin/levels/add', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: new URLSearchParams(data)
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert('Level added successfully!');
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error adding level: ' + error.message);
+            }
+        });
+        
+        async function moveLevel(levelId, direction) {
+            try {
+                const response = await fetch(`/admin/levels/move/${levelId}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({direction: direction})
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error moving level: ' + error.message);
+            }
+        }
+        
+        async function deleteLevel(levelId) {
+            if (!confirm('Are you sure you want to delete this level?')) return;
+            
+            try {
+                const response = await fetch(`/admin/levels/delete/${levelId}`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error deleting level: ' + error.message);
+            }
+        }
+        
+        function editLevel(levelId) {
+            alert('Edit functionality would open a modal with level details');
+        }
+    </script>
+</body>
+</html>
