@@ -1087,9 +1087,9 @@ def update_user_points(user_id):
         }
         points = calculate_record_points(record_with_status, level)
         total_points += points
-        print(f"DEBUG: User {user_id} - Record progress {record['progress']}% = {points} points")
+
     
-    print(f"DEBUG: User {user_id} total points: {total_points}")
+
     
     # Get user's current points before update
     user = mongo_db.users.find_one({"_id": user_id})
@@ -10384,10 +10384,10 @@ def admin_approve_record(record_id):
         record = mongo_db.records.find_one({"_id": record_object_id})
         if not record:
             flash('Record not found', 'danger')
-            print(f"DEBUG: Record {record_id} not found in database")
+
             return redirect(url_for('admin'))
         
-        print(f"DEBUG: Found record: {record}")
+
         
         # Check if already approved
         if record.get('status') == 'approved':
@@ -10402,7 +10402,7 @@ def admin_approve_record(record_id):
         user = mongo_db.users.find_one({"_id": record['user_id']})
         level = mongo_db.levels.find_one({"_id": record['level_id']})
         
-        print(f"DEBUG: User found: {user is not None}, Level found: {level is not None}")
+
         
         if not user:
             flash('Error: User not found for this record', 'danger')
@@ -10417,7 +10417,7 @@ def admin_approve_record(record_id):
             flash('Error: Invalid progress value in record', 'danger')
             return redirect(url_for('admin'))
         
-        print(f"DEBUG: About to approve record. Progress: {record['progress']}, Level points: {level.get('points', 'N/A')}")
+        
         
         # Approve the record with timestamp
         approval_time = datetime.now(timezone.utc)
@@ -10430,14 +10430,14 @@ def admin_approve_record(record_id):
             }}
         )
         
-        print(f"DEBUG: Record update result: {update_result.modified_count} documents modified")
+
         
         # Calculate points for this specific record
         approved_record = dict(record)
         approved_record['status'] = 'approved'
         points_earned = calculate_record_points(approved_record, level)
         
-        print(f"DEBUG: Points calculated: {points_earned}")
+
         
         # Get user's points before update
         old_points = user.get('points', 0)
@@ -10449,7 +10449,7 @@ def admin_approve_record(record_id):
         updated_user = mongo_db.users.find_one({"_id": record['user_id']})
         new_points = updated_user.get('points', 0) if updated_user else 0
         
-        print(f"DEBUG: User points - Before: {old_points}, After: {new_points}, Difference: {new_points - old_points}")
+
         
         # Check if this user is the verifier of this level and award verifier points if applicable
         if level.get('verifier') and user.get('username'):
@@ -13269,9 +13269,9 @@ def public_profile(username):
     legacy_completed_count = len(legacy_list_completions)
     
     # Debug logging to help identify the issue
-    print(f"DEBUG: Viewing profile for user: {profile_user['username']} (ID: {profile_user['_id']})")
-    print(f"DEBUG: Found {len(user_records)} records for this user")
-    print(f"DEBUG: Current session user: {session.get('user_id', 'Not logged in')}")
+
+
+
     
     return render_template('public_profile.html', 
                          user=profile_user,  # Use profile_user instead of user to avoid confusion
