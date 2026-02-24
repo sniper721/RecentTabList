@@ -120,6 +120,18 @@
                         </div>
                         <small class="text-muted">Remove admin privileges</small>
                     </form>
+                    
+                    <h6 class="mt-3">Reset User Password</h6>
+                    <form method="POST" action="{{ url_for('admin_reset_user_password') }}">
+                        <div class="mb-2">
+                            <input type="text" class="form-control form-control-sm" name="username" placeholder="Username" required>
+                        </div>
+                        <div class="mb-2">
+                            <input type="password" class="form-control form-control-sm" name="new_password" placeholder="New Password" required>
+                        </div>
+                        <button type="submit" class="btn btn-warning btn-sm w-100">Reset Password</button>
+                        <small class="text-muted">Force reset a user's password</small>
+                    </form>
                 </div>
             </div>
         </div>

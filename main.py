@@ -8846,6 +8846,7 @@ RTL User Commands:
   rtl.make_admin('username') - Promote user to admin
   rtl.check_admin('username') - Check user admin status
   rtl.fix_admin_session('username') - Check admin session info
+  rtl.reset_password('username', 'new_password') - Reset user password
   
 RTL Level Commands:
   rtl.level('name') - Get detailed level info
@@ -9225,6 +9226,64 @@ Note: Install psutil for detailed system metrics"""
         
         elif command == 'april_fools()' or command == 'chaos_mode()':
             return toggle_april_fools_mode()
+        
+        elif command.startswith('reset_password(') and command.endswith(')'):
+            # Extract username and new password from command
+            try:
+                # Extract the parameters inside the parentheses
+                params_str = command[15:-1]  # Remove 'reset_password(' and ')'
+                
+                # Handle quoted parameters properly
+                import ast
+                from datetime import datetime, timezone
+                try:
+                    # Safely parse the parameters as a tuple
+                    params = ast.literal_eval(f"({params_str})")
+                    if isinstance(params, tuple) and len(params) == 2:
+                        username, new_password = params
+                    elif isinstance(params, str):
+                        # If only one parameter was passed, this won't work
+                        return "Error: reset_password requires two parameters: username and new_password"
+                    else:
+                        return "Error: Invalid parameters. Usage: rtl.reset_password('username', 'new_password')"
+                except:
+                    # Alternative parsing method
+                    parts = params_str.split(',', 1)
+                    if len(parts) != 2:
+                        return "Error: Invalid parameters. Usage: rtl.reset_password('username', 'new_password')"
+                    
+                    username = parts[0].strip().strip("'\"")
+                    new_password = parts[1].strip().strip("'\"")
+                
+                # Find the user by username
+                user = mongo_db.users.find_one({"username": username})
+                if not user:
+                    return f"Error: User '{username}' not found"
+                
+                # Hash the new password
+                password_hash = generate_password_hash(new_password)
+                
+                # Update the user's password
+                mongo_db.users.update_one(
+                    {"username": username},
+                    {"$set": {"password_hash": password_hash}}
+                )
+                
+                # Log the action
+                admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+                admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+                log_message = f"Admin {admin_username} reset password for user {username} via console command"
+                from datetime import datetime, timezone
+                mongo_db.logs.insert_one({
+                    "message": log_message, 
+                    "timestamp": datetime.now(timezone.utc),
+                    "action_type": "password_reset_console"
+                })
+                
+                return f"✅ Password reset successfully for user '{username}'"
+                
+            except Exception as e:
+                return f"Error resetting password: {str(e)}"
         
         elif command == 'chaos_status()' or command == 'april_status()':
             return get_april_fools_status()
@@ -10853,6 +10912,54 @@ def admin_users():
     
     users = list(mongo_db.users.find({}, max_time_ms=60000).sort("date_joined", -1))
     return render_template('admin/users.html', users=users)
+
+
+@app.route('/admin/reset_user_password', methods=['POST'])
+def admin_reset_user_password():
+    """Force reset a user's password - Admin only"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        flash('Access denied', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        username = request.form.get('username')
+        new_password = request.form.get('new_password')
+        
+        if not username or not new_password:
+            flash('Username and new password are required', 'danger')
+            return redirect(url_for('admin_console'))
+        
+        # Find the user by username
+        user = mongo_db.users.find_one({"username": username})
+        if not user:
+            flash('User not found', 'danger')
+            return redirect(url_for('admin_console'))
+        
+        # Hash the new password
+        password_hash = generate_password_hash(new_password)
+        
+        # Update the user's password
+        mongo_db.users.update_one(
+            {"username": username},
+            {"$set": {"password_hash": password_hash}}
+        )
+        
+        # Log the action
+        admin_user = mongo_db.users.find_one({"_id": session['user_id']})
+        admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
+        log_message = f"Admin {admin_username} reset password for user {username}"
+        mongo_db.logs.insert_one({
+            "message": log_message, 
+            "timestamp": datetime.now(timezone.utc),
+            "action_type": "password_reset"
+        })
+        
+        flash(f'Password reset successfully for user {username}', 'success')
+        return redirect(url_for('admin_console'))
+    
+    except Exception as e:
+        flash(f'Error resetting password: {str(e)}', 'danger')
+        return redirect(url_for('admin_console'))
 
 @app.route('/admin/settings')
 def admin_settings():
