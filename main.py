@@ -1,40 +1,27 @@
-﻿from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 from pymongo import MongoClient
 from werkzeug.security import generate_password_hash, check_password_hash
 from authlib.integrations.flask_client import OAuth
 import os
-import json
-import threading
-import time
 from datetime import datetime, timezone, timedelta
-from bson import ObjectId
-
-# Custom JSON encoder for MongoDB ObjectId
-class MongoEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, ObjectId):
-            return str(obj)
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        return super().default(obj)
 
 # 1Try to import Discord integration, but don't fail if it's missing
 try:
     from discord_integration import notify_record_submitted, notify_record_approved, notify_record_rejected, notify_admin_action
     DISCORD_AVAILABLE = True
-    print("âœ… Discord integration loaded successfully")
+    print("✅ Discord integration loaded successfully")
 except ImportError as e:
-    print(f"âŒ Discord integration failed to load: {e}")
+    print(f"❌ Discord integration failed to load: {e}")
     DISCORD_AVAILABLE = False
     # Create dummy functions so the app doesn't crash
     def notify_record_submitted(*args, **kwargs):
-        print("âŒ Discord integration not available - notify_record_submitted")
+        print("❌ Discord integration not available - notify_record_submitted")
     def notify_record_approved(*args, **kwargs):
-        print("âŒ Discord integration not available - notify_record_approved")  
+        print("❌ Discord integration not available - notify_record_approved")  
     def notify_record_rejected(*args, **kwargs):
-        print("âŒ Discord integration not available - notify_record_rejected")
+        print("❌ Discord integration not available - notify_record_rejected")
     def notify_admin_action(*args, **kwargs):
-        print("âŒ Discord integration not available - notify_admin_action")
+        print("❌ Discord integration not available - notify_admin_action")
 
 # Try to import Discord bot integration
 try:
@@ -47,41 +34,41 @@ try:
     import base64
     import hashlib
 
-    print("âœ… Discord bot integration loaded successfully")
+    print("✅ Discord bot integration loaded successfully")
 except ImportError as e:
-    print(f"âŒ Discord bot integration failed to load: {e}")
+    print(f"❌ Discord bot integration failed to load: {e}")
     # Create dummy functions so the app doesn't crash
     def check_user_role(*args, **kwargs):
-        print("âŒ Discord bot not available - check_user_role")
+        print("❌ Discord bot not available - check_user_role")
         return False
     def send_dm_to_user(*args, **kwargs):
-        print("âŒ Discord bot not available - send_dm_to_user")
+        print("❌ Discord bot not available - send_dm_to_user")
         return False
     def is_bot_available():
         return False
     def notify_verification_submission(*args, **kwargs):
-        print("âŒ Discord bot not available - notify_verification_submission")
+        print("❌ Discord bot not available - notify_verification_submission")
         return False
 
 # Try to import Changelog Discord integration
 try:
     from changelog_discord import notify_changelog
     CHANGELOG_DISCORD_AVAILABLE = True
-    print("âœ… Changelog Discord integration loaded successfully")
+    print("✅ Changelog Discord integration loaded successfully")
 except ImportError as e:
-    print(f"âŒ Changelog Discord integration failed to load: {e}")
+    print(f"❌ Changelog Discord integration failed to load: {e}")
     CHANGELOG_DISCORD_AVAILABLE = False
     # Create dummy function so the app doesn't crash
     def notify_changelog(*args, **kwargs):
-        print("âŒ Changelog Discord integration not available - notify_changelog")
+        print("❌ Changelog Discord integration not available - notify_changelog")
 
 # Try to import Discord Widget integration
 try:
     from discord_widget import get_formatted_discord_data
     DISCORD_WIDGET_AVAILABLE = True
-    print("âœ… Discord widget integration loaded successfully")
+    print("✅ Discord widget integration loaded successfully")
 except ImportError as e:
-    print(f"âŒ Discord widget integration failed to load: {e}")
+    print(f"❌ Discord widget integration failed to load: {e}")
     DISCORD_WIDGET_AVAILABLE = False
     # Create dummy function so the app doesn't crash
     def get_formatted_discord_data():
@@ -109,9 +96,9 @@ from profanity_filter import check_username_profanity, check_level_name_profanit
 try:
     from real_time_points_system import RealTimePointsManager, handle_level_move, recalculate_all_points
     REAL_TIME_POINTS_AVAILABLE = True
-    print("âœ… Real-time points system loaded successfully")
+    print("✅ Real-time points system loaded successfully")
 except ImportError as e:
-    print(f"âŒ Real-time points system failed to load: {e}")
+    print(f"❌ Real-time points system failed to load: {e}")
     REAL_TIME_POINTS_AVAILABLE = False
 
 # Load environment variables from .env file
@@ -120,6 +107,19 @@ load_dotenv()
 # Initialize Flask app
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here-change-in-production')
+
+# ULTRA-FAST Performance optimizations
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000  # 1 year cache for static files
+app.config['TEMPLATES_AUTO_RELOAD'] = False  # Disable auto-reload in production
+app.config['JSON_SORT_KEYS'] = False  # Faster JSON responses
+
+# Enable compression for responses
+try:
+    from flask_compress import Compress
+    Compress(app)
+    print("✅ Flask compression enabled")
+except ImportError:
+    print("⚠️ flask-compress not installed - install with: pip install flask-compress")
 
 # Session configuration to prevent logout issues
 app.config['SESSION_PERMANENT'] = True
@@ -138,356 +138,10 @@ app.config['GOOGLE_CLIENT_SECRET'] = os.environ.get('GOOGLE_CLIENT_SECRET')
 
 # Discord OAuth configuration will be set later with proper validation
 
-# ============================================================================
-# INSTANT LOAD SYSTEM - Non-blocking MongoDB with cache fallback
-# ============================================================================
-print("\n" + "="*80)
-print("🚀 INSTANT LOAD MODE - Starting Flask IMMEDIATELY")
-print("="*80 + "\n")
-
-# Cache for levels (loaded from JSON files for instant startup)
-levels_cache = {
-    'main_list': [],
-    'legacy_list': [],
-    'last_updated': None,
-    'loaded': False
-}
-
-def preload_cache_from_files():
-    """Load cache from JSON files immediately (instant, no database needed)"""
-    try:
-        # Load main levels cache
-        if os.path.exists('cache_main_levels.json'):
-            with open('cache_main_levels.json', 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                levels_list = data.get('levels', [])
-                
-                # Ensure it's actually a list of dictionaries, not strings or corrupted data
-                if isinstance(levels_list, list) and len(levels_list) > 0 and isinstance(levels_list[0], dict):
-                    levels_cache['main_list'] = levels_list
-                    levels_cache['last_updated'] = data.get('last_updated')
-                    count = len(levels_list)
-                    print(f"✅ Pre-loaded {count} main levels from cache (will refresh from DB)")
-                else:
-                    levels_cache['main_list'] = []
-                    print("⚠️ Cache file exists but contains invalid data (will populate from DB)")
-        else:
-            print("⏳ No main levels cache found (will load from DB on startup)")
-        
-        # Load legacy levels cache
-        if os.path.exists('cache_legacy_levels.json'):
-            with open('cache_legacy_levels.json', 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                levels_list = data.get('levels', [])
-                
-                # Ensure it's actually a list of dictionaries
-                if isinstance(levels_list, list) and len(levels_list) > 0 and isinstance(levels_list[0], dict):
-                    levels_cache['legacy_list'] = levels_list
-                    count = len(levels_list)
-                    print(f"✅ Pre-loaded {count} legacy levels from cache (will refresh from DB)")
-                else:
-                    levels_cache['legacy_list'] = []
-                    print("⚠️ Legacy cache file exists but contains invalid data (will populate from DB)")
-        else:
-            print("⏳ No legacy levels cache found (will load from DB on startup)")
-        
-        levels_cache['loaded'] = True
-        return True  # Always return True since we're loading from DB anyway
-        
-    except Exception as e:
-        print(f"⚠️ Cache preload failed: {e}")
-        levels_cache['main_list'] = []
-        levels_cache['legacy_list'] = []
-        levels_cache['loaded'] = True
-        return False
-
-class NonBlockingMongoDB:
-    """MongoDB connection manager with non-blocking initialization"""
-    
-    def __init__(self):
-        self.client = None
-        self.db = None
-        self.connected = False
-        self.connection_thread = None
-        
-    def connect_async(self):
-        """Start MongoDB connection in background thread (non-blocking)"""
-        self.connection_thread = threading.Thread(target=self._connect_background, daemon=True)
-        self.connection_thread.start()
-        
-    def _connect_background(self):
-        """Background connection with retry logic"""
-        retry_count = 0
-        max_retries = 5
-        
-        while retry_count < max_retries:
-            try:
-                print(f"\n🔧 MongoDB connection attempt {retry_count + 1}/{max_retries}...")
-                
-                # Use maximum timeouts for reliability
-                config = {
-                    'tls': True,
-                    'tlsAllowInvalidCertificates': True,
-                    'tlsAllowInvalidHostnames': True,
-                    'serverSelectionTimeoutMS': 60000,
-                    'socketTimeoutMS': 120000,
-                    'connectTimeoutMS': 60000,
-                    'maxPoolSize': 20,
-                    'minPoolSize': 5,
-                    'maxIdleTimeMS': 60000,
-                    'waitQueueTimeoutMS': 30000,
-                    'retryWrites': True,
-                    'retryReads': True,
-                    'directConnection': False,
-                    'connect': False
-                }
-                
-                start_time = time.time()
-                self.client = MongoClient(mongodb_uri, **config)
-                
-                # Test connection
-                self.client.admin.command('ping', maxTimeMS=60000)
-                elapsed = time.time() - start_time
-                
-                self.db = self.client[mongodb_db]
-                self.connected = True
-                
-                print(f"✅ MongoDB connected successfully in {elapsed:.2f}s")
-                print("🌐 Site is now using LIVE database")
-                
-                # Auto-update cache from database
-                self._update_cache_from_db()
-                
-                return True
-                
-            except Exception as e:
-                retry_count += 1
-                print(f"❌ MongoDB connection failed (attempt {retry_count}): {e}")
-                
-                if retry_count < max_retries:
-                    wait_time = min(5 * retry_count, 30)
-                    print(f"🔄 Retrying in {wait_time} seconds...")
-                    time.sleep(wait_time)
-                else:
-                    print("⚠️ MongoDB connection failed after all retries")
-                    print("📁 Site will continue using cached data")
-                    return False
-    
-    def get_db(self):
-        """Get database instance (returns None if not connected yet)"""
-        if self.connected and self.db:
-            return self.db
-        return None
-    
-    def is_connected(self):
-        """Check if MongoDB is connected"""
-        return self.connected
-    
-    def _update_cache_from_db(self):
-        """Update cache from database (called after successful connection) - Quiet mode"""
-        try:
-            # Check if database is connected
-            if self.db is None:
-                print("⚠️ Database not available for cache update")
-                return
-            
-            print("📦 Loading ALL levels from database...")
-            
-            # Load main levels with timeout protection
-            cursor = self.db.levels.find(
-                {"is_legacy": False},  # Use explicit False instead of $ne
-                {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, 
-                 "points": 1, "level_id": 1, "difficulty": 1, "thumbnail_url": 1}
-            ).sort("position", 1)
-            cursor.max_time_ms(45000)  # 45 second timeout
-            main_levels = list(cursor)
-            
-            if not main_levels:
-                print("⚠️ Warning: No main levels found in database!")
-                main_levels = []  # Ensure it's a list, not None
-            else:
-                print(f"   📊 Found {len(main_levels)} main levels")
-            
-            levels_cache['main_list'] = main_levels
-            levels_cache['last_updated'] = datetime.now(timezone.utc).isoformat()
-            
-            # Save to cache file
-            cache_data = {
-                'levels': main_levels,
-                'last_updated': levels_cache['last_updated']
-            }
-            with open('cache_main_levels.json', 'w', encoding='utf-8') as f:
-                json.dump(cache_data, f, ensure_ascii=False, indent=2, cls=MongoEncoder)
-            
-            print(f"   ✅ Cached {len(main_levels)} main levels")
-            
-            # Load legacy levels with timeout protection
-            cursor = self.db.levels.find(
-                {"is_legacy": True},
-                {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1,
-                 "points": 1, "level_id": 1, "difficulty": 1, "thumbnail_url": 1}
-            ).sort("position", 1)
-            cursor.max_time_ms(45000)  # 45 second timeout
-            legacy_levels = list(cursor)
-            
-            if not legacy_levels:
-                print("⚠️ Warning: No legacy levels found in database!")
-                legacy_levels = []  # Ensure it's a list, not None
-            else:
-                print(f"   📊 Found {len(legacy_levels)} legacy levels")
-            
-            levels_cache['legacy_list'] = legacy_levels
-            
-            # Save to cache file
-            cache_data = {
-                'levels': legacy_levels,
-                'last_updated': levels_cache['last_updated']
-            }
-            with open('cache_legacy_levels.json', 'w', encoding='utf-8') as f:
-                json.dump(cache_data, f, ensure_ascii=False, indent=2, cls=MongoEncoder)
-            
-            print(f"   ✅ Cached {len(legacy_levels)} legacy levels")
-            print("✨ Cache updated successfully!")
-            
-        except Exception as e:
-            print(f"⚠️ Cache update failed: {e}")
-            import traceback
-            traceback.print_exc()
-            # Don't set to None - keep existing cache or empty lists
-            if 'main_list' not in levels_cache or levels_cache['main_list'] is None:
-                levels_cache['main_list'] = []
-            if 'legacy_list' not in levels_cache or levels_cache['legacy_list'] is None:
-                levels_cache['legacy_list'] = []
-
-# Create global MongoDB manager
-mongo_manager = NonBlockingMongoDB()
-
-# Preload cache from files (INSTANT)
-preload_cache_from_files()
-
-# Start MongoDB connection in background (NON-BLOCKING)
-mongo_manager.connect_async()
-
-# Create lazy MongoDB wrapper that uses the manager
-class LazyMongoDB:
-    """Lazy-loading MongoDB wrapper that works even when not connected yet"""
-    def __init__(self, manager):
-        self.manager = manager
-    
-    def __getattr__(self, name):
-        db = self.manager.get_db()
-        if db is None:
-            # Return a dummy object that raises error on actual use
-            class DummyCollection:
-                def find(self, *args, **kwargs):
-                    raise Exception("MongoDB not connected - using fallback")
-                def find_one(self, *args, **kwargs):
-                    raise Exception("MongoDB not connected - using fallback")
-                def count_documents(self, *args, **kwargs):
-                    return 0
-            return DummyCollection()
-        return getattr(db, name)
-
-mongo_db = LazyMongoDB(mongo_manager)
-
-# Background monitor to update cache when MongoDB connects
-def background_cache_monitor():
-    """Monitor MongoDB connection and update cache silently (quiet mode)"""
-    cache_updated = False  # Track if we've already updated cache
-    
-    while True:
-        time.sleep(3)  # Check every 3 seconds
-        
-        # Update cache when MongoDB connects
-        if not cache_updated and mongo_manager.is_connected():
-            try:
-                mongo_manager._update_cache_from_db()
-                cache_updated = True
-            except Exception as e:
-                print(f"⚠️ Cache update failed: {e}")
-
-def load_levels_progressively():
-    """Load ALL levels INSTANTLY - from cache or database"""
-    try:
-        print("\n📊 Loading all levels...")
-        
-        # FIRST: Check if we already have cached levels (instant!)
-        print(f"   🔍 Checking cache: {len(levels_cache.get('main_list', []))} levels in memory")
-        print(f"   📁 Cache file exists: {os.path.exists('cache_main_levels.json')}")
-        
-        if levels_cache['main_list'] and len(levels_cache['main_list']) > 0:
-            print(f"✅ Using {len(levels_cache['main_list'])} cached levels instantly!")
-            app.loading_levels = list(levels_cache['main_list'])
-            app.loading_complete = True
-            print(f"🚀 All {len(levels_cache['main_list'])} levels are now live!")
-            return
-        
-        # SECOND: If no cache, wait for MongoDB and load from database
-        print("⏳ No cache available, waiting for MongoDB...")
-        wait_count = 0
-        while not mongo_manager.is_connected():
-            time.sleep(1)
-            wait_count += 1
-            if wait_count > 120:  # Wait max 120 seconds
-                print("⚠️ MongoDB didn't connect in time")
-                app.loading_complete = True
-                return
-        
-        # MongoDB is connected - load ALL levels from database
-        db = mongo_manager.get_db()
-        if db:
-            print("✨ Loading ALL levels from database now...")
-            
-            # Load ALL main levels at once with minimal fields for speed
-            cursor = db.levels.find(
-                {"is_legacy": False},
-                {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, 
-                 "points": 1, "level_id": 1, "difficulty": 1, "thumbnail_url": 1}
-            ).sort("position", 1)
-            cursor.max_time_ms(60000)  # 60 second timeout
-            all_levels = list(cursor)
-            
-            print(f"✅ Loaded {len(all_levels)} levels instantly!")
-            
-            # Update cache immediately
-            levels_cache['main_list'] = all_levels
-            levels_cache['last_updated'] = datetime.now(timezone.utc).isoformat()
-            
-            # Set app levels for immediate display
-            app.loading_levels = all_levels
-            app.loading_complete = True
-            
-            print(f"🚀 All {len(all_levels)} levels are now live on the website!")
-        else:
-            print("⚠️ Database not available after connection")
-            app.loading_complete = True
-        
-    except Exception as e:
-        print(f"❌ Level loading failed: {e}")
-        import traceback
-        traceback.print_exc()
-        app.loading_complete = True
-
-# Start background monitor thread
-monitor_thread = threading.Thread(target=background_cache_monitor, daemon=True)
-monitor_thread.start()
-
-print("\n" + "="*80)
-print("✅ INSTANT START COMPLETE - Flask is ready!")
-print("="*80)
-print(f"\n📊 Initial Status:")
-print(f"   • Main levels cached: {len(levels_cache['main_list'])}")
-print(f"   • Legacy levels cached: {len(levels_cache['legacy_list'])}")
-print(f"   • MongoDB connected: {mongo_manager.is_connected()}")
-print("\n⚡ System will now:")
-print("   1. Start Flask server immediately")
-print("   2. Connect to MongoDB in background")
-print("   3. Load ALL database levels INSTANTLY when connected")
-print("   4. Update cache files automatically")
-print("\n⏳ Wait for MongoDB connection (~15-30 seconds)...")
-print("="*80 + "\n")
-
-print("Initializing OAuth...")
+# Initialize MongoDB and OAuth
+# Initialize MongoDB and OAuth
+print("Initializing MongoDB connection...")
+import time
 retry_count = 0
 max_retries = 3
 
@@ -495,39 +149,39 @@ while retry_count < max_retries:
     try:
         print(f"MongoDB URI: {mongodb_uri[:50]}... (attempt {retry_count + 1}/{max_retries})")
         print(f"MongoDB DB: {mongodb_db}")
-        mongo_client= MongoClient(
+        mongo_client = MongoClient(
             mongodb_uri,
             tls=True,
             tlsAllowInvalidCertificates=True,   # Allow invalid certificates for better connectivity
             tlsAllowInvalidHostnames=True,      # Allow invalid hostnames
-            serverSelectionTimeoutMS=60000,     # 60 seconds for server selection (maximum)
-            socketTimeoutMS=120000,             # 120 seconds for socket operations (maximum)
-            connectTimeoutMS=60000,             # 60 seconds for initial connection (maximum)
-            maxPoolSize=20,                     # Maximum pool size for concurrent operations
-            minPoolSize=5,
-            maxIdleTimeMS=60000,                # Maximum idle time
-            waitQueueTimeoutMS=30000,           # Maximum wait queue timeout
+            serverSelectionTimeoutMS=10000,     # Reduced to 10 seconds
+            socketTimeoutMS=10000,              # Reduced to 10 seconds
+            connectTimeoutMS=10000,             # Reduced to 10 seconds
+            maxPoolSize=5,                      # Reduced pool size
+            minPoolSize=1,
+            maxIdleTimeMS=20000,                # Reduced idle time
+            waitQueueTimeoutMS=5000,            # Reduced wait queue timeout
             retryWrites=True,
             retryReads=True,
             directConnection=False,             # Use replica set discovery
             connect=False                       # Don't connect immediately
         )
         mongo_db = mongo_client[mongodb_db]
-        # Test connection with increased timeout
-        mongo_client.admin.command('ping', maxTimeMS=60000)  # Match the increased timeouts
-        print("âœ“ MongoDB initialized successfully")
+        # Test connection with timeout
+        mongo_client.admin.command('ping', maxTimeMS=10000)  # Match the shorter timeouts
+        print("✓ MongoDB initialized successfully")
         
         # Set MongoDB reference for changelog notifier
         try:
             from changelog_discord import set_mongo_db
             set_mongo_db(mongo_db)
-            print("âœ“ Changelog Discord notifier database reference set")
+            print("✓ Changelog Discord notifier database reference set")
         except Exception as e:
-            print(f"âš ï¸  Warning: Could not set changelog notifier database reference: {e}")
+            print(f"⚠️  Warning: Could not set changelog notifier database reference: {e}")
         break
     except Exception as e:
         retry_count += 1
-        print(f"âŒ MongoDB connection attempt {retry_count} failed: {e}")
+        print(f"❌ MongoDB connection attempt {retry_count} failed: {e}")
         if retry_count < max_retries:
             print(f"Retrying in 2 seconds...")
             time.sleep(2)  # Reduced retry delay
@@ -536,16 +190,12 @@ while retry_count < max_retries:
             raise Exception("Failed to connect to MongoDB after all retries")
 
 if retry_count < max_retries:
-    # Create indexes for better performance (ignore if already exist)
+    # Create indexes for better performance
     try:
-        mongo_db.levels.create_index([("is_legacy", 1), ("position", 1)], name="isLegacy_position_idx", background=True)
-        print("âœ“ Database indexes created")
+        mongo_db.levels.create_index([("is_legacy", 1), ("position", 1)])
+        print("✓ Database indexes created")
     except Exception as e:
-        # Index already exists - this is fine, skip it
-        if "already exists" in str(e):
-            print("âœ“ Database indexes already exist (skipped)")
-        else:
-            print(f"Index creation info: {e}")
+        print(f"Index creation warning: {e}")
 else:
     print("MongoDB initialization error: Failed after all retries")
     print("Falling back to SQLite...")
@@ -565,9 +215,9 @@ try:
             "pin": "1234"
         }
         mongo_db.site_settings.insert_one(default_console_settings)
-        print("âœ“ Default console settings created")
+        print("✓ Default console settings created")
     else:
-        print("âœ“ Console settings loaded")
+        print("✓ Console settings loaded")
 except Exception as e:
     print(f"Warning: Could not initialize console settings: {e}")
 
@@ -588,7 +238,7 @@ if app.config['GOOGLE_CLIENT_ID'] and app.config['GOOGLE_CLIENT_SECRET']:
             'scope': 'openid email profile'
         }
     )
-    print("âœ“ Google OAuth configured")
+    print("✓ Google OAuth configured")
 else:
     print("No Google OAuth credentials found, skipping...")
 
@@ -614,58 +264,78 @@ if client_id and client_secret and client_secret != 'your_discord_client_secret_
                 'scope': 'identify'
             }
         )
-        print("âœ“ Discord OAuth configured successfully")
+        print("✓ Discord OAuth configured successfully")
     except Exception as e:
-        print(f"âŒ Discord OAuth configuration failed: {e}")
+        print(f"❌ Discord OAuth configuration failed: {e}")
         discord_oauth = None
 else:
     if not client_id:
-        print("âŒ DISCORD_CLIENT_ID not found in environment")
+        print("❌ DISCORD_CLIENT_ID not found in environment")
     elif not client_secret or client_secret == 'your_discord_client_secret_here':
-        print("âŒ DISCORD_CLIENT_SECRET not configured (placeholder value detected)")
+        print("❌ DISCORD_CLIENT_SECRET not configured (placeholder value detected)")
         print("   Please get your Client Secret from Discord Developer Portal")
-    print("âš ï¸  Discord account linking will be disabled")
+    print("⚠️  Discord account linking will be disabled")
 
-# Simple cache for levels
+# Simple cache for levels - OPTIMIZED FOR SPEED
 levels_cache = {
     'main_list': None,
     'legacy_list': None,
     'last_updated': None,
-    'loading': False  # Track if currently loading
+    'ttl': 300  # 5 minutes cache TTL
 }
 
-# Clear cache on startup to force fresh data
-print("🔄 Clearing level cache on startup...")
-levels_cache = {
-    'main_list': None,
-    'legacy_list': None,
-    'last_updated': None,
-    'loading': False
-}
+def get_fast_cached_levels(is_legacy=False):
+    """Ultra-fast cached level retrieval with TTL"""
+    global levels_cache
+    
+    cache_key = 'legacy_list' if is_legacy else 'main_list'
+    now = datetime.now(timezone.utc)
+    
+    # Check if cache is valid
+    if (levels_cache[cache_key] is not None and 
+        levels_cache['last_updated'] is not None):
+        
+        age = (now - levels_cache['last_updated']).total_seconds()
+        if age < levels_cache['ttl']:
+            # Cache hit - return immediately
+            return levels_cache[cache_key]
+    
+    # Cache miss - load from database
+    try:
+        if is_legacy:
+            levels = list(mongo_db.levels.find(
+                {"is_legacy": True},
+                {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, 
+                 "points": 1, "level_id": 1, "difficulty": 1, "video_url": 1, 
+                 "thumbnail_url": 1, "min_percentage": 1, "demon_type": 1}
+            ).sort("position", 1))
+        else:
+            levels = list(mongo_db.levels.find(
+                {"$or": [{"is_legacy": False}, {"is_legacy": {"$exists": False}}]},
+                {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, 
+                 "points": 1, "level_id": 1, "difficulty": 1, "video_url": 1, 
+                 "thumbnail_url": 1, "min_percentage": 1, "demon_type": 1}
+            ).sort("position", 1).limit(100))
+        
+        # Update cache
+        levels_cache[cache_key] = levels
+        levels_cache['last_updated'] = now
+        
+        return levels
+    except Exception as e:
+        print(f"Error loading levels: {e}")
+        return levels_cache.get(cache_key) or []
 
-# Load cache from JSON files on startup (FAST!)
-print("💾 Loading cache from JSON files...")
+# Load cache from file on startup
 try:
     import json
-    # Try to load main levels cache
-    try:
-        with open('cache_main_levels.json', 'r') as f:
-            levels_cache['main_list'] = json.load(f)
-        print("✅ Loaded main levels from cache_main_levels.json")
-    except FileNotFoundError:
-        print("⚠️  cache_main_levels.json not found - will load from database on first request")
-    
-    # Try to load legacy levels cache
-    try:
-        with open('cache_legacy_levels.json', 'r') as f:
-            levels_cache['legacy_list'] = json.load(f)
-        print("✅ Loaded legacy levels from cache_legacy_levels.json")
-    except FileNotFoundError:
-        print("⚠️  cache_legacy_levels.json not found - will load from database on first request")
-        
+    with open('cache_main_levels.json', 'r') as f:
+        cache_data = json.load(f)
+        levels_cache['main_list'] = cache_data.get('levels', [])
+        levels_cache['last_updated'] = datetime.now(timezone.utc)
+        print(f"Loaded {len(levels_cache['main_list'])} levels from cache file")
 except Exception as e:
-    print(f"❌ Failed to load JSON cache: {e}")
-    print("   Will use database instead")
+    print(f"Could not load cache file: {e}")
 
 @app.before_request
 def check_ip_ban_and_verifier_status():
@@ -768,64 +438,6 @@ def get_cached_levels(is_legacy=False, quick_load=False):
     cache_key = 'legacy_list' if is_legacy else 'main_list'
     cached_levels = levels_cache.get(cache_key)
     return cached_levels if cached_levels is not None else []
-
-def load_levels_from_database(is_legacy=False, timeout_ms=45000):
-    """Load levels directly from database with timeout protection
-    
-    Args:
-        is_legacy: Load legacy list if True, main list if False
-        timeout_ms: Query timeout in milliseconds (default 45 seconds)
-    
-    Returns:
-        List of level documents from database, or empty list on error
-    """
-    try:
-        print(f"📊 Loading {'legacy' if is_legacy else 'main'} levels from database...")
-        start_time = time.time()
-        
-        # Check if MongoDB is connected
-        if not mongo_manager.is_connected():
-            print("⚠️ MongoDB not connected")
-            return []
-        
-        # Build query - use explicit False check for main list to avoid BSON comparison issues
-        if is_legacy:
-            query = {"is_legacy": True}
-        else:
-            query = {"is_legacy": False}  # Explicit False check instead of $ne
-        
-        # Define fields to retrieve
-        projection = {
-            "_id": 1,
-            "name": 1,
-            "creator": 1,
-            "verifier": 1,
-            "position": 1,
-            "points": 1,
-            "level_id": 1,
-            "difficulty": 1,
-            "thumbnail_url": 1,
-            "video_url": 1,
-            "min_percentage": 1,
-            "image_base64": 1
-        }
-        
-        # Execute query with timeout
-        cursor = mongo_db.levels.find(query, projection).sort("position", 1)
-        cursor.max_time_ms(timeout_ms)
-        
-        levels = list(cursor)
-        elapsed = time.time() - start_time
-        
-        print(f"✅ Loaded {len(levels)} {'legacy' if is_legacy else 'main'} levels in {elapsed:.2f}s")
-        
-        return levels
-        
-    except Exception as e:
-        print(f"❌ Failed to load {'legacy' if is_legacy else 'main'} levels: {e}")
-        import traceback
-        traceback.print_exc()
-        return []
 
 # Helper functions
 def retry_db_operation(max_retries=3, delay=1):
@@ -1099,11 +711,11 @@ def utility_processor():
         except:
             return None
     
-    # Get current theme from session (with robust error handling)
+    # Get current theme from session (with error handling)
     try:
-        current_theme = session.get('theme', 'light') if session else 'light'
-    except (RuntimeError, AttributeError):
-        # No request context or session not available
+        current_theme = session.get('theme', 'light')
+    except RuntimeError:
+        # No request context available
         current_theme = 'light'
     
     # Get Discord widget data
@@ -1259,10 +871,10 @@ def reinitialize_db_connection():
         
         # Test new connection
         mongo_client.admin.command('ping', maxTimeMS=30000)
-        print("âœ“ MongoDB connection reinitialized successfully")
+        print("✓ MongoDB connection reinitialized successfully")
         return True
     except Exception as e:
-        print(f"âŒ Failed to reinitialize MongoDB connection: {e}")
+        print(f"❌ Failed to reinitialize MongoDB connection: {e}")
         return False
 
 def calculate_record_points(record, level):
@@ -1385,10 +997,10 @@ def create_global_notification(notification_type, title, message, related_id=Non
 def fix_verifier_points_bug():
     """Fix the bug where verifiers lose points and update affected users"""
     try:
-        print("ðŸ” Starting verifier points bug fix...")
+        print("🔍 Starting verifier points bug fix...")
         
         # Find all records that are marked as verifier records
-        verifier_records = list(mongo_db.records.find({"is_verifier": True}, max_time_ms=120000))
+        verifier_records = list(mongo_db.records.find({"is_verifier": True}))
         print(f"Found {len(verifier_records)} verifier records to check")
         
         # Group records by user
@@ -1406,17 +1018,15 @@ def fix_verifier_points_bug():
                 # Recalculate points for this user
                 new_points = update_user_points(user_id)
                 updated_users += 1
-                print(f"âœ… Updated points for user {user_id}: {new_points} points")
+                print(f"✅ Updated points for user {user_id}: {new_points} points")
             except Exception as e:
-                print(f"âŒ Error updating points for user {user_id}: {e}")
+                print(f"❌ Error updating points for user {user_id}: {e}")
         
-        print(f"âœ… Verifier points bug fix completed. Updated {updated_users} users.")
+        print(f"✅ Verifier points bug fix completed. Updated {updated_users} users.")
         return updated_users
         
     except Exception as e:
-        print(f"âŒ Error in fix_verifier_points_bug: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"❌ Error in fix_verifier_points_bug: {e}")
         return 0
 
 
@@ -1566,9 +1176,9 @@ def update_user_points(user_id):
             try:
                 from discord_bot import sync_single_user_roles
                 sync_single_user_roles(user['discord_id'], total_points)
-                print(f"âœ… Synced Discord roles for user {user.get('username', 'Unknown')} (points: {old_points} â†’ {total_points})")
+                print(f"✅ Synced Discord roles for user {user.get('username', 'Unknown')} (points: {old_points} → {total_points})")
             except Exception as e:
-                print(f"âš ï¸ Error syncing Discord roles for user {user.get('username', 'Unknown')}: {e}")
+                print(f"⚠️ Error syncing Discord roles for user {user.get('username', 'Unknown')}: {e}")
     
     return total_points
 
@@ -1585,10 +1195,10 @@ def check_and_notify_points_milestones(user, old_points, new_points):
             if isinstance(last_sync_time, datetime):
                 time_diff = datetime.now(timezone.utc) - last_sync_time
                 if time_diff.total_seconds() < 300:  # 5 minutes
-                    print(f"â­ï¸ Skipping milestone notifications for user {user['username']} - role sync in progress or recently completed")
+                    print(f"⏭️ Skipping milestone notifications for user {user['username']} - role sync in progress or recently completed")
                     return
     except Exception as e:
-        print(f"âš ï¸ Error checking role sync status: {e}")
+        print(f"⚠️ Error checking role sync status: {e}")
     
     # Define points thresholds and corresponding roles
     milestones = [
@@ -1672,13 +1282,13 @@ def check_and_notify_points_milestones(user, old_points, new_points):
             role_name = role_names.get(milestone_role_id, "New Role")
             
             # Send DM notification for the highest milestone reached
-            message = f"ðŸŽ‰ Congratulations! You've reached {highest_milestone} points on the RTL list and have been awarded the '{role_name}' role!"
+            message = f"🎉 Congratulations! You've reached {highest_milestone} points on the RTL list and have been awarded the '{role_name}' role!"
             try:
                 if is_bot_available():
                     send_dm_to_user(user['discord_id'], message)
-                    print(f"âœ… Sent milestone notification to user {user['username']} for {highest_milestone} points")
+                    print(f"✅ Sent milestone notification to user {user['username']} for {highest_milestone} points")
                 else:
-                    print("âš ï¸ Discord bot not available - skipping milestone notification")
+                    print("⚠️ Discord bot not available - skipping milestone notification")
             except Exception as e:
                 print(f"Error sending milestone notification: {e}")
     
@@ -1705,11 +1315,11 @@ def recalculate_all_points():
             # Recalculate all user points
             users_updated = manager.recalculate_all_user_points()
             
-            print(f"âœ… Real-time recalculation: {levels_updated} levels, {users_updated} users updated")
+            print(f"✅ Real-time recalculation: {levels_updated} levels, {users_updated} users updated")
             return levels_updated, users_updated
             
         except Exception as e:
-            print(f"âŒ Real-time recalculation failed: {e}")
+            print(f"❌ Real-time recalculation failed: {e}")
             # Fall back to old method for levels only
             pass
     
@@ -1735,7 +1345,7 @@ def recalculate_all_points():
     # Execute all updates in a single bulk operation
     if bulk_operations:
         mongo_db.levels.bulk_write(bulk_operations)
-        print(f"âš ï¸ Fallback: Updated points for {len(bulk_operations)} levels only (users not updated)")
+        print(f"⚠️ Fallback: Updated points for {len(bulk_operations)} levels only (users not updated)")
         return len(bulk_operations), 0
     
     return 0, 0
@@ -1752,7 +1362,7 @@ def log_level_change(action, level_name, admin_username, **kwargs):
         }
         
         mongo_db.level_changelog.insert_one(changelog_entry)
-        print(f"ðŸ“ Logged level change: {action} - {level_name}")
+        print(f"📝 Logged level change: {action} - {level_name}")
         
         # Send enhanced Discord notification
         send_enhanced_changelog_notification(action, level_name, admin_username, **kwargs)
@@ -1884,7 +1494,7 @@ def send_enhanced_changelog_notification(action, level_name, admin_username, **k
         # Send the notification - ensure only one message is sent
         if message and CHANGELOG_DISCORD_AVAILABLE:
             notify_changelog(message, admin_username)
-            print(f"âœ… Changelog notification sent: {message}")
+            print(f"✅ Changelog notification sent: {message}")
         
     except Exception as e:
         print(f"Error sending changelog notification: {e}")
@@ -1940,8 +1550,8 @@ def auto_manage_legacy_list():
             # Note: We don't log this as a separate changelog entry since 
             # the placement message already mentions "This pushes X to the legacy list"
             
-            print(f"ðŸ”„ Automatically moved {level_at_101['name']} to legacy list at position #{next_legacy_position}")
-            print(f"ðŸ”„ Shifted main list positions to fill the gap")
+            print(f"🔄 Automatically moved {level_at_101['name']} to legacy list at position #{next_legacy_position}")
+            print(f"🔄 Shifted main list positions to fill the gap")
             return level_at_101["name"]
         
         return None
@@ -2035,64 +1645,84 @@ def log_admin_action(admin_username, action, details=""):
 print("Setting up routes...")
 
 # Start Discord bot after all initialization is complete
-print("ðŸ”§ Initializing Discord bot integration...")
+print("🔧 Initializing Discord bot integration...")
 try:
-    print("ðŸ“¦ Importing Discord bot module...")
+    print("📦 Importing Discord bot module...")
     from discord_bot import start_discord_bot, is_bot_available
-    print("âœ… Discord bot module imported successfully")
+    print("✅ Discord bot module imported successfully")
     
     # Set the MongoDB reference for the discord_bot module
     import discord_bot
     discord_bot.mongo_db = mongo_db
     
-    print("ðŸ¤– Attempting to start Discord bot...")
+    print("🤖 Attempting to start Discord bot...")
     bot_started = start_discord_bot()
     if bot_started:
-        print("ðŸ¤– Discord bot startup initiated")
-        print("â³ Bot will be available once it connects to Discord")
+        print("🤖 Discord bot startup initiated")
+        print("⏳ Bot will be available once it connects to Discord")
         
         # Quick check after a moment
         import time
         time.sleep(2)
         if is_bot_available():
-            print("ðŸŽ‰ Discord bot connected successfully!")
+            print("🎉 Discord bot connected successfully!")
         else:
-            print("â³ Discord bot still connecting...")
+            print("⏳ Discord bot still connecting...")
             
-        # Start level monitor after a LONGER delay to ensure site loads first
+        # Start level monitor after a short delay to ensure bot is ready
         def start_monitor_delayed():
             import time
-            print("â³ Level monitor waiting 90 seconds before starting...")
-            time.sleep(90)  # Wait 90 seconds for site to be fully loaded and stable
+            time.sleep(10)  # Wait 10 seconds for bot to be ready
             try:
                 from level_monitor import start_level_monitor
                 from discord_bot import bot
-                print("ðŸ”„ Attempting to start level monitor...")
                 monitor = start_level_monitor(mongo_db, bot)
                 if monitor:
-                    print("âœ… Level monitor started automatically in background")
+                    print("✅ Level monitor started automatically")
                 else:
-                    print("âŒ Failed to start level monitor automatically")
+                    print("❌ Failed to start level monitor automatically")
             except Exception as e:
-                print(f"âŒ Error starting level monitor: {e}")
-                print("âš ï¸ Level monitor disabled - site will continue without automatic level checking")
+                print(f"❌ Error starting level monitor: {e}")
         
-        # Start monitor in background thread (daemon mode ensures it won't block app startup)
+        # Start monitor in background thread
         import threading
         monitor_thread = threading.Thread(target=start_monitor_delayed, daemon=True)
         monitor_thread.start()
-        print("â³ Level monitor will start in background after 90 second delay...")
         
     else:
-        print("âš ï¸ Discord bot could not be started - continuing without bot features")
+        print("⚠️ Discord bot could not be started - continuing without bot features")
 except ImportError as e:
-    print(f"âŒ Failed to import Discord bot module: {e}")
-    print("âš ï¸ Continuing without Discord bot features")
+    print(f"❌ Failed to import Discord bot module: {e}")
+    print("⚠️ Continuing without Discord bot features")
 except Exception as e:
-    print(f"âŒ Failed to start Discord bot: {e}")
+    print(f"❌ Failed to start Discord bot: {e}")
     import traceback
     traceback.print_exc()
-    print("âš ï¸ Continuing without Discord bot features")
+    print("⚠️ Continuing without Discord bot features")
+
+# ULTRA-FAST: Preload cache on startup
+print("\n⚡ PRELOADING CACHE FOR ULTRA-FAST PERFORMANCE...")
+try:
+    import threading
+    def preload_cache():
+        import time
+        start = time.time()
+        print("Loading main list into cache...")
+        main_levels = get_fast_cached_levels(is_legacy=False)
+        print(f"Loaded {len(main_levels)} main levels in {time.time() - start:.3f}s")
+        
+        start = time.time()
+        print("Loading legacy list into cache...")
+        legacy_levels = get_fast_cached_levels(is_legacy=True)
+        print(f"Loaded {len(legacy_levels)} legacy levels in {time.time() - start:.3f}s")
+        
+        print("✅ CACHE PRELOADED - Site will load ULTRA-FAST!")
+    
+    # Preload in background thread so app starts immediately
+    preload_thread = threading.Thread(target=preload_cache, daemon=True)
+    preload_thread.start()
+except Exception as e:
+    print(f"⚠️ Cache preload failed: {e}")
 
 @app.route('/thumb/<path:url>')
 def thumbnail_proxy(url):
@@ -2154,7 +1784,7 @@ def thumbnail_proxy(url):
 def fix_missing_urls():
     """Fix missing video URLs for levels that should have images"""
     if 'user_id' not in session or not session.get('is_admin'):
-        return "âŒ Access denied - Admin only"
+        return "❌ Access denied - Admin only"
     
     try:
         # Direct database updates with exact level names and URLs
@@ -2192,31 +1822,31 @@ def fix_missing_urls():
                 )
                 
                 if result.modified_count > 0:
-                    results.append(f"âœ… UPDATED: '{level['name']}' â†’ {fix['url']}")
+                    results.append(f"✅ UPDATED: '{level['name']}' → {fix['url']}")
                 else:
-                    results.append(f"âšª UNCHANGED: '{level['name']}' (already had URL)")
+                    results.append(f"⚪ UNCHANGED: '{level['name']}' (already had URL)")
             else:
-                results.append(f"âŒ NOT FOUND: '{fix['name']}'")
+                results.append(f"❌ NOT FOUND: '{fix['name']}'")
         
         # Clear cache
         levels_cache['main_list'] = None
         levels_cache['legacy_list'] = None
         
         html = f"""
-        <h1>ðŸ”§ URL Fix Results</h1>
+        <h1>🔧 URL Fix Results</h1>
         <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-family: monospace;">
             {'<br>'.join(results)}
         </div>
         <p style="margin-top: 20px;">
             <!-- Image debug link removed --> |
-            <a href="/">ðŸ  Main List</a>
+            <a href="/">🏠 Main List</a>
         </p>
         """
         
         return html
         
     except Exception as e:
-        return f"âŒ Error: {str(e)}"
+        return f"❌ Error: {str(e)}"
 
 @app.route('/quick_fix_urls')
 def quick_fix_urls():
@@ -2249,20 +1879,20 @@ def quick_fix_urls():
                     {"_id": level["_id"]},
                     {"$set": {"video_url": fix['url']}}
                 )
-                results.append(f"âœ… Updated '{level['name']}' (#{level.get('position', '?')}) with {fix['url']}")
+                results.append(f"✅ Updated '{level['name']}' (#{level.get('position', '?')}) with {fix['url']}")
             else:
-                results.append(f"âŒ Level '{fix['name']}' not found")
+                results.append(f"❌ Level '{fix['name']}' not found")
         
-        html = "<h2>ðŸš€ Quick URL Fix Results</h2><ul>"
+        html = "<h2>🚀 Quick URL Fix Results</h2><ul>"
         for result in results:
             html += f"<li>{result}</li>"
         html += "</ul>"
-        html += '<p><a href="/debug_levels">ðŸ” Check Results</a> | <a href="/">â† Back</a></p>'
+        html += '<p><a href="/debug_levels">🔍 Check Results</a> | <a href="/">← Back</a></p>'
         
         return html
         
     except Exception as e:
-        return f"<h2>âŒ Error</h2><p>{str(e)}</p>"
+        return f"<h2>❌ Error</h2><p>{str(e)}</p>"
 
 # Base64 image testing removed - no image uploads supported
 
@@ -2824,7 +2454,7 @@ def debug_thumbnails():
         
         debug_html = """
         <div style="padding: 20px; font-family: Arial;">
-            <h2>ðŸ” Thumbnail Debug Info</h2>
+            <h2>🔍 Thumbnail Debug Info</h2>
             <table border="1" style="border-collapse: collapse; width: 100%;">
                 <tr style="background: #f5f5f5;">
                     <th style="padding: 10px;">Position</th>
@@ -2873,7 +2503,7 @@ def debug_thumbnails():
         debug_html += """
             </table>
             <br>
-            <p><a href="/">â† Back to Main List</a> | <a href="/admin/levels">Admin Levels</a> | <a href="/test_base64_upload">Test Base64 Upload</a> | <a href="/test_base64_display">ðŸ§ª Test Base64 Display</a></p>
+            <p><a href="/">← Back to Main List</a> | <a href="/admin/levels">Admin Levels</a> | <a href="/test_base64_upload">Test Base64 Upload</a> | <a href="/test_base64_display">🧪 Test Base64 Display</a></p>
         </div>
         """
         
@@ -2890,7 +2520,7 @@ def debug_thumbnails():
 def complete_fix():
     """Complete system fix - images and decimals"""
     if 'user_id' not in session or not session.get('is_admin'):
-        return "âŒ Access denied - Admin only"
+        return "❌ Access denied - Admin only"
     
     try:
         fixes = []
@@ -2910,7 +2540,7 @@ def complete_fix():
                 {"$set": {"video_url": youtube_url}}
             )
             if result.modified_count > 0:
-                fixes.append(f"âœ… Added video URL to '{level_name}'")
+                fixes.append(f"✅ Added video URL to '{level_name}'")
         
         # 2. Fix decimal points for all levels
         levels = list(mongo_db.levels.find({"is_legacy": False}, {"_id": 1, "position": 1, "points": 1}))
@@ -2927,7 +2557,7 @@ def complete_fix():
                 )
                 points_fixed += 1
         
-        fixes.append(f"âœ… Fixed points for {points_fixed} levels")
+        fixes.append(f"✅ Fixed points for {points_fixed} levels")
         
         # 3. Update all user points
         users_updated = 0
@@ -2935,27 +2565,27 @@ def complete_fix():
             update_user_points(user["_id"])
             users_updated += 1
         
-        fixes.append(f"âœ… Updated points for {users_updated} users")
+        fixes.append(f"✅ Updated points for {users_updated} users")
         
         # Clear cache
         levels_cache['main_list'] = None
         levels_cache['legacy_list'] = None
         
         html = f"""
-        <h1>ðŸ”§ Complete Fix Results</h1>
+        <h1>🔧 Complete Fix Results</h1>
         <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-family: monospace;">
             {'<br>'.join(fixes)}
         </div>
         <p style="margin-top: 20px;">
-            <a href="/">ðŸ  Main List</a> |
-            <a href="/stats/players">ðŸ† Leaderboard</a>
+            <a href="/">🏠 Main List</a> |
+            <a href="/stats/players">🏆 Leaderboard</a>
         </p>
         """
         
         return html
         
     except Exception as e:
-        return f"âŒ Error: {str(e)}"
+        return f"❌ Error: {str(e)}"
 
 @app.route('/test_thumbnails')
 def test_thumbnails():
@@ -2971,7 +2601,7 @@ def test_thumbnails():
         ).sort("position", 1).limit(10))
         
         html = """
-        <h1>ðŸ§ª YouTube Thumbnail Format Test</h1>
+        <h1>🧪 YouTube Thumbnail Format Test</h1>
         <p>Testing different YouTube thumbnail formats to find what works...</p>
         <style>
             .test-card { 
@@ -3073,7 +2703,7 @@ def test_thumbnails():
         
         html += """
         <div style="clear: both; margin-top: 20px;">
-            <h3>ðŸ“‹ Results Analysis:</h3>
+            <h3>📋 Results Analysis:</h3>
             <p>Look for images with <strong>green borders</strong> - those formats work!</p>
             <p>Images with <strong>red borders</strong> are broken/unavailable.</p>
             <br>
@@ -3085,7 +2715,7 @@ def test_thumbnails():
         return html
         
     except Exception as e:
-        return f"âŒ Error: {str(e)}"
+        return f"❌ Error: {str(e)}"
 
 @app.route('/fix_youtube_thumbnails')
 def fix_youtube_thumbnails():
@@ -3161,34 +2791,34 @@ def fix_youtube_thumbnails():
                         {"$set": {"thumbnail_url": best_url}}
                     )
                     
-                    results.append(f"âœ… #{position} {name}: {working_format}")
+                    results.append(f"✅ #{position} {name}: {working_format}")
                     fixed_count += 1
                 else:
-                    results.append(f"âŒ #{position} {name}: No working format found")
+                    results.append(f"❌ #{position} {name}: No working format found")
             else:
-                results.append(f"âš ï¸ #{position} {name}: Could not extract YouTube ID")
+                results.append(f"⚠️ #{position} {name}: Could not extract YouTube ID")
         
         # Clear cache
         levels_cache['main_list'] = None
         levels_cache['legacy_list'] = None
         
         html = f"""
-        <h1>ðŸ”§ YouTube Thumbnail Auto-Fix Results</h1>
+        <h1>🔧 YouTube Thumbnail Auto-Fix Results</h1>
         <p><strong>Fixed {fixed_count} out of {len(levels)} levels</strong></p>
         <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; font-family: monospace;">
             {'<br>'.join(results)}
         </div>
         <p style="margin-top: 20px;">
-            <a href="/">ðŸ  Test Main List</a> |
-            <a href="/test_thumbnails">ðŸ§ª Test Thumbnails</a> |
-            <a href="/admin">âš™ï¸ Admin Panel</a>
+            <a href="/">🏠 Test Main List</a> |
+            <a href="/test_thumbnails">🧪 Test Thumbnails</a> |
+            <a href="/admin">⚙️ Admin Panel</a>
         </p>
         """
         
         return html
         
     except Exception as e:
-        return f"âŒ Error: {str(e)}"
+        return f"❌ Error: {str(e)}"
 
 @app.route('/admin/ip_ban/<user_id>', methods=['GET', 'POST'])
 def ip_ban_user(user_id):
@@ -3528,150 +3158,150 @@ TRANSLATIONS = {
     },
     'ru': {
         # Navigation
-        'main_list': 'ÐžÑÐ½Ð¾Ð²Ð½Ð¾Ð¹ ÑÐ¿Ð¸ÑÐ¾Ðº',
-        'legacy_list': 'Ð£ÑÑ‚Ð°Ñ€ÐµÐ²ÑˆÐ¸Ð¹ ÑÐ¿Ð¸ÑÐ¾Ðº',
-        'future_list': 'Ð‘ÑƒÐ´ÑƒÑ‰Ð¸Ð¹ ÑÐ¿Ð¸ÑÐ¾Ðº',
-        'time_machine': 'ÐœÐ°ÑˆÐ¸Ð½Ð° Ð²Ñ€ÐµÐ¼ÐµÐ½Ð¸',
-        'submit': 'ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ',
-        'submit_record': 'ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Ñ€ÐµÐºÐ¾Ñ€Ð´',
-        'submit_verification': 'ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Ð²ÐµÑ€Ð¸Ñ„Ð¸ÐºÐ°Ñ†Ð¸ÑŽ',
-        'roulette': 'Ð ÑƒÐ»ÐµÑ‚ÐºÐ°',
-        'changelog': 'Ð–ÑƒÑ€Ð½Ð°Ð» Ð¸Ð·Ð¼ÐµÐ½ÐµÐ½Ð¸Ð¹',
-        'guide': 'Ð ÑƒÐºÐ¾Ð²Ð¾Ð´ÑÑ‚Ð²Ð¾',
-        'stats_viewer': 'ÐŸÑ€Ð¾ÑÐ¼Ð¾Ñ‚Ñ€ ÑÑ‚Ð°Ñ‚Ð¸ÑÑ‚Ð¸ÐºÐ¸',
-        'language': 'Ð¯Ð·Ñ‹Ðº',
+        'main_list': 'Основной список',
+        'legacy_list': 'Устаревший список',
+        'future_list': 'Будущий список',
+        'time_machine': 'Машина времени',
+        'submit': 'Отправить',
+        'submit_record': 'Отправить рекорд',
+        'submit_verification': 'Отправить верификацию',
+        'roulette': 'Рулетка',
+        'changelog': 'Журнал изменений',
+        'guide': 'Руководство',
+        'stats_viewer': 'Просмотр статистики',
+        'language': 'Язык',
         
         # Action Cards
-        'guidelines': 'Ð ÑƒÐºÐ¾Ð²Ð¾Ð´ÑÑ‰Ð¸Ðµ Ð¿Ñ€Ð¸Ð½Ñ†Ð¸Ð¿Ñ‹',
-        'submit_records': 'ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Ñ€ÐµÐºÐ¾Ñ€Ð´Ñ‹',
-        'guidelines_text': 'Ð’ÑÐµ Ð¾Ð¿ÐµÑ€Ð°Ñ†Ð¸Ð¸ ÑÐ¿Ð¸ÑÐºÐ° Ð¿Ð¾ÑÐ»ÐµÐ´Ð½Ð¸Ñ… Ð²ÐºÐ»Ð°Ð´Ð¾Ðº Ð²Ñ‹Ð¿Ð¾Ð»Ð½ÑÑŽÑ‚ÑÑ Ð² ÑÐ¾Ð¾Ñ‚Ð²ÐµÑ‚ÑÑ‚Ð²Ð¸Ð¸ Ñ Ð½Ð°ÑˆÐ¸Ð¼Ð¸ Ñ€ÑƒÐºÐ¾Ð²Ð¾Ð´ÑÑ‰Ð¸Ð¼Ð¸ Ð¿Ñ€Ð¸Ð½Ñ†Ð¸Ð¿Ð°Ð¼Ð¸. ÐžÐ±ÑÐ·Ð°Ñ‚ÐµÐ»ÑŒÐ½Ð¾ Ð¾Ð·Ð½Ð°ÐºÐ¾Ð¼ÑŒÑ‚ÐµÑÑŒ Ñ Ð½Ð¸Ð¼Ð¸ Ð¿ÐµÑ€ÐµÐ´ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¾Ð¹ Ð·Ð°Ð¿Ð¸ÑÐ¸!',
-        'submit_text': 'ÐŸÑ€Ð¸Ð¼ÐµÑ‡Ð°Ð½Ð¸Ðµ: ÐŸÐ¾Ð¶Ð°Ð»ÑƒÐ¹ÑÑ‚Ð°, Ð½Ðµ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²Ð»ÑÐ¹Ñ‚Ðµ Ð±ÐµÑÑÐ¼Ñ‹ÑÐ»Ð¸Ñ†Ñƒ, ÑÑ‚Ð¾ Ñ‚Ð¾Ð»ÑŒÐºÐ¾ ÑƒÑÐ»Ð¾Ð¶Ð½ÑÐµÑ‚ Ñ€Ð°Ð±Ð¾Ñ‚Ñƒ Ð²ÑÐµÐ¼ Ð½Ð°Ð¼ Ð¸ Ð¿Ñ€Ð¸Ð²ÐµÐ´ÐµÑ‚ Ðº Ð±Ð°Ð½Ñƒ. Ð¤Ð¾Ñ€Ð¼Ð° Ð¾Ñ‚ÐºÐ»Ð¾Ð½ÑÐµÑ‚ Ð´ÑƒÐ±Ð»Ð¸Ñ€ÑƒÑŽÑ‰Ð¸Ðµ Ð·Ð°ÑÐ²ÐºÐ¸.',
-        'stats_text': 'ÐŸÐ¾Ð»ÑƒÑ‡Ð¸Ñ‚Ðµ Ð¿Ð¾Ð´Ñ€Ð¾Ð±Ð½Ñ‹Ð¹ Ð¾Ð±Ð·Ð¾Ñ€ Ñ‚Ð¾Ð³Ð¾, ÐºÑ‚Ð¾ Ð·Ð°Ð²ÐµÑ€ÑˆÐ¸Ð» Ð±Ð¾Ð»ÑŒÑˆÐµ Ð²ÑÐµÐ³Ð¾, ÑÐ¾Ð·Ð´Ð°Ð» Ð±Ð¾Ð»ÑŒÑˆÐµ Ð²ÑÐµÐ³Ð¾ Ð´ÐµÐ¼Ð¾Ð½Ð¾Ð² Ð¸Ð»Ð¸ Ð¿Ð¾Ð±ÐµÐ´Ð¸Ð» Ð±Ð¾Ð»ÑŒÑˆÐµ Ð²ÑÐµÐ³Ð¾ Ð´ÐµÐ¼Ð¾Ð½Ð¾Ð²! Ð•ÑÑ‚ÑŒ Ð´Ð°Ð¶Ðµ Ñ‚Ð°Ð±Ð»Ð¸Ñ†Ð° Ð»Ð¸Ð´ÐµÑ€Ð¾Ð²!',
-        'read_guidelines': 'ÐŸÑ€Ð¾Ñ‡Ð¸Ñ‚Ð°Ñ‚ÑŒ Ñ€ÑƒÐºÐ¾Ð²Ð¾Ð´ÑÑ‰Ð¸Ðµ Ð¿Ñ€Ð¸Ð½Ñ†Ð¸Ð¿Ñ‹!',
-        'submit_record_btn': 'ÐžÑ‚Ð¿Ñ€Ð°Ð²Ð¸Ñ‚ÑŒ Ñ€ÐµÐºÐ¾Ñ€Ð´!',
-        'open_stats': 'ÐžÑ‚ÐºÑ€Ñ‹Ñ‚ÑŒ Ð¿Ñ€Ð¾ÑÐ¼Ð¾Ñ‚Ñ€ ÑÑ‚Ð°Ñ‚Ð¸ÑÑ‚Ð¸ÐºÐ¸!',
+        'guidelines': 'Руководящие принципы',
+        'submit_records': 'Отправить рекорды',
+        'guidelines_text': 'Все операции списка последних вкладок выполняются в соответствии с нашими руководящими принципами. Обязательно ознакомьтесь с ними перед отправкой записи!',
+        'submit_text': 'Примечание: Пожалуйста, не отправляйте бессмыслицу, это только усложняет работу всем нам и приведет к бану. Форма отклоняет дублирующие заявки.',
+        'stats_text': 'Получите подробный обзор того, кто завершил больше всего, создал больше всего демонов или победил больше всего демонов! Есть даже таблица лидеров!',
+        'read_guidelines': 'Прочитать руководящие принципы!',
+        'submit_record_btn': 'Отправить рекорд!',
+        'open_stats': 'Открыть просмотр статистики!',
         
         # General UI
-        'position': 'ÐŸÐ¾Ð·Ð¸Ñ†Ð¸Ñ',
-        'level': 'Ð£Ñ€Ð¾Ð²ÐµÐ½ÑŒ',
-        'creator': 'Ð¡Ð¾Ð·Ð´Ð°Ñ‚ÐµÐ»ÑŒ',
-        'verifier': 'Ð’ÐµÑ€Ð¸Ñ„Ð¸ÐºÐ°Ñ‚Ð¾Ñ€',
-        'points': 'ÐžÑ‡ÐºÐ¸',
-        'difficulty': 'Ð¡Ð»Ð¾Ð¶Ð½Ð¾ÑÑ‚ÑŒ',
-        'records': 'Ð—Ð°Ð¿Ð¸ÑÐ¸',
-        'completion': 'Ð—Ð°Ð²ÐµÑ€ÑˆÐµÐ½Ð¸Ðµ',
-        'progress': 'ÐŸÑ€Ð¾Ð³Ñ€ÐµÑÑ',
-        'percentage': 'ÐŸÑ€Ð¾Ñ†ÐµÐ½Ñ‚',
-        'player': 'Ð˜Ð³Ñ€Ð¾Ðº',
-        'date': 'Ð”Ð°Ñ‚Ð°',
-        'video': 'Ð’Ð¸Ð´ÐµÐ¾',
-        'status': 'Ð¡Ñ‚Ð°Ñ‚ÑƒÑ',
-        'pending': 'ÐžÐ¶Ð¸Ð´Ð°Ð½Ð¸Ðµ',
-        'approved': 'ÐžÐ´Ð¾Ð±Ñ€ÐµÐ½Ð¾',
-        'rejected': 'ÐžÑ‚ÐºÐ»Ð¾Ð½ÐµÐ½Ð¾',
-        'login': 'Ð’Ð¾Ð¹Ñ‚Ð¸',
-        'register': 'Ð ÐµÐ³Ð¸ÑÑ‚Ñ€Ð°Ñ†Ð¸Ñ',
-        'logout': 'Ð’Ñ‹Ð¹Ñ‚Ð¸',
-        'profile': 'ÐŸÑ€Ð¾Ñ„Ð¸Ð»ÑŒ',
-        'settings': 'ÐÐ°ÑÑ‚Ñ€Ð¾Ð¹ÐºÐ¸',
-        'notifications': 'Ð£Ð²ÐµÐ´Ð¾Ð¼Ð»ÐµÐ½Ð¸Ñ',
-        'admin_panel': 'ÐŸÐ°Ð½ÐµÐ»ÑŒ Ð°Ð´Ð¼Ð¸Ð½Ð¸ÑÑ‚Ñ€Ð°Ñ‚Ð¾Ñ€Ð°',
-        'account': 'ÐÐºÐºÐ°ÑƒÐ½Ñ‚',
+        'position': 'Позиция',
+        'level': 'Уровень',
+        'creator': 'Создатель',
+        'verifier': 'Верификатор',
+        'points': 'Очки',
+        'difficulty': 'Сложность',
+        'records': 'Записи',
+        'completion': 'Завершение',
+        'progress': 'Прогресс',
+        'percentage': 'Процент',
+        'player': 'Игрок',
+        'date': 'Дата',
+        'video': 'Видео',
+        'status': 'Статус',
+        'pending': 'Ожидание',
+        'approved': 'Одобрено',
+        'rejected': 'Отклонено',
+        'login': 'Войти',
+        'register': 'Регистрация',
+        'logout': 'Выйти',
+        'profile': 'Профиль',
+        'settings': 'Настройки',
+        'notifications': 'Уведомления',
+        'admin_panel': 'Панель администратора',
+        'account': 'Аккаунт',
         
         # Level difficulties
-        'easy': 'Ð›ÐµÐ³ÐºÐ¸Ð¹',
-        'normal': 'ÐžÐ±Ñ‹Ñ‡Ð½Ñ‹Ð¹',
-        'hard': 'Ð¡Ð»Ð¾Ð¶Ð½Ñ‹Ð¹',
-        'harder': 'Ð¡Ð»Ð¾Ð¶Ð½ÐµÐµ',
-        'insane': 'Ð‘ÐµÐ·ÑƒÐ¼Ð½Ñ‹Ð¹',
-        'easy_demon': 'Ð›ÐµÐ³ÐºÐ¸Ð¹ Ð´ÐµÐ¼Ð¾Ð½',
-        'medium_demon': 'Ð¡Ñ€ÐµÐ´Ð½Ð¸Ð¹ Ð´ÐµÐ¼Ð¾Ð½',
-        'hard_demon': 'Ð¡Ð»Ð¾Ð¶Ð½Ñ‹Ð¹ Ð´ÐµÐ¼Ð¾Ð½',
-        'insane_demon': 'Ð‘ÐµÐ·ÑƒÐ¼Ð½Ñ‹Ð¹ Ð´ÐµÐ¼Ð¾Ð½',
-        'extreme_demon': 'Ð­ÐºÑÑ‚Ñ€ÐµÐ¼Ð°Ð»ÑŒÐ½Ñ‹Ð¹ Ð´ÐµÐ¼Ð¾Ð½',
+        'easy': 'Легкий',
+        'normal': 'Обычный',
+        'hard': 'Сложный',
+        'harder': 'Сложнее',
+        'insane': 'Безумный',
+        'easy_demon': 'Легкий демон',
+        'medium_demon': 'Средний демон',
+        'hard_demon': 'Сложный демон',
+        'insane_demon': 'Безумный демон',
+        'extreme_demon': 'Экстремальный демон',
         
         # Common actions
-        'view': 'ÐŸÑ€Ð¾ÑÐ¼Ð¾Ñ‚Ñ€',
-        'edit': 'Ð ÐµÐ´Ð°ÐºÑ‚Ð¸Ñ€Ð¾Ð²Ð°Ñ‚ÑŒ',
-        'delete': 'Ð£Ð´Ð°Ð»Ð¸Ñ‚ÑŒ',
-        'save': 'Ð¡Ð¾Ñ…Ñ€Ð°Ð½Ð¸Ñ‚ÑŒ',
-        'cancel': 'ÐžÑ‚Ð¼ÐµÐ½Ð°',
-        'confirm': 'ÐŸÐ¾Ð´Ñ‚Ð²ÐµÑ€Ð´Ð¸Ñ‚ÑŒ',
-        'search': 'ÐŸÐ¾Ð¸ÑÐº',
-        'filter': 'Ð¤Ð¸Ð»ÑŒÑ‚Ñ€',
-        'sort': 'Ð¡Ð¾Ñ€Ñ‚Ð¸Ñ€Ð¾Ð²ÐºÐ°',
-        'loading': 'Ð—Ð°Ð³Ñ€ÑƒÐ·ÐºÐ°...',
-        'error': 'ÐžÑˆÐ¸Ð±ÐºÐ°',
-        'success': 'Ð£ÑÐ¿ÐµÑ…',
-        'warning': 'ÐŸÑ€ÐµÐ´ÑƒÐ¿Ñ€ÐµÐ¶Ð´ÐµÐ½Ð¸Ðµ',
-        'info': 'Ð˜Ð½Ñ„Ð¾Ñ€Ð¼Ð°Ñ†Ð¸Ñ',
+        'view': 'Просмотр',
+        'edit': 'Редактировать',
+        'delete': 'Удалить',
+        'save': 'Сохранить',
+        'cancel': 'Отмена',
+        'confirm': 'Подтвердить',
+        'search': 'Поиск',
+        'filter': 'Фильтр',
+        'sort': 'Сортировка',
+        'loading': 'Загрузка...',
+        'error': 'Ошибка',
+        'success': 'Успех',
+        'warning': 'Предупреждение',
+        'info': 'Информация',
         
         # Site title and branding
-        'site_title': 'GD Ð¡Ð¿Ð¸ÑÐ¾Ðº Ð¿Ð¾ÑÐ»ÐµÐ´Ð½Ð¸Ñ… Ð²ÐºÐ»Ð°Ð´Ð¾Ðº',
-        'recent_tab_list': 'Ð¡Ð¿Ð¸ÑÐ¾Ðº Ð¿Ð¾ÑÐ»ÐµÐ´Ð½Ð¸Ñ… Ð²ÐºÐ»Ð°Ð´Ð¾Ðº',
-        'demonlist': 'Ð¡Ð¿Ð¸ÑÐ¾Ðº Ð¿Ð¾ÑÐ»ÐµÐ´Ð½Ð¸Ñ… Ð²ÐºÐ»Ð°Ð´Ð¾Ðº',
+        'site_title': 'GD Список последних вкладок',
+        'recent_tab_list': 'Список последних вкладок',
+        'demonlist': 'Список последних вкладок',
         
         # About section
-        'about': 'Ðž Ð½Ð°Ñ',
-        'about_text_1': 'Ð”Ð¾Ð±Ñ€Ð¾ Ð¿Ð¾Ð¶Ð°Ð»Ð¾Ð²Ð°Ñ‚ÑŒ Ð² GD Ð¡Ð¿Ð¸ÑÐ¾Ðº Ð¿Ð¾ÑÐ»ÐµÐ´Ð½Ð¸Ñ… Ð²ÐºÐ»Ð°Ð´Ð¾Ðº! Ð­Ñ‚Ð¾ ÑƒÐ¿Ñ€Ð°Ð²Ð»ÑÐµÐ¼Ñ‹Ð¹ ÑÐ¾Ð¾Ð±Ñ‰ÐµÑÑ‚Ð²Ð¾Ð¼ ÑÐ¿Ð¸ÑÐ¾Ðº, ÐºÐ¾Ñ‚Ð¾Ñ€Ñ‹Ð¹ Ñ€Ð°Ð½Ð¶Ð¸Ñ€ÑƒÐµÑ‚ ÑƒÑ€Ð¾Ð²Ð½Ð¸ Ð¿Ð¾ÑÐ»ÐµÐ´Ð½Ð¸Ñ… Ð²ÐºÐ»Ð°Ð´Ð¾Ðº Ð¿Ð¾ ÑÐ»Ð¾Ð¶Ð½Ð¾ÑÑ‚Ð¸.',
-        'about_text_2': 'ÐÐ°Ð¶Ð¼Ð¸Ñ‚Ðµ Ð½Ð° Ð»ÑŽÐ±Ð¾Ð¹ ÑƒÑ€Ð¾Ð²ÐµÐ½ÑŒ, Ñ‡Ñ‚Ð¾Ð±Ñ‹ Ð¿Ñ€Ð¾ÑÐ¼Ð¾Ñ‚Ñ€ÐµÑ‚ÑŒ Ð±Ð¾Ð»ÐµÐµ Ð¿Ð¾Ð´Ñ€Ð¾Ð±Ð½ÑƒÑŽ Ð¸Ð½Ñ„Ð¾Ñ€Ð¼Ð°Ñ†Ð¸ÑŽ, Ð²ÐºÐ»ÑŽÑ‡Ð°Ñ Ð·Ð°Ð¿Ð¸ÑÐ¸ Ð¸ Ð¸Ð½Ñ„Ð¾Ñ€Ð¼Ð°Ñ†Ð¸ÑŽ Ð¾Ð± ÑƒÑ€Ð¾Ð²Ð½Ðµ.',
+        'about': 'О нас',
+        'about_text_1': 'Добро пожаловать в GD Список последних вкладок! Это управляемый сообществом список, который ранжирует уровни последних вкладок по сложности.',
+        'about_text_2': 'Нажмите на любой уровень, чтобы просмотреть более подробную информацию, включая записи и информацию об уровне.',
         
         # Discord section
-        'discord_server': 'Discord Ð¡ÐµÑ€Ð²ÐµÑ€',
-        'discord_text': 'ÐŸÑ€Ð¸ÑÐ¾ÐµÐ´Ð¸Ð½ÑÐ¹Ñ‚ÐµÑÑŒ Ðº Ð½Ð°ÑˆÐµÐ¼Ñƒ ÑÐ¾Ð¾Ð±Ñ‰ÐµÑÑ‚Ð²Ñƒ Ð´Ð»Ñ Ð¾Ð±ÑÑƒÐ¶Ð´ÐµÐ½Ð¸Ð¹ Ð¸ Ð¾Ñ‚Ð¿Ñ€Ð°Ð²ÐºÐ¸ ÑƒÑ€Ð¾Ð²Ð½ÐµÐ¹!',
-        'join_discord': 'ÐŸÑ€Ð¸ÑÐ¾ÐµÐ´Ð¸Ð½Ð¸Ñ‚ÑŒÑÑ Ðº Discord ÑÐµÑ€Ð²ÐµÑ€Ñƒ',
+        'discord_server': 'Discord Сервер',
+        'discord_text': 'Присоединяйтесь к нашему сообществу для обсуждений и отправки уровней!',
+        'join_discord': 'Присоединиться к Discord серверу',
         
         # Credits section
-        'credits': 'ÐÐ²Ñ‚Ð¾Ñ€Ñ‹',
-        'list_admin': 'ÐÐ´Ð¼Ð¸Ð½Ð¸ÑÑ‚Ñ€Ð°Ñ‚Ð¾Ñ€ ÑÐ¿Ð¸ÑÐºÐ°',
-        'list_moderators': 'ÐœÐ¾Ð´ÐµÑ€Ð°Ñ‚Ð¾Ñ€Ñ‹ ÑÐ¿Ð¸ÑÐºÐ°',
-        'list_coders': 'ÐŸÑ€Ð¾Ð³Ñ€Ð°Ð¼Ð¼Ð¸ÑÑ‚Ñ‹ ÑÐ¿Ð¸ÑÐºÐ°',
-        'server_moderator': 'ÐœÐ¾Ð´ÐµÑ€Ð°Ñ‚Ð¾Ñ€ ÑÐµÑ€Ð²ÐµÑ€Ð°',
+        'credits': 'Авторы',
+        'list_admin': 'Администратор списка',
+        'list_moderators': 'Модераторы списка',
+        'list_coders': 'Программисты списка',
+        'server_moderator': 'Модератор сервера',
         
         # Search
-        'search_all_levels': 'ÐŸÐ¾Ð¸ÑÐº Ð²ÑÐµÑ… ÑƒÑ€Ð¾Ð²Ð½ÐµÐ¹...',
+        'search_all_levels': 'Поиск всех уровней...',
         
         # Footer
-        'showing_all_levels': 'ÐŸÐ¾ÐºÐ°Ð·Ð°Ð½Ð¾ Ð²ÑÐµÐ³Ð¾',
-        'levels': 'ÑƒÑ€Ð¾Ð²Ð½ÐµÐ¹',
+        'showing_all_levels': 'Показано всего',
+        'levels': 'уровней',
         
         # Level details
-        'by': 'Ð¾Ñ‚',
-        'verified_by': 'Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐµÐ½Ð¾'
+        'by': 'от',
+        'verified_by': 'проверено'
     },
     'es': {
         # Navigation
         'main_list': 'Lista principal',
         'legacy_list': 'Lista heredada',
         'future_list': 'Lista futura',
-        'time_machine': 'MÃ¡quina del tiempo',
+        'time_machine': 'Máquina del tiempo',
         'submit': 'Enviar',
-        'submit_record': 'Enviar rÃ©cord',
-        'submit_verification': 'Enviar verificaciÃ³n',
+        'submit_record': 'Enviar récord',
+        'submit_verification': 'Enviar verificación',
         'roulette': 'Ruleta',
         'changelog': 'Registro de cambios',
-        'guide': 'GuÃ­a',
-        'stats_viewer': 'Visor de estadÃ­sticas',
+        'guide': 'Guía',
+        'stats_viewer': 'Visor de estadísticas',
         'language': 'Idioma',
         
         # Action Cards
         'guidelines': 'Pautas',
-        'submit_records': 'Enviar rÃ©cords',
-        'guidelines_text': 'Â¡Todas las operaciones de la lista de pestaÃ±as recientes se llevan a cabo de acuerdo con nuestras pautas. Â¡AsegÃºrate de revisarlas antes de enviar un rÃ©cord!',
-        'submit_text': 'Nota: Por favor, no envÃ­es tonterÃ­as, solo hace que sea mÃ¡s difÃ­cil para todos nosotros y te banearÃ¡n. El formulario rechaza envÃ­os duplicados.',
-        'stats_text': 'Â¡ObtÃ©n una descripciÃ³n detallada de quiÃ©n completÃ³ mÃ¡s, creÃ³ mÃ¡s demonios o venciÃ³ mÃ¡s demonios! Â¡Incluso hay una tabla de clasificaciÃ³n!',
-        'read_guidelines': 'Â¡Lee las pautas!',
-        'submit_record_btn': 'Â¡Enviar un rÃ©cord!',
-        'open_stats': 'Â¡Abrir el visor de estadÃ­sticas!',
+        'submit_records': 'Enviar récords',
+        'guidelines_text': '¡Todas las operaciones de la lista de pestañas recientes se llevan a cabo de acuerdo con nuestras pautas. ¡Asegúrate de revisarlas antes de enviar un récord!',
+        'submit_text': 'Nota: Por favor, no envíes tonterías, solo hace que sea más difícil para todos nosotros y te banearán. El formulario rechaza envíos duplicados.',
+        'stats_text': '¡Obtén una descripción detallada de quién completó más, creó más demonios o venció más demonios! ¡Incluso hay una tabla de clasificación!',
+        'read_guidelines': '¡Lee las pautas!',
+        'submit_record_btn': '¡Enviar un récord!',
+        'open_stats': '¡Abrir el visor de estadísticas!',
         
         # General UI
-        'position': 'PosiciÃ³n',
+        'position': 'Posición',
         'level': 'Nivel',
         'creator': 'Creador',
         'verifier': 'Verificador',
         'points': 'Puntos',
         'difficulty': 'Dificultad',
-        'records': 'RÃ©cords',
+        'records': 'Récords',
         'completion': 'Completado',
         'progress': 'Progreso',
         'percentage': 'Porcentaje',
@@ -3682,24 +3312,24 @@ TRANSLATIONS = {
         'pending': 'Pendiente',
         'approved': 'Aprobado',
         'rejected': 'Rechazado',
-        'login': 'Iniciar sesiÃ³n',
+        'login': 'Iniciar sesión',
         'register': 'Registrarse',
-        'logout': 'Cerrar sesiÃ³n',
+        'logout': 'Cerrar sesión',
         'profile': 'Perfil',
-        'settings': 'ConfiguraciÃ³n',
+        'settings': 'Configuración',
         'notifications': 'Notificaciones',
-        'admin_panel': 'Panel de administraciÃ³n',
+        'admin_panel': 'Panel de administración',
         'account': 'Cuenta',
         
         # Level difficulties
-        'easy': 'FÃ¡cil',
+        'easy': 'Fácil',
         'normal': 'Normal',
-        'hard': 'DifÃ­cil',
-        'harder': 'MÃ¡s difÃ­cil',
+        'hard': 'Difícil',
+        'harder': 'Más difícil',
         'insane': 'Loco',
-        'easy_demon': 'Demonio fÃ¡cil',
+        'easy_demon': 'Demonio fácil',
         'medium_demon': 'Demonio medio',
-        'hard_demon': 'Demonio difÃ­cil',
+        'hard_demon': 'Demonio difícil',
         'insane_demon': 'Demonio loco',
         'extreme_demon': 'Demonio extremo',
         
@@ -3715,27 +3345,27 @@ TRANSLATIONS = {
         'sort': 'Ordenar',
         'loading': 'Cargando...',
         'error': 'Error',
-        'success': 'Ã‰xito',
+        'success': 'Éxito',
         'warning': 'Advertencia',
-        'info': 'InformaciÃ³n',
+        'info': 'Información',
         
         # Site title and branding
-        'site_title': 'GD Lista de pestaÃ±as recientes',
-        'recent_tab_list': 'Lista de pestaÃ±as recientes',
-        'demonlist': 'Lista de pestaÃ±as recientes',
+        'site_title': 'GD Lista de pestañas recientes',
+        'recent_tab_list': 'Lista de pestañas recientes',
+        'demonlist': 'Lista de pestañas recientes',
         
         # About section
         'about': 'Acerca de',
-        'about_text_1': 'Â¡Bienvenido a la GD Lista de pestaÃ±as recientes! Esta es una lista impulsada por la comunidad que clasifica los niveles de pestaÃ±as recientes por dificultad.',
-        'about_text_2': 'Haz clic en cualquier nivel para ver mÃ¡s detalles, incluidos registros e informaciÃ³n sobre el nivel.',
+        'about_text_1': '¡Bienvenido a la GD Lista de pestañas recientes! Esta es una lista impulsada por la comunidad que clasifica los niveles de pestañas recientes por dificultad.',
+        'about_text_2': 'Haz clic en cualquier nivel para ver más detalles, incluidos registros e información sobre el nivel.',
         
         # Discord section
         'discord_server': 'Servidor de Discord',
-        'discord_text': 'Â¡Ãšnete a nuestra comunidad para discusiones y envÃ­os de niveles!',
+        'discord_text': '¡Únete a nuestra comunidad para discusiones y envíos de niveles!',
         'join_discord': 'Unirse al servidor de Discord',
         
         # Credits section
-        'credits': 'CrÃ©ditos',
+        'credits': 'Créditos',
         'list_admin': 'Administrador de la lista',
         'list_moderators': 'Moderadores de la lista',
         'list_coders': 'Programadores de la lista',
@@ -3755,12 +3385,12 @@ TRANSLATIONS = {
     'fr': {
         # Navigation
         'main_list': 'Liste principale',
-        'legacy_list': 'Liste hÃ©ritÃ©e',
+        'legacy_list': 'Liste héritée',
         'future_list': 'Liste future',
-        'time_machine': 'Machine Ã  remonter le temps',
+        'time_machine': 'Machine à remonter le temps',
         'submit': 'Soumettre',
         'submit_record': 'Soumettre un record',
-        'submit_verification': 'Soumettre une vÃ©rification',
+        'submit_verification': 'Soumettre une vérification',
         'roulette': 'Roulette',
         'changelog': 'Journal des modifications',
         'guide': 'Guide',
@@ -3770,9 +3400,9 @@ TRANSLATIONS = {
         # Action Cards
         'guidelines': 'Directives',
         'submit_records': 'Soumettre des records',
-        'guidelines_text': 'Toutes les opÃ©rations de la liste des onglets rÃ©cents sont effectuÃ©es conformÃ©ment Ã  nos directives. Assurez-vous de les vÃ©rifier avant de soumettre un record!',
-        'submit_text': 'Note: Veuillez ne pas soumettre de bÃªtises, cela ne fait que rendre les choses plus difficiles pour nous tous et vous fera bannir. Le formulaire rejette les soumissions en double.',
-        'stats_text': 'Obtenez un aperÃ§u dÃ©taillÃ© de qui a terminÃ© le plus, crÃ©Ã© le plus de dÃ©mons ou battu le plus de dÃ©mons! Il y a mÃªme un classement!',
+        'guidelines_text': 'Toutes les opérations de la liste des onglets récents sont effectuées conformément à nos directives. Assurez-vous de les vérifier avant de soumettre un record!',
+        'submit_text': 'Note: Veuillez ne pas soumettre de bêtises, cela ne fait que rendre les choses plus difficiles pour nous tous et vous fera bannir. Le formulaire rejette les soumissions en double.',
+        'stats_text': 'Obtenez un aperçu détaillé de qui a terminé le plus, créé le plus de démons ou battu le plus de démons! Il y a même un classement!',
         'read_guidelines': 'Lire les directives!',
         'submit_record_btn': 'Soumettre un record!',
         'open_stats': 'Ouvrir le visualiseur de statistiques!',
@@ -3780,26 +3410,26 @@ TRANSLATIONS = {
         # General UI
         'position': 'Position',
         'level': 'Niveau',
-        'creator': 'CrÃ©ateur',
-        'verifier': 'VÃ©rificateur',
+        'creator': 'Créateur',
+        'verifier': 'Vérificateur',
         'points': 'Points',
-        'difficulty': 'DifficultÃ©',
+        'difficulty': 'Difficulté',
         'records': 'Records',
-        'completion': 'AchÃ¨vement',
-        'progress': 'ProgrÃ¨s',
+        'completion': 'Achèvement',
+        'progress': 'Progrès',
         'percentage': 'Pourcentage',
         'player': 'Joueur',
         'date': 'Date',
-        'video': 'VidÃ©o',
+        'video': 'Vidéo',
         'status': 'Statut',
         'pending': 'En attente',
-        'approved': 'ApprouvÃ©',
-        'rejected': 'RejetÃ©',
+        'approved': 'Approuvé',
+        'rejected': 'Rejeté',
         'login': 'Se connecter',
         'register': "S'inscrire",
-        'logout': 'Se dÃ©connecter',
+        'logout': 'Se déconnecter',
         'profile': 'Profil',
-        'settings': 'ParamÃ¨tres',
+        'settings': 'Paramètres',
         'notifications': 'Notifications',
         'admin_panel': "Panneau d'administration",
         'account': 'Compte',
@@ -3810,11 +3440,11 @@ TRANSLATIONS = {
         'hard': 'Difficile',
         'harder': 'Plus difficile',
         'insane': 'Fou',
-        'easy_demon': 'DÃ©mon facile',
-        'medium_demon': 'DÃ©mon moyen',
-        'hard_demon': 'DÃ©mon difficile',
-        'insane_demon': 'DÃ©mon fou',
-        'extreme_demon': 'DÃ©mon extrÃªme',
+        'easy_demon': 'Démon facile',
+        'medium_demon': 'Démon moyen',
+        'hard_demon': 'Démon difficile',
+        'insane_demon': 'Démon fou',
+        'extreme_demon': 'Démon extrême',
         
         # Common actions
         'view': 'Voir',
@@ -3828,31 +3458,31 @@ TRANSLATIONS = {
         'sort': 'Trier',
         'loading': 'Chargement...',
         'error': 'Erreur',
-        'success': 'SuccÃ¨s',
+        'success': 'Succès',
         'warning': 'Avertissement',
         'info': 'Information',
         
         # Site title and branding
-        'site_title': 'GD Liste des onglets rÃ©cents',
-        'recent_tab_list': 'Liste des onglets rÃ©cents',
-        'demonlist': 'Liste des onglets rÃ©cents',
+        'site_title': 'GD Liste des onglets récents',
+        'recent_tab_list': 'Liste des onglets récents',
+        'demonlist': 'Liste des onglets récents',
         
         # About section
-        'about': 'Ã€ propos',
-        'about_text_1': 'Bienvenue dans la GD Liste des onglets rÃ©cents! Il s\'agit d\'une liste communautaire qui classe les niveaux d\'onglets rÃ©cents par difficultÃ©.',
-        'about_text_2': 'Cliquez sur n\'importe quel niveau pour voir plus de dÃ©tails, y compris les enregistrements et les informations sur le niveau.',
+        'about': 'À propos',
+        'about_text_1': 'Bienvenue dans la GD Liste des onglets récents! Il s\'agit d\'une liste communautaire qui classe les niveaux d\'onglets récents par difficulté.',
+        'about_text_2': 'Cliquez sur n\'importe quel niveau pour voir plus de détails, y compris les enregistrements et les informations sur le niveau.',
         
         # Discord section
         'discord_server': 'Serveur Discord',
-        'discord_text': 'Rejoignez notre communautÃ© pour des discussions et des soumissions de niveaux!',
+        'discord_text': 'Rejoignez notre communauté pour des discussions et des soumissions de niveaux!',
         'join_discord': 'Rejoindre le serveur Discord',
         
         # Credits section
-        'credits': 'CrÃ©dits',
+        'credits': 'Crédits',
         'list_admin': 'Administrateur de la liste',
-        'list_moderators': 'ModÃ©rateurs de la liste',
+        'list_moderators': 'Modérateurs de la liste',
         'list_coders': 'Programmeurs de la liste',
-        'server_moderator': 'ModÃ©rateur du serveur',
+        'server_moderator': 'Modérateur du serveur',
         
         # Search
         'search_all_levels': 'Rechercher tous les niveaux...',
@@ -3863,7 +3493,7 @@ TRANSLATIONS = {
         
         # Level details
         'by': 'par',
-        'verified_by': 'vÃ©rifiÃ© par'
+        'verified_by': 'vérifié par'
     }
 }
 
@@ -4111,7 +3741,7 @@ def admin_move_level(level_id):
         )
         
         # Log admin action
-        log_admin_action(admin_username, f"MOVED LEVEL: {level['name']}", f"Position {current_position} â†’ {new_position}")
+        log_admin_action(admin_username, f"MOVED LEVEL: {level['name']}", f"Position {current_position} → {new_position}")
         
         # Update historical rankings
         try:
@@ -4132,7 +3762,7 @@ def admin_recalculate_all_points():
     
     try:
         # Step 1: Recalculate all level points
-        print("ðŸ”„ Admin recalculate: Starting level points recalculation...")
+        print("🔄 Admin recalculate: Starting level points recalculation...")
         levels = list(mongo_db.levels.find({}))
         levels_updated = 0
         
@@ -4151,7 +3781,7 @@ def admin_recalculate_all_points():
                     levels_updated += 1
         
         # Step 2: Recalculate all user points using verified method
-        print("ðŸ”„ Admin recalculate: Starting user points recalculation...")
+        print("🔄 Admin recalculate: Starting user points recalculation...")
         
         # Reload levels with correct points
         levels = list(mongo_db.levels.find({}))
@@ -4214,7 +3844,7 @@ def admin_recalculate_all_points():
         admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
         log_admin_action(admin_username, "RECALCULATED ALL POINTS", f"Updated {levels_updated} levels and {users_updated} users")
         
-        print(f"âœ… Admin recalculate completed: {levels_updated} levels, {users_updated} users updated")
+        print(f"✅ Admin recalculate completed: {levels_updated} levels, {users_updated} users updated")
         
         return {
             'success': True, 
@@ -4260,7 +3890,7 @@ def admin_add_level():
         pushed_to_legacy = None
         if not is_legacy and position <= 100:
             # Count current main list levels
-            main_list_count = mongo_db.levels.count_documents({"is_legacy": False})
+            main_list_count = mongo_db.levels.count_documents({"is_legacy": {"$ne": True}})
             
             # If we already have 100 levels, adding one more will push the last one to legacy
             if main_list_count >= 100:
@@ -4360,10 +3990,10 @@ def admin_add_level():
                 # Recalculate all user points (since level points changed)
                 users_updated = manager.recalculate_all_user_points()
                 
-                print(f"âœ… Level addition triggered real-time recalculation: {levels_updated} levels, {users_updated} users updated")
+                print(f"✅ Level addition triggered real-time recalculation: {levels_updated} levels, {users_updated} users updated")
                 
             except Exception as e:
-                print(f"âš ï¸ Warning: Real-time points recalculation failed after level addition: {e}")
+                print(f"⚠️ Warning: Real-time points recalculation failed after level addition: {e}")
         
         # Handle automatic legacy management (only for main list additions)
         if not is_legacy:
@@ -4505,7 +4135,7 @@ def admin_rebuild_image_system():
             
             # Skip if already has custom thumbnail
             if thumbnail_url and thumbnail_url.strip():
-                results.append(f"#{position} {name}: âœ… Has custom thumbnail")
+                results.append(f"#{position} {name}: ✅ Has custom thumbnail")
                 continue
             
             # Try to extract and set working thumbnail
@@ -4547,10 +4177,10 @@ def admin_rebuild_image_system():
                             {"_id": level["_id"]},
                             {"$set": {"thumbnail_url": working_thumbnail}}
                         )
-                        results.append(f"#{position} {name}: âœ… Set {format_name} thumbnail")
+                        results.append(f"#{position} {name}: ✅ Set {format_name} thumbnail")
                         fixed_count += 1
                     else:
-                        results.append(f"#{position} {name}: âŒ No working YouTube thumbnail found")
+                        results.append(f"#{position} {name}: ❌ No working YouTube thumbnail found")
                 
                 elif 'streamable.com/' in video_url:
                     # Try Streamable thumbnail
@@ -4564,26 +4194,26 @@ def admin_rebuild_image_system():
                                 {"_id": level["_id"]},
                                 {"$set": {"thumbnail_url": streamable_thumb}}
                             )
-                            results.append(f"#{position} {name}: âœ… Set Streamable thumbnail")
+                            results.append(f"#{position} {name}: ✅ Set Streamable thumbnail")
                             fixed_count += 1
                         else:
-                            results.append(f"#{position} {name}: âŒ Streamable thumbnail not available")
+                            results.append(f"#{position} {name}: ❌ Streamable thumbnail not available")
                     except:
-                        results.append(f"#{position} {name}: âŒ Error testing Streamable thumbnail")
+                        results.append(f"#{position} {name}: ❌ Error testing Streamable thumbnail")
                 
                 else:
-                    results.append(f"#{position} {name}: âš ï¸ Unknown video platform")
+                    results.append(f"#{position} {name}: ⚠️ Unknown video platform")
             else:
-                results.append(f"#{position} {name}: âŒ No video URL")
+                results.append(f"#{position} {name}: ❌ No video URL")
         
         # Clear cache
         levels_cache['main_list'] = None
         levels_cache['legacy_list'] = None
         
         html = f"""
-        <h1>ðŸ”§ Image System Rebuild Complete</h1>
+        <h1>🔧 Image System Rebuild Complete</h1>
         <div class="alert alert-success">
-            <h4>âœ… Rebuild Summary</h4>
+            <h4>✅ Rebuild Summary</h4>
             <p><strong>Fixed {fixed_count} out of {len(levels)} levels</strong></p>
             <p>All working thumbnails have been automatically set.</p>
         </div>
@@ -4593,19 +4223,19 @@ def admin_rebuild_image_system():
         </div>
         
         <div class="mt-4">
-            <a href="/" class="btn btn-success btn-lg">ðŸ  Test Main List</a>
-            <a href="/admin/levels_enhanced" class="btn btn-primary btn-lg">âš™ï¸ Enhanced Admin</a>
-            <a href="/admin" class="btn btn-secondary btn-lg">ðŸ“Š Admin Dashboard</a>
+            <a href="/" class="btn btn-success btn-lg">🏠 Test Main List</a>
+            <a href="/admin/levels_enhanced" class="btn btn-primary btn-lg">⚙️ Enhanced Admin</a>
+            <a href="/admin" class="btn btn-secondary btn-lg">📊 Admin Dashboard</a>
         </div>
         
         <div class="alert alert-info mt-4">
-            <h5>ðŸŽ¯ What This Did:</h5>
+            <h5>🎯 What This Did:</h5>
             <ul>
-                <li>âœ… Tested all YouTube thumbnail formats for each level</li>
-                <li>âœ… Set the best working thumbnail for each level</li>
-                <li>âœ… Added Streamable thumbnail support</li>
-                <li>âœ… Cleared all caches for immediate effect</li>
-                <li>âœ… Images should now load properly on the main list</li>
+                <li>✅ Tested all YouTube thumbnail formats for each level</li>
+                <li>✅ Set the best working thumbnail for each level</li>
+                <li>✅ Added Streamable thumbnail support</li>
+                <li>✅ Cleared all caches for immediate effect</li>
+                <li>✅ Images should now load properly on the main list</li>
             </ul>
         </div>
         """
@@ -4613,7 +4243,7 @@ def admin_rebuild_image_system():
         return html
         
     except Exception as e:
-        return f"âŒ Error rebuilding image system: {str(e)}"
+        return f"❌ Error rebuilding image system: {str(e)}"
 
 # test_new_images route removed - no image functionality
 
@@ -4625,7 +4255,7 @@ def admin_rebuild_image_system():
 def restore_images():
     """Restore the original working image system"""
     if 'user_id' not in session or not session.get('is_admin'):
-        return "âŒ Access denied - Admin only"
+        return "❌ Access denied - Admin only"
     
     try:
         # Add the missing YouTube URLs that should be there
@@ -4646,47 +4276,47 @@ def restore_images():
             )
             
             if result.matched_count > 0:
-                results.append(f"âœ… Restored: {level_name}")
+                results.append(f"✅ Restored: {level_name}")
             else:
-                results.append(f"âŒ Not found: {level_name}")
+                results.append(f"❌ Not found: {level_name}")
         
         # Clear cache
         levels_cache['main_list'] = None
         
         return f"""
-        <h1>ðŸŽ¨ ORIGINAL IMAGE SYSTEM RESTORED!</h1>
+        <h1>🎨 ORIGINAL IMAGE SYSTEM RESTORED!</h1>
         
         <div style="background: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h2>âœ… What I Restored:</h2>
+            <h2>✅ What I Restored:</h2>
             <ul>
-                <li>âœ… Original template logic (no more complex mapping)</li>
-                <li>âœ… Simple thumbnail handling (no more base64)</li>
-                <li>âœ… YouTube thumbnail extraction</li>
-                <li>âœ… Custom image upload support</li>
+                <li>✅ Original template logic (no more complex mapping)</li>
+                <li>✅ Simple thumbnail handling (no more base64)</li>
+                <li>✅ YouTube thumbnail extraction</li>
+                <li>✅ Custom image upload support</li>
             </ul>
         </div>
         
         <div style="background: #cce5ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h2>ðŸ”§ YouTube URLs Added:</h2>
+            <h2>🔧 YouTube URLs Added:</h2>
             {'<br>'.join(results)}
         </div>
         
         <div style="background: #fff3e0; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h2>ðŸŽ¯ How It Works Now (Original System):</h2>
+            <h2>🎯 How It Works Now (Original System):</h2>
             <ol>
-                <li><strong>Custom Images:</strong> Upload via admin panel â†’ Shows custom image</li>
+                <li><strong>Custom Images:</strong> Upload via admin panel → Shows custom image</li>
                 <li><strong>YouTube URLs:</strong> Automatic thumbnail extraction</li>
-                <li><strong>No Video:</strong> Shows "ðŸ“· No Preview"</li>
+                <li><strong>No Video:</strong> Shows "📷 No Preview"</li>
             </ol>
         </div>
         
         <p>
-            <a href="/" style="background: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 18px;">ðŸ  CHECK MAIN LIST - IMAGES SHOULD WORK NOW!</a>
+            <a href="/" style="background: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 18px;">🏠 CHECK MAIN LIST - IMAGES SHOULD WORK NOW!</a>
         </p>
         """
         
     except Exception as e:
-        return f"âŒ Error: {str(e)}"
+        return f"❌ Error: {str(e)}"
 
 @app.route('/test')
 def test():
@@ -4700,12 +4330,12 @@ def test():
         points_table += f"<tr><td>#{pos}</td><td>{points}</td><td>250 * (0.963655^{exponent})</td></tr>"
     
     return f"""
-    <h1>âœ… Points Formula UPDATED SUCCESSFULLY</h1>
+    <h1>✅ Points Formula UPDATED SUCCESSFULLY</h1>
     <h2>Formula: p = 250(0.963655)^(position-1)</h2>
-    <p><strong>âœ… Position #1 = 250.00 points</strong></p>
-    <p><strong>âœ… Position #50 = 40.75 points</strong></p>
-    <p><strong>âœ… Position #100 = 6.40 points</strong></p>
-    <p><strong>âœ… Position #150 = 1.01 points</strong></p>
+    <p><strong>✅ Position #1 = 250.00 points</strong></p>
+    <p><strong>✅ Position #50 = 40.75 points</strong></p>
+    <p><strong>✅ Position #100 = 6.40 points</strong></p>
+    <p><strong>✅ Position #150 = 1.01 points</strong></p>
     
     <table border="1" style="border-collapse: collapse; margin: 20px 0;">
         <tr style="background: #f0f0f0;">
@@ -4716,22 +4346,22 @@ def test():
         {points_table}
     </table>
     
-    <h2>ðŸŽ¯ Key Examples:</h2>
+    <h2>🎯 Key Examples:</h2>
     <ul>
         <li><strong>Position #1:</strong> 250 * (0.963655^0) = <strong>{calculate_level_points(1)} points</strong></li>
         <li><strong>Position #50:</strong> 250 * (0.963655^49) = <strong>{calculate_level_points(50)} points</strong></li>
         <li><strong>Position #100:</strong> 250 * (0.963655^99) = <strong>{calculate_level_points(100)} points</strong></li>
     </ul>
     
-    <h2>âœ… All Systems Updated:</h2>
+    <h2>✅ All Systems Updated:</h2>
     <ul>
-        <li>âœ… Points formula FIXED (Position 100 = 6.4 points)</li>
-        <li>âœ… All user points RECALCULATED</li>
-        <li>âœ… Level points UPDATED</li>
-        <li>âœ… Formula verification COMPLETE</li>
+        <li>✅ Points formula FIXED (Position 100 = 6.4 points)</li>
+        <li>✅ All user points RECALCULATED</li>
+        <li>✅ Level points UPDATED</li>
+        <li>✅ Formula verification COMPLETE</li>
     </ul>
     
-    <p><a href="/">â† Back to main list</a> | <a href="/admin">Admin Panel</a></p>
+    <p><a href="/">← Back to main list</a> | <a href="/admin">Admin Panel</a></p>
     """
 
 # test_images_simple route removed - no image functionality
@@ -4744,7 +4374,7 @@ def check_missing_levels():
         level_names = ['the light circles', 'old memories', 'los pollos tv 3', 'ochiru 2']
         
         html = """
-        <h1>ðŸ” CHECKING MISSING LEVELS</h1>
+        <h1>🔍 CHECKING MISSING LEVELS</h1>
         <p>Looking at the specific levels from your screenshot...</p>
         <table border="1" style="border-collapse: collapse; width: 100%;">
             <tr style="background: #f0f0f0;">
@@ -4763,11 +4393,11 @@ def check_missing_levels():
             
             if level:
                 video_url = level.get('video_url', '')
-                status = 'âœ… Has YouTube URL' if ('youtube.com' in video_url or 'youtu.be' in video_url) else 'âŒ Missing URL'
+                status = '✅ Has YouTube URL' if ('youtube.com' in video_url or 'youtu.be' in video_url) else '❌ Missing URL'
                 html += f"""
-                <tr style="background: {'#e8f5e8' if status.startswith('âœ…') else '#ffebee'};">
+                <tr style="background: {'#e8f5e8' if status.startswith('✅') else '#ffebee'};">
                     <td style="padding: 10px; font-weight: bold;">{level['name']}</td>
-                    <td style="padding: 10px;">âœ… Found (#{level.get('position', '?')})</td>
+                    <td style="padding: 10px;">✅ Found (#{level.get('position', '?')})</td>
                     <td style="padding: 10px; font-size: 11px;">{video_url or 'EMPTY'}</td>
                     <td style="padding: 10px; font-weight: bold;">{status}</td>
                 </tr>
@@ -4776,23 +4406,23 @@ def check_missing_levels():
                 html += f"""
                 <tr style="background: #ffebee;">
                     <td style="padding: 10px; font-weight: bold;">{name}</td>
-                    <td style="padding: 10px;">âŒ NOT FOUND</td>
+                    <td style="padding: 10px;">❌ NOT FOUND</td>
                     <td style="padding: 10px;">-</td>
-                    <td style="padding: 10px; font-weight: bold;">âŒ Level Missing</td>
+                    <td style="padding: 10px; font-weight: bold;">❌ Level Missing</td>
                 </tr>
                 """
         
         html += """
         </table>
         <p style="margin-top: 20px;">
-            <a href="/fix_all_missing_images" style="background: #dc3545; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 18px;">ðŸ”§ FIX ALL MISSING IMAGES</a>
+            <a href="/fix_all_missing_images" style="background: #dc3545; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 18px;">🔧 FIX ALL MISSING IMAGES</a>
         </p>
         """
         
         return html
         
     except Exception as e:
-        return f"âŒ Error: {str(e)}"
+        return f"❌ Error: {str(e)}"
 
 # debug_images route removed - no image functionality
 
@@ -4809,7 +4439,7 @@ def cleanup_broken_thumbnails():
         }))
         
         if not levels_with_broken_thumbs:
-            return "<h2>âœ… No broken thumbnails found!</h2><p><a href='/'>â† Back to main</a></p>"
+            return "<h2>✅ No broken thumbnails found!</h2><p><a href='/'>← Back to main</a></p>"
         
         # Clear the broken thumbnail URLs
         result = mongo_db.levels.update_many(
@@ -4822,23 +4452,23 @@ def cleanup_broken_thumbnails():
         levels_cache['legacy_list'] = None
         
         return f"""
-        <h2>ðŸ”§ Cleaned Up Broken Thumbnails!</h2>
+        <h2>🔧 Cleaned Up Broken Thumbnails!</h2>
         <div style="background: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <p>âœ… Removed {result.modified_count} broken thumbnail URLs</p>
+            <p>✅ Removed {result.modified_count} broken thumbnail URLs</p>
             <p>These were pointing to missing files in /static/thumbnails/</p>
             <p>Now these levels will fall back to YouTube thumbnails automatically!</p>
         </div>
         <p>
-            <a href="/" style="background: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 18px;">ðŸ  CHECK MAIN LIST NOW</a>
+            <a href="/" style="background: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 18px;">🏠 CHECK MAIN LIST NOW</a>
         </p>
         <p>
             <!-- Image debug link removed --> | 
-            <a href="/admin">âš™ï¸ Admin Panel</a>
+            <a href="/admin">⚙️ Admin Panel</a>
         </p>
         """
         
     except Exception as e:
-        return f"âŒ Error: {str(e)}"
+        return f"❌ Error: {str(e)}"
 
 @app.route('/debug_levels')
 def debug_levels():
@@ -4850,7 +4480,7 @@ def debug_levels():
         ).sort("position", 1).limit(15))
         
         html = """
-        <h2>ðŸ” Debug: Level URLs + Fix Missing Thumbnails</h2>
+        <h2>🔍 Debug: Level URLs + Fix Missing Thumbnails</h2>
         <p>Checking which levels need thumbnail fixes...</p>
         <table border="1" style="border-collapse: collapse; width: 100%;">
             <tr style="background: #f0f0f0;">
@@ -4875,35 +4505,35 @@ def debug_levels():
             action_html = ''
             
             if thumbnail_url_field and thumbnail_url_field.strip():
-                status = 'âœ… Has Custom Thumbnail'
+                status = '✅ Has Custom Thumbnail'
                 preview_html = f'<img src="{thumbnail_url_field}" style="width: 80px; height: 45px; border: 2px solid purple;">'
-                action_html = 'âœ… OK'
+                action_html = '✅ OK'
             elif video_url and video_url.strip():
                 if 'youtube.com' in video_url and 'watch?v=' in video_url:
                     video_id = video_url.split('watch?v=')[1].split('&')[0]
-                    status = 'âœ… Has YouTube URL'
+                    status = '✅ Has YouTube URL'
                     preview_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" style="width: 80px; height: 45px; border: 2px solid green;">'
-                    action_html = 'âœ… Should Work'
+                    action_html = '✅ Should Work'
                 elif 'youtu.be/' in video_url:
                     video_id = video_url.split('youtu.be/')[1].split('?')[0]
-                    status = 'âœ… Has YouTu.be URL'
+                    status = '✅ Has YouTu.be URL'
                     preview_html = f'<img src="https://img.youtube.com/vi/{video_id}/mqdefault.jpg" style="width: 80px; height: 45px; border: 2px solid blue;">'
-                    action_html = 'âœ… Should Work'
+                    action_html = '✅ Should Work'
                 else:
                     domain = video_url.split('/')[2] if '/' in video_url else 'Video'
-                    status = f'âš ï¸ Non-YouTube: {domain}'
-                    preview_html = f'<div style="background: #17a2b8; color: white; padding: 5px; width: 80px; height: 45px; display: flex; align-items: center; justify-content: center; font-size: 10px;">ðŸŽ¥ {domain}</div>'
-                    action_html = 'âš ï¸ Needs Custom Image'
+                    status = f'⚠️ Non-YouTube: {domain}'
+                    preview_html = f'<div style="background: #17a2b8; color: white; padding: 5px; width: 80px; height: 45px; display: flex; align-items: center; justify-content: center; font-size: 10px;">🎥 {domain}</div>'
+                    action_html = '⚠️ Needs Custom Image'
             else:
-                status = 'âŒ No Video URL'
-                preview_html = '<div style="background: #f8f9fa; color: #6c757d; padding: 5px; width: 80px; height: 45px; display: flex; align-items: center; justify-content: center; font-size: 10px;">ðŸ“· None</div>'
-                action_html = 'âŒ NEEDS FIX'
+                status = '❌ No Video URL'
+                preview_html = '<div style="background: #f8f9fa; color: #6c757d; padding: 5px; width: 80px; height: 45px; display: flex; align-items: center; justify-content: center; font-size: 10px;">📷 None</div>'
+                action_html = '❌ NEEDS FIX'
             
             # Color code the row
             row_color = ''
-            if 'âŒ' in status:
+            if '❌' in status:
                 row_color = 'background: #ffebee;'
-            elif 'âš ï¸' in status:
+            elif '⚠️' in status:
                 row_color = 'background: #fff3e0;'
             else:
                 row_color = 'background: #e8f5e8;'
@@ -4922,24 +4552,24 @@ def debug_levels():
         html += """
         </table>
         <div style="margin-top: 20px;">
-            <h3>ðŸ› ï¸ Fix Actions Needed:</h3>
+            <h3>🛠️ Fix Actions Needed:</h3>
             <ul>
-                <li><strong>âŒ Red rows:</strong> Need video URLs or custom thumbnails</li>
-                <li><strong>âš ï¸ Orange rows:</strong> Need custom thumbnails (non-YouTube videos)</li>
-                <li><strong>âœ… Green rows:</strong> Should work automatically</li>
+                <li><strong>❌ Red rows:</strong> Need video URLs or custom thumbnails</li>
+                <li><strong>⚠️ Orange rows:</strong> Need custom thumbnails (non-YouTube videos)</li>
+                <li><strong>✅ Green rows:</strong> Should work automatically</li>
             </ul>
         </div>
         <p style="margin-top: 20px;">
-            <a href="/">â† Back to main list</a> | 
-            <a href="/admin/levels">ðŸ› ï¸ Admin Levels</a> |
-            <a href="/fix_thumbnails">ðŸ”§ Auto-Fix Thumbnails</a>
+            <a href="/">← Back to main list</a> | 
+            <a href="/admin/levels">🛠️ Admin Levels</a> |
+            <a href="/fix_thumbnails">🔧 Auto-Fix Thumbnails</a>
         </p>
         """
         
         return html
         
     except Exception as e:
-        return f"<h2>âŒ Database Error</h2><p>{str(e)}</p><p><a href='/'>â† Back</a></p>"
+        return f"<h2>❌ Database Error</h2><p>{str(e)}</p><p><a href='/'>← Back</a></p>"
 
 # stress_test_images route removed - no image functionality
 
@@ -4947,7 +4577,7 @@ def debug_levels():
 def fix_all_missing_images():
     """Fix ALL missing images based on the screenshot"""
     if 'user_id' not in session or not session.get('is_admin'):
-        return "âŒ Access denied - Admin only"
+        return "❌ Access denied - Admin only"
     
     try:
         # Based on your screenshot, these levels need YouTube URLs
@@ -4976,37 +4606,37 @@ def fix_all_missing_images():
                 )
             
             if result.matched_count > 0:
-                results.append(f"âœ… FIXED: {level_name}")
+                results.append(f"✅ FIXED: {level_name}")
             else:
-                results.append(f"âŒ NOT FOUND: {level_name}")
+                results.append(f"❌ NOT FOUND: {level_name}")
         
         # Clear cache to refresh immediately
         levels_cache['main_list'] = None
         levels_cache['legacy_list'] = None
         
         return f"""
-        <h1>ðŸŽ¯ ALL IMAGES FIXED!</h1>
+        <h1>🎯 ALL IMAGES FIXED!</h1>
         <div style="background: #d4edda; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h2>âœ… Results:</h2>
+            <h2>✅ Results:</h2>
             {'<br>'.join(results)}
         </div>
         <div style="background: #cce5ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h2>ðŸŽ¨ What Should Happen Now:</h2>
+            <h2>🎨 What Should Happen Now:</h2>
             <ul>
-                <li>âœ… the light circles â†’ YouTube thumbnail</li>
-                <li>âœ… old memories â†’ YouTube thumbnail</li>
-                <li>âœ… ochiru 2 â†’ YouTube thumbnail</li>
-                <li>âœ… the ringer â†’ YouTube thumbnail</li>
-                <li>âš ï¸ los pollos tv 3 â†’ Shows "streamable.com" (non-YouTube)</li>
+                <li>✅ the light circles → YouTube thumbnail</li>
+                <li>✅ old memories → YouTube thumbnail</li>
+                <li>✅ ochiru 2 → YouTube thumbnail</li>
+                <li>✅ the ringer → YouTube thumbnail</li>
+                <li>⚠️ los pollos tv 3 → Shows "streamable.com" (non-YouTube)</li>
             </ul>
         </div>
         <p>
-            <a href="/" style="background: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 18px;">ðŸ  CHECK MAIN LIST NOW</a>
+            <a href="/" style="background: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 18px;">🏠 CHECK MAIN LIST NOW</a>
         </p>
         """
         
     except Exception as e:
-        return f"âŒ Error: {str(e)}"
+        return f"❌ Error: {str(e)}"
 # All broken code removed - clean slate
         return f"Error testing images: {e}"
 
@@ -5194,10 +4824,10 @@ def fix_image_system():
         cache_dir = 'static/thumbs'
         if os.path.exists(cache_dir):
             shutil.rmtree(cache_dir)
-            results.append("âœ… Cleared thumbnail cache")
+            results.append("✅ Cleared thumbnail cache")
         
         os.makedirs(cache_dir, exist_ok=True)
-        results.append("âœ… Created fresh thumbnail cache directory")
+        results.append("✅ Created fresh thumbnail cache directory")
         
         # 2. Remove Base64 thumbnails
         base64_count = mongo_db.levels.count_documents({"thumbnail_url": {"$regex": "^data:"}})
@@ -5206,7 +4836,7 @@ def fix_image_system():
                 {"thumbnail_url": {"$regex": "^data:"}},
                 {"$set": {"thumbnail_url": ""}}
             )
-            results.append(f"âœ… Removed {base64_count} Base64 thumbnails")
+            results.append(f"✅ Removed {base64_count} Base64 thumbnails")
         
         # 3. Fix YouTube URLs
         youtube_levels = list(mongo_db.levels.find({
@@ -5233,12 +4863,12 @@ def fix_image_system():
                     fixed_youtube += 1
         
         if fixed_youtube > 0:
-            results.append(f"âœ… Fixed {fixed_youtube} YouTube thumbnails")
+            results.append(f"✅ Fixed {fixed_youtube} YouTube thumbnails")
         
         # 4. Clear levels cache to force reload
         global levels_cache
         levels_cache.clear()
-        results.append("âœ… Cleared levels cache")
+        results.append("✅ Cleared levels cache")
         
         # 5. Create placeholder for missing thumbnails
         placeholder_path = os.path.join(cache_dir, 'placeholder.jpg')
@@ -5263,24 +4893,24 @@ def fix_image_system():
             
             draw.text((x, y), text, fill='#6c757d', font=font)
             img.save(placeholder_path, 'JPEG', quality=85)
-            results.append("âœ… Created placeholder thumbnail")
+            results.append("✅ Created placeholder thumbnail")
             
         except Exception as e:
-            results.append(f"âš ï¸ Could not create placeholder: {e}")
+            results.append(f"⚠️ Could not create placeholder: {e}")
         
         return f"""
-        <h2>ðŸ”§ Thumbnail System Fixed!</h2>
+        <h2>🔧 Thumbnail System Fixed!</h2>
         <div style="font-family: monospace; background: #f8f9fa; padding: 20px; border-radius: 8px;">
             {'<br>'.join(results)}
         </div>
         <br>
-        <p><a href="/instant_load" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">ðŸ”„ Reload Data</a></p>
-        <p><a href="/" style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">ðŸ  Back to Main</a></p>
-        <p><a href="/test_thumbnails" style="background: #ffc107; color: black; padding: 10px 20px; text-decoration: none; border-radius: 5px;">ðŸ§ª Test Thumbnails</a></p>
+        <p><a href="/instant_load" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🔄 Reload Data</a></p>
+        <p><a href="/" style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🏠 Back to Main</a></p>
+        <p><a href="/test_thumbnails" style="background: #ffc107; color: black; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🧪 Test Thumbnails</a></p>
         """
         
     except Exception as e:
-        return f"âŒ Error fixing thumbnails: {e}"
+        return f"❌ Error fixing thumbnails: {e}"
 
 
 
@@ -5307,13 +4937,13 @@ def debug_records():
         sample_level = mongo_db.levels.find_one({})
         
         results = [
-            f"ðŸ“Š Database Status:",
+            f"📊 Database Status:",
             f"- Pending records: {pending_count}",
             f"- Approved records: {approved_count}",
             f"- Total users: {total_users}",
             f"- Total levels: {total_levels}",
             "",
-            f"ðŸ” Sample Data:",
+            f"🔍 Sample Data:",
         ]
         
         if sample_record:
@@ -5339,16 +4969,16 @@ def debug_records():
             results.append(f"- Test points calculation: {test_points} points for {test_record.get('progress', 'N/A')}% on {sample_level.get('name', 'N/A')}")
         
         return f"""
-        <h2>ðŸ”§ Record System Debug</h2>
+        <h2>🔧 Record System Debug</h2>
         <div style="font-family: monospace; background: #f8f9fa; padding: 20px; border-radius: 8px;">
             {'<br>'.join(results)}
         </div>
         <br>
-        <p><a href="/admin" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">ðŸ  Back to Admin</a></p>
+        <p><a href="/admin" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🏠 Back to Admin</a></p>
         """
         
     except Exception as e:
-        return f"âŒ Error debugging records: {e}"
+        return f"❌ Error debugging records: {e}"
 
 @app.route('/quick_fix')
 def quick_fix():
@@ -5374,7 +5004,7 @@ def quick_fix():
                     {"$set": {"points": points}}
                 )
             
-            results.append(f"âœ… Fixed {levels_without_points} levels without points")
+            results.append(f"✅ Fixed {levels_without_points} levels without points")
         
         # 2. Fix missing points in users
         users_without_points = mongo_db.users.count_documents({"points": {"$exists": False}})
@@ -5383,7 +5013,7 @@ def quick_fix():
                 {"points": {"$exists": False}},
                 {"$set": {"points": 0}}
             )
-            results.append(f"âœ… Fixed {users_without_points} users without points")
+            results.append(f"✅ Fixed {users_without_points} users without points")
         
         # 3. Recalculate all user points
         users_with_records = mongo_db.records.distinct("user_id", {"status": "approved"})
@@ -5395,7 +5025,7 @@ def quick_fix():
             except Exception as e:
                 print(f"Error updating points for user {user_id}: {e}")
         
-        results.append(f"âœ… Recalculated points for {points_fixed}/{len(users_with_records)} users")
+        results.append(f"✅ Recalculated points for {points_fixed}/{len(users_with_records)} users")
         
         # 4. Fix missing min_percentage in levels
         levels_without_min_pct = mongo_db.levels.count_documents({"min_percentage": {"$exists": False}})
@@ -5404,26 +5034,26 @@ def quick_fix():
                 {"min_percentage": {"$exists": False}},
                 {"$set": {"min_percentage": 100}}
             )
-            results.append(f"âœ… Fixed {levels_without_min_pct} levels without min_percentage")
+            results.append(f"✅ Fixed {levels_without_min_pct} levels without min_percentage")
         
         # 5. Clear levels cache
         global levels_cache
         levels_cache.clear()
-        results.append("âœ… Cleared levels cache")
+        results.append("✅ Cleared levels cache")
         
         return f"""
-        <h2>âš¡ Quick Fix Complete!</h2>
+        <h2>⚡ Quick Fix Complete!</h2>
         <div style="font-family: monospace; background: #f8f9fa; padding: 20px; border-radius: 8px;">
             {'<br>'.join(results)}
         </div>
         <br>
-        <p><a href="/admin" style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">ðŸ  Back to Admin</a></p>
-        <p><a href="/debug_records" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">ðŸ” Debug Records</a></p>
-        <p><a href="/fix_all_points" style="background: #ffc107; color: black; padding: 10px 20px; text-decoration: none; border-radius: 5px;">ðŸ”§ Fix All Points</a></p>
+        <p><a href="/admin" style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🏠 Back to Admin</a></p>
+        <p><a href="/debug_records" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🔍 Debug Records</a></p>
+        <p><a href="/fix_all_points" style="background: #ffc107; color: black; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🔧 Fix All Points</a></p>
         """
         
     except Exception as e:
-        return f"âŒ Error in quick fix: {e}"
+        return f"❌ Error in quick fix: {e}"
 
 @app.route('/fix_all_points')
 def fix_all_points():
@@ -5455,13 +5085,13 @@ def fix_all_points():
                 new_points = updated_user.get('points', 0) if updated_user else 0
                 
                 if new_points != old_points:
-                    results.append(f"âœ… {user.get('username', 'Unknown')}: {old_points} â†’ {new_points} points")
+                    results.append(f"✅ {user.get('username', 'Unknown')}: {old_points} → {new_points} points")
                     total_fixed += 1
                 else:
-                    results.append(f"âœ“ {user.get('username', 'Unknown')}: {new_points} points (no change)")
+                    results.append(f"✓ {user.get('username', 'Unknown')}: {new_points} points (no change)")
                     
             except Exception as e:
-                results.append(f"âŒ Error fixing user {user_id}: {e}")
+                results.append(f"❌ Error fixing user {user_id}: {e}")
         
         # Also fix users with 0 points who should have points
         zero_point_users = mongo_db.users.count_documents({"points": {"$lte": 0}})
@@ -5472,18 +5102,18 @@ def fix_all_points():
             )
         
         return f"""
-        <h2>ðŸ”§ All User Points Fixed!</h2>
+        <h2>🔧 All User Points Fixed!</h2>
         <div style="font-family: monospace; background: #f8f9fa; padding: 20px; border-radius: 8px; max-height: 400px; overflow-y: auto;">
             <strong>Fixed {total_fixed} users with point changes:</strong><br><br>
             {'<br>'.join(results)}
         </div>
         <br>
-        <p><a href="/debug_records" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">ðŸ” Check Results</a></p>
-        <p><a href="/admin" style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">ðŸ  Back to Admin</a></p>
+        <p><a href="/debug_records" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🔍 Check Results</a></p>
+        <p><a href="/admin" style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">🏠 Back to Admin</a></p>
         """
         
     except Exception as e:
-        return f"âŒ Error fixing all points: {e}"
+        return f"❌ Error fixing all points: {e}"
 
 @app.route('/admin/reset_user/<user_id>', methods=['POST'])
 def admin_reset_user(user_id):
@@ -5696,7 +5326,7 @@ def admin_reset_user_api(user_id):
             f"Reset API key for {user['username']}"
         )
         
-        flash(f'âœ… API key reset for {user["username"]}. New key: {new_api_key}', 'success')
+        flash(f'✅ API key reset for {user["username"]}. New key: {new_api_key}', 'success')
         
     except Exception as e:
         flash(f'Error resetting API key: {str(e)}', 'danger')
@@ -5735,9 +5365,9 @@ def virtual_list():
         </style>
     </head>
     <body>
-        <h1>ðŸš€ RTL - Virtual List (Ultra Fast)</h1>
+        <h1>🚀 RTL - Virtual List (Ultra Fast)</h1>
         <p>Showing {len(main_list)} levels with virtual scrolling</p>
-        <p><a href="/">â† Back to paginated view</a></p>
+        <p><a href="/">← Back to paginated view</a></p>
         
         <div class="virtual-container" id="container">
             <!-- Items will be rendered by JavaScript -->
@@ -5779,7 +5409,7 @@ def virtual_list():
                           '<div class="level-img" style="background: #ddd; display: flex; align-items: center; justify-content: center; font-size: 12px;">No Image</div>'}}
                         <div class="level-info">
                             <div class="level-name">${{level.name}}</div>
-                            <div class="level-meta">by ${{level.creator}} â€¢ verified by ${{level.verifier}} â€¢ ${{level.difficulty}}/10 â€¢ ${{level.points}} points</div>
+                            <div class="level-meta">by ${{level.creator}} • verified by ${{level.verifier}} • ${{level.difficulty}}/10 • ${{level.points}} points</div>
                         </div>
                     `;
                     
@@ -5827,11 +5457,11 @@ def instant_load():
         
         return f"""
         <div style="text-align: center; padding: 50px; font-family: Arial;">
-            <h1>âœ… Loaded Successfully!</h1>
+            <h1>✅ Loaded Successfully!</h1>
             <p>Load time: {end_time - start_time:.3f} seconds</p>
             <p>Main levels: {len(main_levels)} | Legacy: {len(legacy_levels)}</p>
             <br>
-            <a href="/" style="background: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 18px;">ðŸš€ Go to Main List</a>
+            <a href="/" style="background: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 18px;">🚀 Go to Main List</a>
             <br><br>
             <a href="/legacy">View Legacy List</a>
         </div>
@@ -5840,7 +5470,7 @@ def instant_load():
     except Exception as e:
         return f"""
         <div style="text-align: center; padding: 50px; font-family: Arial;">
-            <h1>âŒ Load Failed</h1>
+            <h1>❌ Load Failed</h1>
             <p>Error: {e}</p>
             <a href="/debug_db">Check Database</a> | <a href="/fast">Use Sample Data</a>
         </div>
@@ -5860,7 +5490,7 @@ def load_images():
         if not main_levels and not legacy_levels:
             return """
             <div style="text-align: center; padding: 50px; font-family: Arial;">
-                <h1>âš ï¸ No Levels Loaded</h1>
+                <h1>⚠️ No Levels Loaded</h1>
                 <p>Please load levels first</p>
                 <a href="/instant_load">Load Levels First</a>
             </div>
@@ -5898,11 +5528,11 @@ def load_images():
         
         return f"""
         <div style="text-align: center; padding: 50px; font-family: Arial;">
-            <h1>ðŸ“· Images Loaded!</h1>
+            <h1>📷 Images Loaded!</h1>
             <p>Load time: {end_time - start_time:.3f} seconds</p>
             <p>Updated {len(main_levels)} main + {len(legacy_levels)} legacy levels</p>
             <br>
-            <a href="/" style="background: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 18px;">ðŸš€ View Main List</a>
+            <a href="/" style="background: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-size: 18px;">🚀 View Main List</a>
             <br><br>
             <a href="/legacy">View Legacy List</a>
         </div>
@@ -5911,7 +5541,7 @@ def load_images():
     except Exception as e:
         return f"""
         <div style="text-align: center; padding: 50px; font-family: Arial;">
-            <h1>âŒ Image Load Failed</h1>
+            <h1>❌ Image Load Failed</h1>
             <p>Error: {e}</p>
             <a href="/">Back to Main</a>
         </div>
@@ -5943,7 +5573,7 @@ def debug_db():
         <p>Total documents: {total_count}</p>
         <p>Main levels: {main_count}</p>
         <p>Legacy levels: {legacy_count}</p>
-        <p>âœ… Image functionality removed - no thumbnails stored</p>
+        <p>✅ Image functionality removed - no thumbnails stored</p>
         
         <p><a href='/'>Back to main</a></p>
         """
@@ -5960,10 +5590,10 @@ def debug_info():
     try:
         mongo_client.admin.command('ping', maxTimeMS=2000)
         ping_time = time.time() - start_time
-        ping_status = f"âœ… {ping_time:.2f}s"
+        ping_status = f"✅ {ping_time:.2f}s"
     except Exception as e:
         ping_time = time.time() - start_time
-        ping_status = f"âŒ {ping_time:.2f}s - {str(e)}"
+        ping_status = f"❌ {ping_time:.2f}s - {str(e)}"
     
     # Check cache status
     cache_status = {
@@ -6008,7 +5638,7 @@ def test_legacy_db():
         
         return f"""
         <h1>Legacy Database Test</h1>
-        <p><strong>Connection:</strong> âœ… OK</p>
+        <p><strong>Connection:</strong> ✅ OK</p>
         <p><strong>Legacy Count:</strong> {legacy_count}</p>
         <p><strong>Sample Legacy Levels:</strong></p>
         <ul>
@@ -6070,8 +5700,8 @@ def test_discord():
     result = f"""
     <h1>Discord Integration Test</h1>
     <p><strong>Discord Available:</strong> {DISCORD_AVAILABLE}</p>
-    <p><strong>Webhook URL:</strong> {'âœ… Set' if webhook_url else 'âŒ Missing'}</p>
-    <p><strong>Website URL:</strong> {website_url or 'âŒ Missing'}</p>
+    <p><strong>Webhook URL:</strong> {'✅ Set' if webhook_url else '❌ Missing'}</p>
+    <p><strong>Website URL:</strong> {website_url or '❌ Missing'}</p>
     """
     
     if webhook_url:
@@ -6080,197 +5710,82 @@ def test_discord():
     try:
         if DISCORD_AVAILABLE:
             notify_record_submitted('TestUser', 'Test Level', 99, 'https://youtube.com/test')
-            result += "<p>âœ… Discord test notification sent!</p>"
+            result += "<p>✅ Discord test notification sent!</p>"
         else:
-            result += "<p>âŒ Discord integration not available</p>"
+            result += "<p>❌ Discord integration not available</p>"
     except Exception as e:
-        result += f"<p>âŒ Discord test failed: {str(e)}</p>"
+        result += f"<p>❌ Discord test failed: {str(e)}</p>"
         import traceback
         result += f"<pre>{traceback.format_exc()}</pre>"
     
     return result
 
-
-# API endpoint for background level loading
-@app.route('/api/levels/main')
-def api_get_main_levels():
-    """API endpoint to get main list levels - for background loading"""
-    try:
-        # Get fresh data from MongoDB
-        main_list = list(mongo_db.levels.find(
-            {"is_legacy": False},
-            {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, "level_id": 1, "difficulty": 1, "thumbnail_url": 1, "video_url": 1, "min_percentage": 1}
-        ).sort("position", 1))
-        
-        # Check for April Fools mode
-        april_fools_active = is_april_fools_active()
-        if april_fools_active:
-            main_list = randomize_level_positions(main_list.copy())
-        
-        return {
-            'success': True,
-            'levels': main_list,
-            'total_levels': len(main_list),
-            'april_fools_active': april_fools_active
-        }
-    except Exception as e:
-            print(f"Error in API endpoint for main levels: {e}")
-            return {
-            'success': False,
-            'error': str(e),
-            'levels': [],
-            'total_levels': 0
-        }, 500
-
-
-@app.route('/api/loading-status')
-def loading_status():
-    """API endpoint to get current loading progress"""
-    current_levels = getattr(app, 'loading_levels', [])
-    loading_complete = getattr(app, 'loading_complete', False)
-    
-    # Debug info
-    cache_has_data = bool(levels_cache.get('main_list')) and len(levels_cache.get('main_list', [])) > 0
-    mongo_connected = mongo_manager.is_connected()
-    
-    return {
-        'levels': current_levels if current_levels else [],
-        'count': len(current_levels) if current_levels else 0,
-        'complete': loading_complete,
-        'debug': {
-            'cache_has_data': cache_has_data,
-            'cache_count': len(levels_cache.get('main_list', [])) if levels_cache.get('main_list') else 0,
-            'mongo_connected': mongo_connected
-        }
-    }
-
 @app.route('/')
 def index():
-    """INSTANT LOAD - Shows page immediately, loads levels in background"""
+    """Main list - DIRECT DATABASE LOAD - NO CACHE"""
     try:
-        # Try to get from cache first
-        main_list = get_cached_levels(is_legacy=False)
+        # DIRECT DATABASE QUERY - LOAD 100 LEVELS NOW
+        levels = list(mongo_db.levels.find(
+            {"is_legacy": False},
+            {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, 
+             "points": 1, "level_id": 1, "difficulty": 1, "video_url": 1, 
+             "thumbnail_url": 1, "min_percentage": 1, "demon_type": 1}
+        ).sort("position", 1).limit(100))
         
-        # If cache has data, return immediately (no database query!)
-        if main_list and len(main_list) > 0:
-            print(f"✅ Serving {len(main_list)} levels from cache (instant!)")
-            
-            # 🎭 APRIL FOOLS MODE: Randomize positions if active
-            if is_april_fools_active():
-                main_list = randomize_level_positions(main_list.copy())
-            
-            # Show all levels on one page (no pagination)
-            total_levels = len(main_list)
-            
-            return render_template('index.html', 
-                                 levels=main_list,
-                                 total_levels=total_levels,
-                                 april_fools_active=is_april_fools_active(),
-                                 auto_refresh=False)  # No need to refresh
-        
-        # Cache is empty - page will load with message and auto-refresh
-        print("⚠️ Cache empty - page will auto-refresh when levels load")
-        
-        # Start background loading thread if not already running
-        if not hasattr(app, 'progressive_loading') or not app.progressive_loading:
-            app.progressive_loading = True
-            app.loading_levels = []
-            app.loading_complete = False
-            
-            # Start background loader thread
-            loader_thread = threading.Thread(target=load_levels_progressively, daemon=True)
-            loader_thread.start()
-            print("🔧 Started progressive loader thread")
-        
-        # Return empty state - template will auto-refresh
-        current_levels = [{"_id": 0, "name": "⏳ Loading levels from database...", "creator": "System", "verifier": "System", "position": 1, "points": 0, "level_id": "loading", "difficulty": 1}]
+        print(f"LOADED {len(levels)} LEVELS FROM DATABASE")
+        if levels:
+            print(f"First level: {levels[0]['name']}")
+            print(f"Last level: {levels[-1]['name']}")
         
         return render_template('index.html', 
-                             levels=current_levels,
-                             total_levels=1,
-                             april_fools_active=False,
-                             auto_refresh=True)  # Tell template to auto-refresh
-        
+                             levels=levels, 
+                             total_levels=len(levels), 
+                             april_fools_active=False)
     except Exception as e:
-        print(f"Error in index route: {e}")
+        print(f"ERROR LOADING LEVELS: {e}")
         import traceback
         traceback.print_exc()
-        
-        # Fallback to cache even on error
-        cached_main = get_cached_levels(is_legacy=False)
-        
-        if cached_main and len(cached_main) > 0:
-            return render_template('index.html', 
-                                 levels=cached_main,
-                                 total_levels=len(cached_main),
-                                 april_fools_active=is_april_fools_active(),
-                                 auto_refresh=False)
-        else:
-            return render_template('index.html', 
-                                 levels=[{"_id": 0, "name": "⚠️ Error loading levels - Please refresh the page", "creator": "System", "verifier": "System", "position": 1, "points": 0, "level_id": "error", "difficulty": 1}],
-                                 total_levels=1,
-                                 april_fools_active=False,
-                                 auto_refresh=True)
-
-# Routes
+        return render_template('index.html', 
+                             levels=[], 
+                             total_levels=0, 
+                             april_fools_active=False)
 
 @app.route('/legacy')
 def legacy():
-    """AUTO-LOAD - Instantly loads legacy levels automatically"""
+    """Legacy list - ULTRA-FAST with caching"""
+    try:
+        # Use fast cached levels
+        levels = get_fast_cached_levels(is_legacy=True)
+        
+        return render_template('legacy.html', 
+                             levels=levels, 
+                             total_levels=len(levels))
+    except Exception as e:
+        print(f"Error loading legacy list: {e}")
+        return render_template('legacy.html', 
+                             levels=[], 
+                             total_levels=0)
     legacy_list = get_cached_levels(is_legacy=True)
     
-    # If no cache or empty cache, load fresh from database
-    if not legacy_list or len(legacy_list) == 0:
+    # If no cache, auto-load it now
+    if not legacy_list:
         try:
-            print("Loading legacy levels from database...")
-            start_time = time.time()
+            print("Auto-loading legacy levels...")
+            legacy_list = list(mongo_db.levels.find(
+                {"is_legacy": True},
+                {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, "level_id": 1, "difficulty": 1, "thumbnail_url": 1, "video_url": 1, "min_percentage": 1}
+            ).sort("position", 1))
             
-            # Use helper function to load from database
-            legacy_list = load_levels_from_database(is_legacy=True)
-            
-            load_time = (time.time() - start_time) * 1000
-            print(f"✅ Loaded {len(legacy_list)} legacy levels in {load_time:.2f}ms")
-            
-            # Cache it for next time
+            # Cache it
             levels_cache['legacy_list'] = legacy_list
             levels_cache['last_updated'] = datetime.now(timezone.utc)
-            
-            # Save to cache file
-            cache_data = {
-                'levels': legacy_list,
-                'last_updated': datetime.now(timezone.utc).isoformat()
-            }
-            with open('cache_legacy_levels.json', 'w', encoding='utf-8') as f:
-                json.dump(cache_data, f, ensure_ascii=False, indent=2, cls=MongoEncoder)
-            
-            print(f"💾 Saved {len(legacy_list)} legacy levels to cache")
+            print(f"Auto-loaded {len(legacy_list)} legacy levels")
             
         except Exception as e:
-            print(f"❌ Legacy database query failed: {e}")
-            import traceback
-            traceback.print_exc()
-            # Try emergency fallback with minimal fields
-            try:
-                print("Trying emergency fallback for legacy...")
-                cursor = mongo_db.levels.find(
-                    {"is_legacy": True},
-                    {
-                        "position": 1, 
-                        "name": 1, 
-                        "creator": 1, 
-                        "points": 1,
-                        "thumbnail_url": 1,
-                        "image_base64": 1
-                    }
-                ).sort("position", 1)
-                cursor.max_time_ms(30000)  # 30 second timeout
-                legacy_list = list(cursor)
-                print(f"✅ Emergency fallback loaded {len(legacy_list)} legacy levels")
-            except Exception as e2:
-                print(f"❌ Emergency fallback also failed: {e2}")
-                legacy_list = []
+            print(f"Legacy auto-load failed: {e}")
+            legacy_list = []
     
-    # ðŸŽ­ APRIL FOOLS MODE: Randomize legacy positions if active
+    # 🎭 APRIL FOOLS MODE: Randomize legacy positions if active
     if is_april_fools_active():
         legacy_list = randomize_level_positions(legacy_list.copy())
     
@@ -6302,12 +5817,12 @@ def timemachine():
                 try:
                     with open('historical_rankings_new.json', 'r') as f:
                         historical_data = json.load(f)
-                    print("âœ… Loaded new historical rankings data")
+                    print("✅ Loaded new historical rankings data")
                 except FileNotFoundError:
                     # Fallback to old file if new one doesn't exist
                     with open('historical_rankings.json', 'r') as f:
                         historical_data = json.load(f)
-                    print("âš ï¸ Using old historical rankings data")
+                    print("⚠️ Using old historical rankings data")
             except Exception as e:
                 print(f"Error loading historical rankings: {e}")
                 # Create fallback historical data based on current database
@@ -7165,7 +6680,7 @@ def discord_login():
         # Local development - use Flask's url_for
         redirect_uri = url_for('discord_callback', _external=True)
     
-    print(f"ðŸ” Discord OAuth redirect URI: {redirect_uri}")
+    print(f"🔍 Discord OAuth redirect URI: {redirect_uri}")
     return discord_oauth.authorize_redirect(redirect_uri)
 
 @app.route('/discord-setup-help')
@@ -7596,9 +7111,9 @@ def handle_verification_submission():
                     username, level_name, creator, verifier, difficulty, placement_num, 
                     experience_num, enjoyment_num, verification_url, comments, level_id
                 )
-                print(f"âœ… Discord notification sent for verification submission by {username}")
+                print(f"✅ Discord notification sent for verification submission by {username}")
             else:
-                print("âš ï¸ Discord bot not available - skipping notification")
+                print("⚠️ Discord bot not available - skipping notification")
         except Exception as e:
             print(f"Error sending Discord notification: {e}")
         
@@ -7702,7 +7217,7 @@ def handle_single_record_submission():
     try:
         user = mongo_db.users.find_one({"_id": session['user_id']})
         username = user['username'] if user else 'Unknown'
-        print(f"ðŸ”” Sending Discord notification for {username} - {level['name']} - {progress}%")
+        print(f"🔔 Sending Discord notification for {username} - {level['name']} - {progress}%")
         
         # Try the imported function first
         if DISCORD_AVAILABLE:
@@ -7711,9 +7226,9 @@ def handle_single_record_submission():
             # Fallback: send Discord notification directly
             send_discord_notification_direct(username, level['name'], progress, video_url, comments)
         
-        print(f"âœ… Discord notification sent successfully")
+        print(f"✅ Discord notification sent successfully")
     except Exception as e:
-        print(f"âŒ Discord notification error: {e}")
+        print(f"❌ Discord notification error: {e}")
         import traceback
         traceback.print_exc()
     
@@ -7810,9 +7325,9 @@ def handle_multiple_record_submission():
                     if DISCORD_AVAILABLE:
                         notify_record_submitted(username, record['level_name'], record['progress'], '', record['comments'])
                 
-                print(f"âœ… Discord notifications sent for {len(submitted_records)} records")
+                print(f"✅ Discord notifications sent for {len(submitted_records)} records")
             except Exception as e:
-                print(f"âŒ Discord notification error: {e}")
+                print(f"❌ Discord notification error: {e}")
         
         # Show results
         if submitted_records:
@@ -7850,7 +7365,7 @@ def log_submission_with_comments(user_id, level_name, progress, comments):
         }
         
         mongo_db.submission_logs.insert_one(log_entry)
-        print(f"ðŸ“ Logged submission: {username} - {level_name} - {progress}% - Comments: {comments}")
+        print(f"📝 Logged submission: {username} - {level_name} - {progress}% - Comments: {comments}")
         
     except Exception as e:
         print(f"Error logging submission: {e}")
@@ -7862,31 +7377,31 @@ def send_discord_notification_direct(username, level_name, progress, video_url, 
         webhook_url = os.environ.get('DISCORD_WEBHOOK_URL')
         
         if not webhook_url:
-            print("âŒ No Discord webhook URL configured for fallback")
+            print("❌ No Discord webhook URL configured for fallback")
             return
         
         embed = {
-            "title": "ðŸ“ New Record Submission",
+            "title": "📝 New Record Submission",
             "description": "A new record has been submitted for review",
             "color": 10181046,  # Purple color
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "fields": [
-                {"name": "ðŸ‘¤ Player", "value": username, "inline": True},
-                {"name": "ðŸŽ® Level", "value": level_name, "inline": True},
-                {"name": "ðŸ“Š Progress", "value": f"{progress}%", "inline": True}
+                {"name": "👤 Player", "value": username, "inline": True},
+                {"name": "🎮 Level", "value": level_name, "inline": True},
+                {"name": "📊 Progress", "value": f"{progress}%", "inline": True}
             ]
         }
         
         if video_url:
             embed["fields"].append({
-                "name": "ðŸŽ¥ Video",
+                "name": "🎥 Video",
                 "value": f"[Watch Video]({video_url})",
                 "inline": False
             })
         
         if comments and comments.strip():
             embed["fields"].append({
-                "name": "ðŸ’¬ Comments",
+                "name": "💬 Comments",
                 "value": comments[:500] + ("..." if len(comments) > 500 else ""),
                 "inline": False
             })
@@ -7895,12 +7410,12 @@ def send_discord_notification_direct(username, level_name, progress, video_url, 
         
         response = requests.post(webhook_url, json=payload, timeout=10)
         if response.status_code == 204:
-            print("âœ… Fallback Discord notification sent successfully")
+            print("✅ Fallback Discord notification sent successfully")
         else:
-            print(f"âŒ Fallback Discord notification failed: {response.status_code}")
+            print(f"❌ Fallback Discord notification failed: {response.status_code}")
             
     except Exception as e:
-        print(f"âŒ Error in fallback Discord notification: {e}")
+        print(f"❌ Error in fallback Discord notification: {e}")
 
 # Admin routes
 
@@ -8472,7 +7987,7 @@ def admin_verifications():
         # Automatically check for and remove duplicate submissions
         duplicates_removed = check_for_duplicate_levels()
         if duplicates_removed > 0:
-            flash(f'ðŸ§¹ Automatically removed {duplicates_removed} duplicate verification submissions for levels already on the list.', 'info')
+            flash(f'🧹 Automatically removed {duplicates_removed} duplicate verification submissions for levels already on the list.', 'info')
         
         # Get all verification submissions with user info
         pipeline = [
@@ -8607,10 +8122,11 @@ def admin_accept_verification(submission_id):
         admin_user = mongo_db.users.find_one({"_id": session['user_id']})
         admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
         
-        # Call the function to accept the verification submission
-        result = accept_verification_submission(submission_id, admin_username)
+        # Call the function to accept the verification submission with placement
+        result = accept_verification_submission(submission_id, admin_username, placement)
         
         if result:
+            flash(f'Verification accepted! Level placed at position {placement}', 'success')
             return redirect(url_for('admin_verifications'))
         else:
             flash('Error accepting verification submission', 'danger')
@@ -8646,7 +8162,7 @@ def text_difficulty_to_numeric(text_difficulty):
     # Convert to lowercase for case-insensitive matching
     return difficulty_mapping.get(text_difficulty.lower(), 10.0)  # Default to 10.0 (Demon)
 
-def accept_verification_submission(submission_id, admin_username):
+def accept_verification_submission(submission_id, admin_username, custom_placement=None):
     """Accept a verification submission and add it to the main list"""
     submission = mongo_db.verification_submissions.find_one({"_id": ObjectId(submission_id)})
     if not submission:
@@ -8671,8 +8187,13 @@ def accept_verification_submission(submission_id, admin_username):
             print("Submitter not found")
             return False
         
-        # Calculate placement position
-        placement = int(submission.get('placement', 1))
+        # Use custom placement from admin if provided, otherwise use submission placement
+        if custom_placement is not None:
+            placement = int(custom_placement)
+            print(f"Using admin custom placement: {placement}")
+        else:
+            placement = int(submission.get('placement', 1))
+            print(f"Using submission placement: {placement}")
         
         # Validate placement
         if placement < 1:
@@ -8764,9 +8285,9 @@ def accept_verification_submission(submission_id, admin_username):
                 manager = RealTimePointsManager(mongo_db)
                 levels_updated = manager.recalculate_all_level_points()
                 users_updated = manager.recalculate_all_user_points()
-                print(f"âœ… Verification acceptance triggered recalculation: {levels_updated} levels, {users_updated} users updated")
+                print(f"✅ Verification acceptance triggered recalculation: {levels_updated} levels, {users_updated} users updated")
             except Exception as e:
-                print(f"âš ï¸ Warning: Real-time points recalculation failed: {e}")
+                print(f"⚠️ Warning: Real-time points recalculation failed: {e}")
         
         # Handle automatic legacy management
         auto_manage_legacy_list()
@@ -8801,11 +8322,11 @@ def accept_verification_submission(submission_id, admin_username):
             try:
                 if is_bot_available():
                     if assign_verifier_role(submitter['discord_id']):
-                        print(f"âœ… Assigned List Verifier role to user {submitter['username']}")
+                        print(f"✅ Assigned List Verifier role to user {submitter['username']}")
                     else:
-                        print(f"âŒ Failed to assign List Verifier role to user {submitter['username']}")
+                        print(f"❌ Failed to assign List Verifier role to user {submitter['username']}")
                 else:
-                    print("âš ï¸ Discord bot not available - skipping List Verifier role assignment")
+                    print("⚠️ Discord bot not available - skipping List Verifier role assignment")
             except Exception as e:
                 print(f"Error assigning List Verifier role: {e}")
             
@@ -8819,11 +8340,11 @@ def accept_verification_submission(submission_id, admin_username):
                     # Assign Future List Verifier role
                     if is_bot_available():
                         if assign_future_list_verifier_role(submitter['discord_id']):
-                            print(f"âœ… Assigned Future List Verifier role to user {submitter['username']}")
+                            print(f"✅ Assigned Future List Verifier role to user {submitter['username']}")
                         else:
-                            print(f"âŒ Failed to assign Future List Verifier role to user {submitter['username']}")
+                            print(f"❌ Failed to assign Future List Verifier role to user {submitter['username']}")
                     else:
-                        print("âš ï¸ Discord bot not available - skipping Future List Verifier role assignment")
+                        print("⚠️ Discord bot not available - skipping Future List Verifier role assignment")
             except Exception as e:
                 print(f"Error checking future list or assigning Future List Verifier role: {e}")
         
@@ -8874,7 +8395,7 @@ def accept_verification_submission(submission_id, admin_username):
         create_notification(
             submission['user_id'],
             'verification_status',
-            'Verification Accepted! âœ…',
+            'Verification Accepted! ✅',
             f'Your verification for "{submission["level_name"]}" has been accepted and placed at position #{placement}! You automatically received the record and points.',
             new_level_id,
             'level'
@@ -8907,7 +8428,7 @@ def accept_verification_submission(submission_id, admin_username):
         # Calculate points earned
         points_earned = calculate_record_points(verifier_record, new_level)
         
-        flash(f'âœ… Verification accepted! "{submission["level_name"]}" has been placed at position #{placement}. {submitter["username"]} automatically received the record and {points_earned} points.', 'success')
+        flash(f'✅ Verification accepted! "{submission["level_name"]}" has been placed at position #{placement}. {submitter["username"]} automatically received the record and {points_earned} points.', 'success')
         return True
         
     except Exception as e:
@@ -8920,21 +8441,19 @@ def accept_verification_submission(submission_id, admin_username):
 def update_top_1_player_role():
     """Assign the Top 1 Player role to the current #1 player on the list"""
     try:
-        # Get the current #1 player with query timeout
+        # Get the current #1 player
         top_player = mongo_db.users.find_one(
             {"points": {"$gt": 0}}, 
-            sort=[("points", -1)],
-            max_time_ms=60000  # 60 second timeout (increased)
+            sort=[("points", -1)]
         )
         
         if not top_player:
-            print("âš ï¸ No players found with points")
+            print("No players found with points")
             return False
             
         # Remove the role from any previous holder
         previous_top_player = mongo_db.users.find_one(
-            {"has_top_1_role": True},
-            max_time_ms=60000  # 60 second timeout (increased)
+            {"has_top_1_role": True}
         )
         
         if previous_top_player and previous_top_player['_id'] != top_player['_id']:
@@ -8943,13 +8462,13 @@ def update_top_1_player_role():
                 try:
                     if is_bot_available():
                         if remove_top_1_player_role(previous_top_player['discord_id']):
-                            print(f"âœ… Removed Top 1 Player role from {previous_top_player['username']}")
+                            print(f"✅ Removed Top 1 Player role from {previous_top_player['username']}")
                         else:
-                            print(f"âŒ Failed to remove Top 1 Player role from {previous_top_player['username']}")
+                            print(f"❌ Failed to remove Top 1 Player role from {previous_top_player['username']}")
                     else:
-                        print("âš ï¸ Discord bot not available - skipping Top 1 Player role removal")
+                        print("⚠️ Discord bot not available - skipping Top 1 Player role removal")
                 except Exception as e:
-                    print(f"âŒ Error removing Top 1 Player role: {e}")
+                    print(f"Error removing Top 1 Player role: {e}")
             
             # Update database
             mongo_db.users.update_one(
@@ -8962,13 +8481,13 @@ def update_top_1_player_role():
             try:
                 if is_bot_available():
                     if assign_top_1_player_role(top_player['discord_id']):
-                        print(f"âœ… Assigned Top 1 Player role to {top_player['username']}")
+                        print(f"✅ Assigned Top 1 Player role to {top_player['username']}")
                     else:
-                        print(f"âŒ Failed to assign Top 1 Player role to {top_player['username']}")
+                        print(f"❌ Failed to assign Top 1 Player role to {top_player['username']}")
                 else:
-                    print("âš ï¸ Discord bot not available - skipping Top 1 Player role assignment")
+                    print("⚠️ Discord bot not available - skipping Top 1 Player role assignment")
             except Exception as e:
-                print(f"âŒ Error assigning Top 1 Player role: {e}")
+                print(f"Error assigning Top 1 Player role: {e}")
             
             # Update database
             mongo_db.users.update_one(
@@ -8979,9 +8498,7 @@ def update_top_1_player_role():
         return True
         
     except Exception as e:
-        print(f"âŒ Error in update_top_1_player_role: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"Error in update_top_1_player_role: {e}")
         return False
 
 @app.route('/admin/verification/deny/<submission_id>', methods=['POST'])
@@ -9026,13 +8543,13 @@ def admin_deny_verification(submission_id):
             create_notification(
                 submission['user_id'],
                 'verification_status',
-                'Verification Denied âŒ',
+                'Verification Denied ❌',
                 f'Your verification submission for "{submission["level_name"]}" has been denied by an administrator.',
                 None,
                 'system'
             )
         
-        flash(f'âŒ Verification for "{submission["level_name"]}" has been denied and removed.', 'success')
+        flash(f'❌ Verification for "{submission["level_name"]}" has been denied and removed.', 'success')
         
     except Exception as e:
         flash(f'Error denying verification: {str(e)}', 'danger')
@@ -9115,7 +8632,7 @@ def admin_cleanup_duplicate_verifications():
                     create_notification(
                         submission['user_id'],
                         'verification_status',
-                        'Verification Removed - Duplicate Level âš ï¸',
+                        'Verification Removed - Duplicate Level ⚠️',
                         f'Your verification submission for "{submission.get("level_name", "Unknown")}" has been removed because this level already exists on the list at position #{existing_level["position"] if existing_level else "Unknown"}.',
                         existing_level['_id'] if existing_level else None,
                         'level'
@@ -9130,16 +8647,16 @@ def admin_cleanup_duplicate_verifications():
             )
             
             # Create detailed flash message
-            flash_message = f'âœ… Cleanup complete! Removed {removed_count} duplicate verification submissions:'
+            flash_message = f'✅ Cleanup complete! Removed {removed_count} duplicate verification submissions:'
             for i, dup in enumerate(duplicates_found[:5]):  # Show first 5
-                flash_message += f'<br>â€¢ "{dup["level_name"]}" by {dup["submitter"]} (exists at #{dup["existing_position"]} on {dup["existing_list"]} list)'
+                flash_message += f'<br>• "{dup["level_name"]}" by {dup["submitter"]} (exists at #{dup["existing_position"]} on {dup["existing_list"]} list)'
             
             if len(duplicates_found) > 5:
-                flash_message += f'<br>â€¢ ... and {len(duplicates_found) - 5} more'
+                flash_message += f'<br>• ... and {len(duplicates_found) - 5} more'
             
             flash(flash_message, 'success')
         else:
-            flash('âœ… No duplicate verification submissions found.', 'info')
+            flash('✅ No duplicate verification submissions found.', 'info')
         
     except Exception as e:
         flash(f'Error during cleanup: {str(e)}', 'danger')
@@ -9186,14 +8703,14 @@ def check_for_duplicate_levels():
                     create_notification(
                         submission['user_id'],
                         'verification_status',
-                        'Verification Removed - Level Already Exists âš ï¸',
+                        'Verification Removed - Level Already Exists ⚠️',
                         f'Your verification submission for "{submission.get("level_name", "Unknown")}" has been automatically removed because this level already exists on the list.',
                         None,
                         'system'
                     )
         
         if removed_count > 0:
-            print(f"ðŸ§¹ Automatically removed {removed_count} duplicate verification submissions")
+            print(f"🧹 Automatically removed {removed_count} duplicate verification submissions")
         
         return removed_count
         
@@ -9337,7 +8854,7 @@ def handle_super_admin_pin_verification(provided_pin):
             
             # Clear pending login
             session.pop('pending_login_as', None)
-            return {'success': True, 'result': "âŒ INVALID SUPER ADMIN PIN!\nAccess denied. This attempt has been logged."}
+            return {'success': True, 'result': "❌ INVALID SUPER ADMIN PIN!\nAccess denied. This attempt has been logged."}
         
         # PIN is correct, proceed with login
         user = mongo_db.users.find_one({"username": username})
@@ -9378,7 +8895,7 @@ def handle_super_admin_pin_verification(provided_pin):
         elif user.get('is_admin'):
             admin_status = " [ADMIN]"
         
-        return {'success': True, 'result': f"âœ… Successfully logged in as '{username}'{admin_status}\nUser ID: {user['_id']}\nPoints: {user.get('points', 0)}\n\nâš ï¸ SECURITY WARNING: This action has been logged!"}
+        return {'success': True, 'result': f"✅ Successfully logged in as '{username}'{admin_status}\nUser ID: {user['_id']}\nPoints: {user.get('points', 0)}\n\n⚠️ SECURITY WARNING: This action has been logged!"}
         
     except Exception as e:
         session.pop('pending_login_as', None)
@@ -9747,7 +9264,7 @@ Note: Install psutil for detailed system metrics"""
             elif user.get('is_admin'):
                 admin_status = " [ADMIN]"
             
-            return f"ðŸ” SUPER ADMIN PIN REQUIRED\n\nTarget User: {username}{admin_status}\nUser ID: {user['_id']}\nPoints: {user.get('points', 0)}\n\nPlease enter the Super Admin PIN to proceed:"
+            return f"🔐 SUPER ADMIN PIN REQUIRED\n\nTarget User: {username}{admin_status}\nUser ID: {user['_id']}\nPoints: {user.get('points', 0)}\n\nPlease enter the Super Admin PIN to proceed:"
         
         elif command == 'whoami()':
             # Show current session info
@@ -9848,7 +9365,7 @@ Note: Install psutil for detailed system metrics"""
                     "action_type": "password_reset_console"
                 })
                 
-                return f"âœ… Password reset successfully for user '{username}'"
+                return f"✅ Password reset successfully for user '{username}'"
                 
             except Exception as e:
                 return f"Error resetting password: {str(e)}"
@@ -9946,10 +9463,10 @@ def toggle_april_fools_mode():
             # Clear cache to ensure fresh data on next load
             levels_cache.clear()
             
-            return """ðŸŽ­ April Fools Mode DISABLED! ðŸŽ­
+            return """🎭 April Fools Mode DISABLED! 🎭
 
 Level positions have been restored to normal.
-The chaos has ended... for now. ðŸ˜ˆ
+The chaos has ended... for now. 😈
 
 Use rtl.april_fools() again to re-enable the madness!"""
         
@@ -9971,15 +9488,15 @@ Use rtl.april_fools() again to re-enable the madness!"""
                 upsert=True
             )
             
-            return """ðŸŽ­ APRIL FOOLS MODE ACTIVATED! ðŸŽ­
+            return """🎭 APRIL FOOLS MODE ACTIVATED! 🎭
 
-ðŸŒªï¸ CHAOS UNLEASHED! ðŸŒªï¸
+🌪️ CHAOS UNLEASHED! 🌪️
 
 Every time someone refreshes the main list page,
 the levels will appear in COMPLETELY RANDOM positions!
 
-âš ï¸ Don't worry - the real positions are safely stored.
-âš ï¸ This only affects the display, not the actual database.
+⚠️ Don't worry - the real positions are safely stored.
+⚠️ This only affects the display, not the actual database.
 
 Effects:
 - Main list shows random positions every refresh
@@ -9989,7 +9506,7 @@ Effects:
 
 Use rtl.april_fools() again to disable and restore order.
 
-Let the confusion begin! ðŸ˜ˆðŸŽ‰"""
+Let the confusion begin! 😈🎉"""
     
     except Exception as e:
         return f"Error toggling April Fools mode: {str(e)}"
@@ -10007,10 +9524,10 @@ def save_original_positions():
                 {"$set": {"original_position": level["position"]}}
             )
         
-        print(f"âœ… Saved original positions for {len(levels)} levels")
+        print(f"✅ Saved original positions for {len(levels)} levels")
         
     except Exception as e:
-        print(f"âŒ Error saving original positions: {e}")
+        print(f"❌ Error saving original positions: {e}")
 
 def restore_original_positions():
     """Restore original level positions after chaos mode"""
@@ -10031,10 +9548,10 @@ def restore_original_positions():
                 }
             )
         
-        print(f"âœ… Restored original positions for {len(levels)} levels")
+        print(f"✅ Restored original positions for {len(levels)} levels")
         
     except Exception as e:
-        print(f"âŒ Error restoring original positions: {e}")
+        print(f"❌ Error restoring original positions: {e}")
 
 def is_april_fools_active():
     """Check if April Fools mode is currently active"""
@@ -10050,39 +9567,39 @@ def get_april_fools_status():
         settings = mongo_db.site_settings.find_one({"_id": "april_fools"})
         
         if not settings:
-            return """ðŸŽ­ April Fools Mode Status: NEVER ACTIVATED
+            return """🎭 April Fools Mode Status: NEVER ACTIVATED
 
 The chaos has never been unleashed!
-Use rtl.april_fools() to start the madness! ðŸ˜ˆ"""
+Use rtl.april_fools() to start the madness! 😈"""
         
         is_active = settings.get('enabled', False)
         
         if is_active:
             enabled_at = settings.get('enabled_at', 'Unknown')
-            return f"""ðŸŽ­ April Fools Mode Status: ðŸ”´ ACTIVE ðŸ”´
+            return f"""🎭 April Fools Mode Status: 🔴 ACTIVE 🔴
 
-ðŸŒªï¸ CHAOS IS CURRENTLY UNLEASHED! ðŸŒªï¸
+🌪️ CHAOS IS CURRENTLY UNLEASHED! 🌪️
 
 Activated: {enabled_at}
 Effect: Level positions randomize on every page refresh
 Affected Pages: Main list (/), Legacy list (/legacy)
 
-âš ï¸ Original positions are safely stored
-âš ï¸ Use rtl.april_fools() to restore order
+⚠️ Original positions are safely stored
+⚠️ Use rtl.april_fools() to restore order
 
-The madness continues... ðŸ˜ˆðŸŽ‰"""
+The madness continues... 😈🎉"""
         else:
             enabled_at = settings.get('enabled_at', 'Unknown')
             disabled_at = settings.get('disabled_at', 'Unknown')
-            return f"""ðŸŽ­ April Fools Mode Status: ðŸŸ¢ DISABLED ðŸŸ¢
+            return f"""🎭 April Fools Mode Status: 🟢 DISABLED 🟢
 
-The chaos has been contained! âœ…
+The chaos has been contained! ✅
 
 Last Activated: {enabled_at}
 Last Disabled: {disabled_at}
 
 Everything is back to normal order.
-Use rtl.april_fools() to unleash chaos again! ðŸ˜ˆ"""
+Use rtl.april_fools() to unleash chaos again! 😈"""
     
     except Exception as e:
         return f"Error checking April Fools status: {str(e)}"
@@ -10551,14 +10068,14 @@ def admin_levels():
                 }).sort("position", 1))
         else:
             if main_cache:
-                levels = main_cache
+                levels = main_cache[:100]  # Only show top 100 from cache
             else:
-                # Load main levels from database
+                # Load only top 100 main levels from database
                 levels = list(mongo_db.levels.find({"$or": [{"is_legacy": False}, {"is_legacy": {"$exists": False}}]}, {
                     "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, 
                     "level_id": 1, "difficulty": 1, "is_legacy": 1, "level_type": 1,
                     "demon_type": 1, "min_percentage": 1
-                }).sort("position", 1))
+                }).sort("position", 1).limit(100))
         
         # Debug: Check thumbnail URLs and file existence
         import os
@@ -11103,14 +10620,14 @@ def admin_approve_record(record_id):
         log_admin_action(
             admin_username,
             "Record Approved",
-            f"Approved {user['username']}'s {record['progress']}% record on {level['name']} (Position #{level.get('position', '?')}) - Earned {points_earned} points (Total: {old_points} â†’ {new_points})"
+            f"Approved {user['username']}'s {record['progress']}% record on {level['name']} (Position #{level.get('position', '?')}) - Earned {points_earned} points (Total: {old_points} → {new_points})"
         )
         
         # Create notification for user
         create_notification(
             record['user_id'],
             'record_status',
-            'Record Approved! âœ…',
+            'Record Approved! ✅',
             f'Your {record["progress"]}% record on "{level["name"]}" has been approved! You earned {points_earned} points.',
             record_object_id,
             'record'
@@ -11129,7 +10646,7 @@ def admin_approve_record(record_id):
             print(f"Discord notification error: {e}")
             # Don't let Discord errors break the approval process
         
-        flash(f'âœ… Record approved! {user["username"]} earned {points_earned} points for {record["progress"]}% on {level["name"]} (Total: {old_points} â†’ {new_points} points)', 'success')
+        flash(f'✅ Record approved! {user["username"]} earned {points_earned} points for {record["progress"]}% on {level["name"]} (Total: {old_points} → {new_points} points)', 'success')
         
     except Exception as e:
         flash(f'Error approving record: {str(e)}', 'danger')
@@ -11151,9 +10668,9 @@ def admin_fix_verifier_points():
     try:
         # Run the fix function
         updated_users = fix_verifier_points_bug()
-        flash(f'âœ… Verifier points bug fix completed. Updated {updated_users} users.', 'success')
+        flash(f'✅ Verifier points bug fix completed. Updated {updated_users} users.', 'success')
     except Exception as e:
-        flash(f'âŒ Error fixing verifier points: {str(e)}', 'danger')
+        flash(f'❌ Error fixing verifier points: {str(e)}', 'danger')
         print(f"Admin fix verifier points error: {e}")
         import traceback
         traceback.print_exc()
@@ -11179,11 +10696,11 @@ def admin_update_top_1_role():
     try:
         # Run the update function
         if update_top_1_player_role():
-            flash('âœ… Top 1 player role updated successfully.', 'success')
+            flash('✅ Top 1 player role updated successfully.', 'success')
         else:
-            flash('âŒ Failed to update Top 1 player role.', 'danger')
+            flash('❌ Failed to update Top 1 player role.', 'danger')
     except Exception as e:
-        flash(f'âŒ Error updating Top 1 player role: {str(e)}', 'danger')
+        flash(f'❌ Error updating Top 1 player role: {str(e)}', 'danger')
         print(f"Admin update top 1 role error: {e}")
         import traceback
         traceback.print_exc()
@@ -11216,9 +10733,9 @@ def admin_reject_record(record_id):
         success = reject_record(record_id)
         
         if success:
-            flash(f'âœ… Record rejected for "{record["level_name"]}".', 'success')
+            flash(f'✅ Record rejected for "{record["level_name"]}".', 'success')
         else:
-            flash(f'âŒ Error rejecting record for "{record["level_name"]}".', 'danger')
+            flash(f'❌ Error rejecting record for "{record["level_name"]}".', 'danger')
             
     except Exception as e:
         flash(f'Error rejecting record: {str(e)}', 'danger')
@@ -11264,9 +10781,9 @@ def admin_accept_verification_legacy(submission_id):
         if success:
             # Get placement info from submission for the success message
             placement = submission.get('placement', 1)
-            flash(f'âœ… Verification accepted! "{submission["level_name"]}" has been placed at position #{placement}.', 'success')
+            flash(f'✅ Verification accepted! "{submission["level_name"]}" has been placed at position #{placement}.', 'success')
         else:
-            flash(f'âŒ Error accepting verification for "{submission["level_name"]}".', 'danger')
+            flash(f'❌ Error accepting verification for "{submission["level_name"]}".', 'danger')
             
     except Exception as e:
         flash(f'Error accepting verification: {str(e)}', 'danger')
@@ -11332,7 +10849,7 @@ def admin_reject_record_legacy(record_id):
             create_notification(
                 record['user_id'],
                 'record_status',
-                'Record Rejected âŒ',
+                'Record Rejected ❌',
                 f'Your {record["progress"]}% record on "{level["name"]}" has been rejected.',
                 record_object_id,
                 'record'
@@ -11349,7 +10866,7 @@ def admin_reject_record_legacy(record_id):
             except Exception as e:
                 print(f"Discord notification error: {e}")
             
-            flash(f'âŒ Record rejected: {user["username"]}\'s {record["progress"]}% on {level["name"]}', 'warning')
+            flash(f'❌ Record rejected: {user["username"]}\'s {record["progress"]}% on {level["name"]}', 'warning')
         else:
             flash('Record rejected (user/level info unavailable)', 'warning')
             
@@ -11434,9 +10951,9 @@ def admin_bulk_records():
         )
         
         if success_count > 0:
-            flash(f'âœ… Successfully {action}ed {success_count} records', 'success')
+            flash(f'✅ Successfully {action}ed {success_count} records', 'success')
         if error_count > 0:
-            flash(f'âš ï¸ {error_count} records had errors', 'warning')
+            flash(f'⚠️ {error_count} records had errors', 'warning')
             
     except Exception as e:
         flash(f'Error in bulk operation: {str(e)}', 'danger')
@@ -11757,7 +11274,7 @@ def admin_toggle_future_list():
                 upsert=True
             )
             log_admin_action(admin_username, "Future List Enabled", "Enabled the Future List feature")
-            flash('Future List enabled! ðŸš€', 'success')
+            flash('Future List enabled! 🚀', 'success')
         elif action == 'disable':
             mongo_db.site_settings.update_one(
                 {"_id": "main"},
@@ -11975,14 +11492,14 @@ def admin_test_webhook():
         admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
         
         # Send test message without formatting
-        test_message = "ðŸ”” Webhook Test Message\nThis is a test message to verify that the changelog webhook is working correctly."
+        test_message = "🔔 Webhook Test Message\nThis is a test message to verify that the changelog webhook is working correctly."
         
         result = notify_changelog(test_message, admin_username)
         
         if result:
-            flash('âœ… Test webhook message sent successfully!', 'success')
+            flash('✅ Test webhook message sent successfully!', 'success')
         else:
-            flash('âŒ Failed to send test webhook message. Check logs for details.', 'danger')
+            flash('❌ Failed to send test webhook message. Check logs for details.', 'danger')
             
     except Exception as e:
         flash(f'Error sending test webhook: {e}', 'danger')
@@ -12015,9 +11532,9 @@ def admin_send_custom_message():
         result = notify_changelog(message_content, admin_username)
         
         if result:
-            flash('âœ… Custom message sent successfully!', 'success')
+            flash('✅ Custom message sent successfully!', 'success')
         else:
-            flash('âŒ Failed to send custom message. Check logs for details.', 'danger')
+            flash('❌ Failed to send custom message. Check logs for details.', 'danger')
             
     except Exception as e:
         flash(f'Error sending custom message: {e}', 'danger')
@@ -12093,11 +11610,11 @@ def admin_delete_website():
         flash('Access denied', 'danger')
         return redirect(url_for('index'))
     
-    # This is totally a real delete function ðŸ˜‰
+    # This is totally a real delete function 😉
     return redirect('https://www.youtube.com/watch?v=dQw4w9WgXcQ')
 
     
-    # This is totally a real delete function ðŸ˜‰
+    # This is totally a real delete function 😉
     return redirect('https://www.youtube.com/watch?v=dQw4w9WgXcQ')
 
 @app.route('/admin/future_levels', methods=['GET', 'POST'])
@@ -12365,7 +11882,7 @@ def admin_announcements():
         # Create notification for all users
         create_global_notification(
             'announcement',
-            f'New Announcement! ðŸ“¢',
+            f'New Announcement! 📢',
             f'{title} - {message[:100]}...',
             announcement.get('_id'),
             'announcement',
@@ -12436,7 +11953,7 @@ def admin_polls():
         # Create notification for all users
         create_global_notification(
             'poll',
-            'New Poll! ðŸ“Š',
+            'New Poll! 📊',
             f'{question} - Vote now!',
             poll.get('_id'),
             'poll',
@@ -12694,10 +12211,10 @@ def admin_bulk_actions():
     
     return redirect(url_for('admin_levels'))
 
-# ðŸŽ¯ NEW TOOL #1: Level ID Finder & Analyzer
+# 🎯 NEW TOOL #1: Level ID Finder & Analyzer
 @app.route('/level_analyzer', methods=['GET', 'POST'])
 def level_analyzer():
-    """ðŸŽ¯ GD Level ID Finder & Deep Analysis Tool"""
+    """🎯 GD Level ID Finder & Deep Analysis Tool"""
     if request.method == 'POST':
         level_id = request.form.get('level_id', '').strip()
         
@@ -12760,10 +12277,10 @@ def level_analyzer():
     
     return render_template('level_analyzer.html')
 
-# ðŸ† NEW TOOL #2: Personal Progress Tracker & Goals
+# 🏆 NEW TOOL #2: Personal Progress Tracker & Goals
 @app.route('/progress_tracker', methods=['GET', 'POST'])
 def progress_tracker():
-    """ðŸ† Personal GD Progress Tracker with Goals & Achievements"""
+    """🏆 Personal GD Progress Tracker with Goals & Achievements"""
     if 'user_id' not in session:
         flash('Please log in to use the progress tracker', 'warning')
         return redirect(url_for('login'))
@@ -12790,7 +12307,7 @@ def progress_tracker():
             
             try:
                 mongo_db.user_goals.insert_one(goal)
-                flash('Goal set successfully! ðŸŽ¯', 'success')
+                flash('Goal set successfully! 🎯', 'success')
             except:
                 flash('Error setting goal', 'danger')
     
@@ -12852,13 +12369,13 @@ def progress_tracker():
         # Generate achievements
         achievements = []
         if progress_stats['total_completions'] >= 1:
-            achievements.append({'name': 'First Victory', 'icon': 'ðŸ†', 'description': 'Complete your first level'})
+            achievements.append({'name': 'First Victory', 'icon': '🏆', 'description': 'Complete your first level'})
         if progress_stats['total_completions'] >= 10:
-            achievements.append({'name': 'Getting Started', 'icon': 'ðŸŒŸ', 'description': 'Complete 10 levels'})
+            achievements.append({'name': 'Getting Started', 'icon': '🌟', 'description': 'Complete 10 levels'})
         if progress_stats['total_completions'] >= 50:
-            achievements.append({'name': 'Experienced', 'icon': 'ðŸ’ª', 'description': 'Complete 50 levels'})
+            achievements.append({'name': 'Experienced', 'icon': '💪', 'description': 'Complete 50 levels'})
         if progress_stats['completion_rate'] >= 50:
-            achievements.append({'name': 'Efficient', 'icon': 'ðŸŽ¯', 'description': '50%+ completion rate'})
+            achievements.append({'name': 'Efficient', 'icon': '🎯', 'description': '50%+ completion rate'})
         
     except Exception as e:
         # Fallback data
@@ -14159,7 +13676,7 @@ def recent_tab_roulette():
             
             mongo_db.roulette_sessions.insert_one(new_session)
             current_session = new_session
-            flash(f'ðŸŽ¯ Roulette started! Your first challenge: {first_level["name"]} at {1}%', 'success')
+            flash(f'🎯 Roulette started! Your first challenge: {first_level["name"]} at {1}%', 'success')
         
         elif action == 'submit_percentage' and current_session:
             # User submitted their percentage
@@ -14173,7 +13690,7 @@ def recent_tab_roulette():
                 
                 if percentage < required_percentage:
                     # User didn't reach the target, show error but don't end session
-                    flash(f'âŒ Not enough! You got {percentage}% but need at least {required_percentage}%. Try again!', 'warning')
+                    flash(f'❌ Not enough! You got {percentage}% but need at least {required_percentage}%. Try again!', 'warning')
                     return redirect(url_for('recent_tab_roulette'))
                 else:
                     # User reached or exceeded the target
@@ -14181,11 +13698,11 @@ def recent_tab_roulette():
                     if percentage > required_percentage:
                         # Smart skip: if they got 8% when 2% was needed, skip to level 9
                         next_level_num = percentage + 1
-                        flash(f'ðŸš€ Amazing! You got {percentage}% (needed {required_percentage}%), skipping ahead to level {next_level_num}!', 'success')
+                        flash(f'🚀 Amazing! You got {percentage}% (needed {required_percentage}%), skipping ahead to level {next_level_num}!', 'success')
                     else:
                         # Normal progression
                         next_level_num = current_session['current_level'] + 1
-                        flash(f'ðŸŽ‰ Perfect! You got exactly {percentage}%, moving to level {next_level_num}!', 'success')
+                        flash(f'🎉 Perfect! You got exactly {percentage}%, moving to level {next_level_num}!', 'success')
                     
                     # Check if they reached 100% - complete the challenge
                     if percentage >= 100:
@@ -14205,7 +13722,7 @@ def recent_tab_roulette():
                                 "final_percentage": percentage
                             }}
                         )
-                        flash(f'ðŸŽ† CHALLENGE COMPLETED! You reached {percentage}% and finished the Recent Tab Roulette!', 'success')
+                        flash(f'🎆 CHALLENGE COMPLETED! You reached {percentage}% and finished the Recent Tab Roulette!', 'success')
                         current_session = None
                     else:
                         # Continue with next level
@@ -14372,12 +13889,12 @@ def test_notifications():
     
     # Create test notifications
     test_notifications = [
-        ('news', 'New Article Published! ðŸ“°', 'Check out our latest news article about the recent updates.'),
-        ('announcement', 'Site Maintenance Notice ðŸ“¢', 'The site will be under maintenance tomorrow from 2-4 PM UTC.'),
-        ('poll', 'New Poll Available! ðŸ“Š', 'Vote on which features you\'d like to see next!'),
-        ('record_status', 'Record Approved! âœ…', 'Your 87% record on "Bloodbath" has been approved! You earned 156.2 points.'),
+        ('news', 'New Article Published! 📰', 'Check out our latest news article about the recent updates.'),
+        ('announcement', 'Site Maintenance Notice 📢', 'The site will be under maintenance tomorrow from 2-4 PM UTC.'),
+        ('poll', 'New Poll Available! 📊', 'Vote on which features you\'d like to see next!'),
+        ('record_status', 'Record Approved! ✅', 'Your 87% record on "Bloodbath" has been approved! You earned 156.2 points.'),
 
-        ('top_1', 'New #1 Level! ðŸ†', '"Slaughterhouse" is now the new #1 level on the list!')
+        ('top_1', 'New #1 Level! 🏆', '"Slaughterhouse" is now the new #1 level on the list!')
     ]
     
     for notif_type, title, message in test_notifications:
@@ -14435,7 +13952,7 @@ def migrate_notification_preferences():
             )
             updated_count += 1
         
-        flash(f'âœ… Initialized notification preferences for {updated_count} users!', 'success')
+        flash(f'✅ Initialized notification preferences for {updated_count} users!', 'success')
         return redirect(url_for('admin'))
         
     except Exception as e:
@@ -14443,47 +13960,30 @@ def migrate_notification_preferences():
         return redirect(url_for('admin'))
 
 if __name__ == '__main__':
-    # Start background thread for periodic tasks - DELAYED to prioritize site loading
+    # Start background thread for periodic tasks
     import threading
     import time
     
     def periodic_tasks():
-        """Run periodic maintenance tasks - starts after 2 minute delay"""
-        print("â³ Waiting 5 minutes before starting periodic tasks (prioritizing site load)...")
-        time.sleep(300)  # Wait 5 minutes for site to be fully loaded first
-        
+        """Run periodic maintenance tasks"""
         while True:
             try:
                 # Update top 1 player role every hour
-                print("ðŸ”„ Running periodic tasks...")
-                                
-                # Import retry decorator if available
-                try:
-                    from mongodb_optimized import retry_on_timeout
-                                    
-                    @retry_on_timeout(max_retries=3, delay=5)
-                    def run_periodic():
-                        update_top_1_player_role()
-                        fix_verifier_points_bug()
-                                    
-                    run_periodic()
-                except Exception as inner_e:
-                    # Fallback without retry decorator
-                    update_top_1_player_role()
-                    fix_verifier_points_bug()
-                print("âœ… Periodic tasks completed.")
+                print("Running periodic tasks...")
+                update_top_1_player_role()
+                # Fix verifier points bug every hour
+                fix_verifier_points_bug()
+                print("Periodic tasks completed.")
             except Exception as e:
-                print(f"âŒ Error in periodic tasks: {e}")
-                print("âš ï¸ Will retry in next hour")
+                print(f"Error in periodic tasks: {e}")
             
             # Wait for 1 hour before next run
             time.sleep(3600)
     
-    # Start periodic tasks in background thread (daemon mode = won't block shutdown)
+    # Start periodic tasks in background thread
     periodic_thread = threading.Thread(target=periodic_tasks, daemon=True)
     periodic_thread.start()
-    print("â³ Periodic tasks thread started (will begin after 5 minute delay)")
+    print("✅ Periodic tasks thread started")
     
     port = int(os.environ.get('PORT', 10000))
     app.run(debug=True, host='0.0.0.0', port=port)
-

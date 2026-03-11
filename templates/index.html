@@ -67,13 +67,15 @@
                                         <img src="{{ thumbnail_url }}" 
                                              alt="{{ level_name }}" 
                                              class="level-thumbnail img-fluid rounded"
-                                             loading="lazy">
+                                             loading="lazy"
+                                             decoding="async">
                                     {% else %}
                                         <!-- External URL image with error handling -->
                                         <img src="{{ thumbnail_url }}" 
                                              alt="{{ level_name }}" 
                                              class="level-thumbnail img-fluid rounded"
                                              loading="lazy"
+                                             decoding="async"
                                              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                                         <!-- Fallback for broken external images -->
                                         <div class="level-thumbnail-placeholder bg-light rounded d-flex align-items-center justify-content-center text-muted" 
@@ -100,7 +102,8 @@
                                         <img src="https://img.youtube.com/vi/{{ youtube_id }}/hqdefault.jpg" 
                                              alt="{{ level_name }}" 
                                              class="level-thumbnail img-fluid rounded"
-                                             loading="lazy">
+                                             loading="lazy"
+                                             decoding="async">
                                     {% else %}
                                         <!-- Clean placeholder for no video -->
                                         <div class="level-thumbnail-placeholder bg-light rounded d-flex align-items-center justify-content-center text-muted">
