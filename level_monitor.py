@@ -112,7 +112,7 @@ class LevelMonitor:
             levels = list(self.mongo_db.levels.find({
                 "level_id": {"$exists": True, "$ne": None, "$ne": ""},
                 "is_removed": {"$ne": True}  # Don't check already marked as removed
-            }))
+            }, max_time_ms=60000))  # Add query timeout to prevent hanging
             
             print(f"🔍 Checking {len(levels)} levels for removal from GD servers...")
             
@@ -158,6 +158,8 @@ class LevelMonitor:
                     
         except Exception as e:
             print(f"❌ Error in check_all_levels: {e}")
+            # Don't re-raise - allow monitoring to continue even if there are errors
+            # This prevents MongoDB timeouts from breaking the entire monitoring loop
             
     async def check_level_exists(self, level_id):
         """Check if a level exists on GD servers using multiple methods with triple-check and conservative approach"""

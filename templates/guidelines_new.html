@@ -31,12 +31,12 @@
     }
     
     .section-card {
-        background: #000;
+        background: #fff;
         border-radius: 20px;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        box-shadow: 0 10px 40px rgba(0,0,0,0.08);
         margin-bottom: 40px;
         overflow: hidden;
-        border: 1px solid rgba(255,255,255,0.1);
+        border: 1px solid rgba(0,0,0,0.05);
         transition: all 0.3s ease;
     }
     
@@ -76,53 +76,52 @@
     
     .section-body {
         padding: 40px;
-        color: #fff;
     }
     
     .rule-item {
         padding: 20px;
         margin-bottom: 15px;
         border-radius: 12px;
-        background: #1a1a1a;
+        background: #f8f9fa;
         border-left: 5px solid #667eea;
         transition: all 0.2s ease;
     }
     
     .rule-item:hover {
-        background: #2a2a2a;
+        background: #e9ecef;
         transform: translateX(5px);
     }
     
     .rule-item.success {
         border-left-color: #28a745;
-        background: #1a2e1f;
+        background: #d4edda;
     }
     
     .rule-item.danger {
         border-left-color: #dc3545;
-        background: #2e1a1d;
+        background: #f8d7da;
     }
     
     .rule-item.warning {
         border-left-color: #ffc107;
-        background: #2e2a1a;
+        background: #fff3cd;
     }
     
     .rule-item.info {
         border-left-color: #17a2b8;
-        background: #1a2a2e;
+        background: #d1ecf1;
     }
     
     .rule-title {
         font-weight: 700;
         font-size: 1.1rem;
         margin-bottom: 8px;
-        color: #fff;
+        color: #2c3e50;
     }
     
     .rule-description {
         margin: 0;
-        color: #e0e0e0;
+        color: #495057;
         line-height: 1.6;
     }
     
@@ -143,15 +142,10 @@
     .quick-nav {
         position: sticky;
         top: 80px;
-        background: #000;
+        background: white;
         border-radius: 15px;
         padding: 25px;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.3);
-        border: 1px solid rgba(255,255,255,0.1);
-    }
-    
-    .quick-nav h5 {
-        color: #fff;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.08);
     }
     
     .quick-nav-item {
@@ -161,14 +155,12 @@
         transition: all 0.2s ease;
         cursor: pointer;
         border-left: 3px solid transparent;
-        color: #e0e0e0 !important;
     }
     
     .quick-nav-item:hover {
-        background: #1a1a1a;
+        background: #f8f9fa;
         border-left-color: #667eea;
         transform: translateX(5px);
-        color: #fff !important;
     }
     
     .contact-card {
@@ -271,7 +263,7 @@
                 <div class="section-body">
                     <div class="row">
                         <div class="col-md-6">
-                            <h4 class="mb-3 text-white">❌ Not Allowed</h4>
+                            <h4 class="mb-3">❌ Not Allowed</h4>
                             
                             <div class="rule-item danger">
                                 <div class="rule-title">Nerfed/Buffed Levels</div>
@@ -300,7 +292,7 @@
                         </div>
                         
                         <div class="col-md-6">
-                            <h4 class="mb-3 text-white">⚠️ Special Cases</h4>
+                            <h4 class="mb-3">⚠️ Special Cases</h4>
                             
                             <div class="rule-item warning">
                                 <div class="rule-title">Partial Copying</div>
@@ -339,7 +331,7 @@
                 <div class="section-body">
                     <div class="row">
                         <div class="col-md-6">
-                            <h4 class="mb-3 text-white">Required Elements</h4>
+                            <h4 class="mb-3">Required Elements</h4>
                             
                             <div class="rule-item success">
                                 <div class="rule-title">🛡️ Cheat Indicator</div>
@@ -361,13 +353,13 @@
                                 <div class="rule-description">Video must be clear enough to verify legitimacy</div>
                             </div>
                             
-                            <div class="alert alert-info mt-3" style="background: #1a2a2e; border-color: #17a2b8; color: #fff;">
+                            <div class="alert alert-info mt-3">
                                 <strong>Vanilla Players:</strong> If you play vanilla Geometry Dash, the cheat indicator rule is an exception for you.
                             </div>
                         </div>
                         
                         <div class="col-md-6">
-                            <h4 class="mb-3 text-white">Additional Notes</h4>
+                            <h4 class="mb-3">Additional Notes</h4>
                             
                             <div class="rule-item info">
                                 <div class="rule-title">📸 Handcam</div>
@@ -401,7 +393,7 @@
                 <div class="section-body">
                     <div class="row">
                         <div class="col-md-6">
-                            <h4 class="mb-3 text-white">✅ Expected Behavior</h4>
+                            <h4 class="mb-3 text-success">✅ Expected Behavior</h4>
                             <div class="rule-item success">
                                 <div class="rule-description">
                                     • Treat all members with respect<br>
@@ -417,7 +409,7 @@
                         </div>
                         
                         <div class="col-md-6">
-                            <h4 class="mb-3 text-white">❌ Prohibited Behavior</h4>
+                            <h4 class="mb-3 text-danger">❌ Prohibited Behavior</h4>
                             <div class="rule-item danger">
                                 <div class="rule-description">
                                     • Harassment or bullying<br>
@@ -459,16 +451,16 @@
         <div class="col-lg-3">
             <div class="quick-nav">
                 <h5 class="mb-3">Quick Navigation</h5>
-                <a href="#requirements" class="quick-nav-item d-block text-decoration-none">
+                <a href="#requirements" class="quick-nav-item d-block text-decoration-none text-dark">
                     🎯 Requirements
                 </a>
-                <a href="#restrictions" class="quick-nav-item d-block text-decoration-none">
+                <a href="#restrictions" class="quick-nav-item d-block text-decoration-none text-dark">
                     🚫 Restrictions
                 </a>
-                <a href="#verification" class="quick-nav-item d-block text-decoration-none">
+                <a href="#verification" class="quick-nav-item d-block text-decoration-none text-dark">
                     ✅ Verification
                 </a>
-                <a href="#community" class="quick-nav-item d-block text-decoration-none">
+                <a href="#community" class="quick-nav-item d-block text-decoration-none text-dark">
                     🤝 Community
                 </a>
                 

@@ -1,0 +1,31 @@
+﻿# API endpoint for background level loading
+@app.route('/api/levels/main')
+def api_get_main_levels():
+    """API endpoint to get main list levels - for background loading"""
+  try:
+        # Get fresh data from MongoDB
+        main_list = list(mongo_db.levels.find(
+            {"is_legacy": False},
+            {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, "level_id": 1, "difficulty": 1, "thumbnail_url": 1, "video_url": 1, "min_percentage": 1}
+        ).sort("position", 1))
+        
+        # Check for April Fools mode
+        april_fools_active = is_april_fools_active()
+     if april_fools_active:
+            main_list = randomize_level_positions(main_list.copy())
+        
+     return {
+            'success': True,
+            'levels': main_list,
+            'total_levels': len(main_list),
+            'april_fools_active': april_fools_active
+        }
+    except Exception as e:
+        print(f"Error in API endpoint for main levels: {e}")
+     return {
+            'success': False,
+            'error': str(e),
+            'levels': [],
+            'total_levels': 0
+        }, 500
+

@@ -67,13 +67,15 @@
                                         <img src="{{ thumbnail_url }}" 
                                              alt="{{ level_name }}" 
                                              class="level-thumbnail img-fluid rounded"
-                                             loading="lazy">
+                                             loading="lazy"
+                                             decoding="async">
                                     {% else %}
                                         <!-- External URL image with error handling -->
                                         <img src="{{ thumbnail_url }}" 
                                              alt="{{ level_name }}" 
                                              class="level-thumbnail img-fluid rounded"
                                              loading="lazy"
+                                             decoding="async"
                                              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                                         <!-- Fallback for broken external images -->
                                         <div class="level-thumbnail-placeholder bg-light rounded d-flex align-items-center justify-content-center text-muted" 
@@ -100,7 +102,8 @@
                                         <img src="https://img.youtube.com/vi/{{ youtube_id }}/hqdefault.jpg" 
                                              alt="{{ level_name }}" 
                                              class="level-thumbnail img-fluid rounded"
-                                             loading="lazy">
+                                             loading="lazy"
+                                             decoding="async">
                                     {% else %}
                                         <!-- Clean placeholder for no video -->
                                         <div class="level-thumbnail-placeholder bg-light rounded d-flex align-items-center justify-content-center text-muted">
@@ -674,6 +677,142 @@
             modal.style.display = 'none';
         }
     });
+
+    // Progressive Level Loading - Auto-refresh without page reload
+    {% if auto_refresh %}
+    console.log('🔄 Starting progressive level loading...');
+    
+    let lastCount = 0;
+    const refreshInterval = setInterval(function() {
+        fetch('/api/loading-status')
+            .then(response => response.json())
+            .then(data => {
+                console.log(`📊 Loading status: ${data.count} levels (${data.complete ? 'complete' : 'loading...'})`);
+                
+                // If we have new levels, update the page
+                if (data.count > lastCount && data.levels && data.levels.length > 0) {
+                    lastCount = data.count;
+                    
+                    // Update the levels container
+                    const levelsContainer = document.querySelector('.card-body.p-0');
+                    if (levelsContainer) {
+                        // Create new HTML for levels
+                        let levelsHTML = '';
+                        data.levels.forEach((level, index) => {
+                            const position = level.position || (index + 1);
+                            const points = level.points || 0;
+                            const difficulty = level.difficulty || 5;
+                            const stars = '⭐'.repeat(Math.round(difficulty));
+                            
+                            levelsHTML += `
+<div class="d-flex align-items-center p-3 border-bottom level-card mb-4" data-level-id="${level._id || level.level_id}" style="cursor: pointer; transition: all 0.2s ease;">
+    <div class="me-4">
+        <div class="position-relative">
+                            `;
+                            
+                            if (level.thumbnail_url && !level.thumbnail_url.includes('data:image')) {
+                                levelsHTML += `
+<img src="${level.thumbnail_url}" alt="${level.name || 'Level'}" class="img-fluid" style="width: 160px; height: 90px; object-fit: cover; border-radius: 8px;">
+                                `;
+                            } else {
+                                levelsHTML += `
+<div style="width: 160px; height: 90px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 2em;">
+                                    🎮
+                                </div>
+                                `;
+                            }
+                            
+                            levelsHTML += `
+<div class="position-absolute top-0 start-0 badge bg-danger rounded-pill px-2 py-1 m-2" style="font-size: 0.75rem;">
+    #${position}
+</div>
+                        </div>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h5 class="mb-1">${level.name || 'Unknown'}</h5>
+                        <p class="mb-1 text-muted">by ${level.creator || 'Unknown'}</p>
+                        <small class="text-muted d-block">verified by ${level.verifier || 'Unknown'}</small>
+                        ${level.level_id ? `<small class="text-muted me-2">ID: ${level.level_id}</small>` : ''}
+                        <button class="btn btn-outline-secondary btn-sm copy-id-btn" data-id="${level.level_id || level._id}" title="Copy Level ID">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                    <div class="text-end">
+                        <div class="mb-1"><strong>${points} Points</strong></div>
+                        <div class="mb-1">${stars}</div>
+                        ${level.min_percentage ? `<small class="text-muted">Completion: ${level.min_percentage}%</small>` : ''}
+                    </div>
+                </div>
+                            `;
+                        });
+                        
+                        levelsContainer.innerHTML = levelsHTML;
+                        
+                        // Re-attach event listeners to new elements
+                        document.querySelectorAll('.level-card').forEach(card => {
+                            card.addEventListener('click', function(e) {
+                                if (e.target.closest('.copy-id-btn')) return;
+                                const levelId = this.getAttribute('data-level-id');
+                                window.location = '/level/' + levelId;
+                            });
+                        });
+                        
+                        document.querySelectorAll('.copy-id-btn').forEach(btn => {
+                            btn.addEventListener('click', function(e) {
+                                e.stopPropagation();
+                                const levelId = this.getAttribute('data-id');
+                                navigator.clipboard.writeText(levelId).then(() => {
+                                    const icon = btn.querySelector('i');
+                                    icon.className = 'fas fa-check';
+                                    btn.classList.add('btn-success');
+                                    btn.classList.remove('btn-outline-secondary');
+                                    setTimeout(() => {
+                                        icon.className = 'fas fa-copy';
+                                        btn.classList.remove('btn-success');
+                                        btn.classList.add('btn-outline-secondary');
+                                    }, 1500);
+                                });
+                            });
+                        });
+                        
+                        console.log(`✅ Updated page with ${data.count} levels`);
+                    }
+                }
+                
+                // If loading is complete, stop polling
+                if (data.complete) {
+                    console.log('✅ Progressive loading complete!');
+                    clearInterval(refreshInterval);
+                    
+                    // Show completion message
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'alert alert-success alert-dismissible fade show';
+                    alertDiv.style.cssText = 'margin: 1rem;';
+                    alertDiv.innerHTML = `
+                        <strong>✅ All levels loaded!</strong>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+                    
+                    const cardHeader = document.querySelector('.card-header');
+                    if (cardHeader && !document.querySelector('.alert-success')) {
+                        cardHeader.parentNode.insertBefore(alertDiv, cardHeader.nextSibling);
+                    }
+                    
+                    // If we have levels but they're not showing, do a full page reload
+                    if (data.count > 0 && document.querySelectorAll('.level-card').length === 0) {
+                        console.log('🔄 Reloading page to show levels...');
+                        setTimeout(() => window.location.reload(), 2000);
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('❌ Error fetching loading status:', error);
+            });
+    }, 2000);  // Check every 2 seconds
+    {% endif %}
 </script>
+
+<!-- Background Level Loader Script -->
+<script src="{{ url_for('static', filename='js/background_loader.js') }}"></script>
 
 {% endblock %}

@@ -108,6 +108,19 @@ load_dotenv()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here-change-in-production')
 
+# ULTRA-FAST Performance optimizations
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000  # 1 year cache for static files
+app.config['TEMPLATES_AUTO_RELOAD'] = False  # Disable auto-reload in production
+app.config['JSON_SORT_KEYS'] = False  # Faster JSON responses
+
+# Enable compression for responses
+try:
+    from flask_compress import Compress
+    Compress(app)
+    print("✅ Flask compression enabled")
+except ImportError:
+    print("⚠️ flask-compress not installed - install with: pip install flask-compress")
+
 # Session configuration to prevent logout issues
 app.config['SESSION_PERMANENT'] = True
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)  # Sessions last 30 days
@@ -263,12 +276,66 @@ else:
         print("   Please get your Client Secret from Discord Developer Portal")
     print("⚠️  Discord account linking will be disabled")
 
-# Simple cache for levels
+# Simple cache for levels - OPTIMIZED FOR SPEED
 levels_cache = {
     'main_list': None,
     'legacy_list': None,
-    'last_updated': None
+    'last_updated': None,
+    'ttl': 300  # 5 minutes cache TTL
 }
+
+def get_fast_cached_levels(is_legacy=False):
+    """Ultra-fast cached level retrieval with TTL"""
+    global levels_cache
+    
+    cache_key = 'legacy_list' if is_legacy else 'main_list'
+    now = datetime.now(timezone.utc)
+    
+    # Check if cache is valid
+    if (levels_cache[cache_key] is not None and 
+        levels_cache['last_updated'] is not None):
+        
+        age = (now - levels_cache['last_updated']).total_seconds()
+        if age < levels_cache['ttl']:
+            # Cache hit - return immediately
+            return levels_cache[cache_key]
+    
+    # Cache miss - load from database
+    try:
+        if is_legacy:
+            levels = list(mongo_db.levels.find(
+                {"is_legacy": True},
+                {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, 
+                 "points": 1, "level_id": 1, "difficulty": 1, "video_url": 1, 
+                 "thumbnail_url": 1, "min_percentage": 1, "demon_type": 1}
+            ).sort("position", 1))
+        else:
+            levels = list(mongo_db.levels.find(
+                {"$or": [{"is_legacy": False}, {"is_legacy": {"$exists": False}}]},
+                {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, 
+                 "points": 1, "level_id": 1, "difficulty": 1, "video_url": 1, 
+                 "thumbnail_url": 1, "min_percentage": 1, "demon_type": 1}
+            ).sort("position", 1).limit(100))
+        
+        # Update cache
+        levels_cache[cache_key] = levels
+        levels_cache['last_updated'] = now
+        
+        return levels
+    except Exception as e:
+        print(f"Error loading levels: {e}")
+        return levels_cache.get(cache_key) or []
+
+# Load cache from file on startup
+try:
+    import json
+    with open('cache_main_levels.json', 'r') as f:
+        cache_data = json.load(f)
+        levels_cache['main_list'] = cache_data.get('levels', [])
+        levels_cache['last_updated'] = datetime.now(timezone.utc)
+        print(f"Loaded {len(levels_cache['main_list'])} levels from cache file")
+except Exception as e:
+    print(f"Could not load cache file: {e}")
 
 @app.before_request
 def check_ip_ban_and_verifier_status():
@@ -1632,6 +1699,30 @@ except Exception as e:
     import traceback
     traceback.print_exc()
     print("⚠️ Continuing without Discord bot features")
+
+# ULTRA-FAST: Preload cache on startup
+print("\n⚡ PRELOADING CACHE FOR ULTRA-FAST PERFORMANCE...")
+try:
+    import threading
+    def preload_cache():
+        import time
+        start = time.time()
+        print("Loading main list into cache...")
+        main_levels = get_fast_cached_levels(is_legacy=False)
+        print(f"Loaded {len(main_levels)} main levels in {time.time() - start:.3f}s")
+        
+        start = time.time()
+        print("Loading legacy list into cache...")
+        legacy_levels = get_fast_cached_levels(is_legacy=True)
+        print(f"Loaded {len(legacy_levels)} legacy levels in {time.time() - start:.3f}s")
+        
+        print("✅ CACHE PRELOADED - Site will load ULTRA-FAST!")
+    
+    # Preload in background thread so app starts immediately
+    preload_thread = threading.Thread(target=preload_cache, daemon=True)
+    preload_thread.start()
+except Exception as e:
+    print(f"⚠️ Cache preload failed: {e}")
 
 @app.route('/thumb/<path:url>')
 def thumbnail_proxy(url):
@@ -5631,61 +5722,49 @@ def test_discord():
 
 @app.route('/')
 def index():
-    """AUTO-LOAD - Instantly loads everything automatically - ALL LEVELS ON ONE PAGE"""
+    """Main list - DIRECT DATABASE LOAD - NO CACHE"""
     try:
-        main_list = get_cached_levels(is_legacy=False)
+        # DIRECT DATABASE QUERY - LOAD 100 LEVELS NOW
+        levels = list(mongo_db.levels.find(
+            {"is_legacy": False},
+            {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, 
+             "points": 1, "level_id": 1, "difficulty": 1, "video_url": 1, 
+             "thumbnail_url": 1, "min_percentage": 1, "demon_type": 1}
+        ).sort("position", 1).limit(100))
         
-        # If no cache, auto-load it now
-        if not main_list:
-            try:
-                print("Auto-loading main levels...")
-                main_list = list(mongo_db.levels.find(
-                    {"is_legacy": False},
-                    {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, "level_id": 1, "difficulty": 1, "thumbnail_url": 1, "video_url": 1, "min_percentage": 1}
-                ).sort("position", 1).limit(200))  # Add limit for performance
-                
-                # Cache it
-                levels_cache['main_list'] = main_list
-                levels_cache['last_updated'] = datetime.now(timezone.utc)
-                print(f"Auto-loaded {len(main_list)} levels")
-                
-            except Exception as e:
-                print(f"Auto-load failed: {e}")
-                # Try emergency fallback with basic query
-                try:
-                    main_list = list(mongo_db.levels.find({"is_legacy": False}).sort("position", 1).limit(50))
-                    print(f"Emergency fallback loaded {len(main_list)} levels")
-                except Exception as e2:
-                    print(f"Emergency fallback also failed: {e2}")
-                    # Final fallback to sample data
-                    main_list = [
-                        {"_id": 1, "name": "Database Error - Check /debug_db", "creator": "System", "verifier": "System", "position": 1, "points": 0, "level_id": "error", "difficulty": 5}
-                    ]
-        
-        # 🎭 APRIL FOOLS MODE: Randomize positions if active
-        if is_april_fools_active():
-            main_list = randomize_level_positions(main_list.copy())
-        
-        # Show all levels on one page (no pagination)
-        total_levels = len(main_list)
+        print(f"LOADED {len(levels)} LEVELS FROM DATABASE")
+        if levels:
+            print(f"First level: {levels[0]['name']}")
+            print(f"Last level: {levels[-1]['name']}")
         
         return render_template('index.html', 
-                             levels=main_list,
-                             total_levels=total_levels,
-                             april_fools_active=is_april_fools_active())
-    except Exception as e:
-        print(f"Critical error in index route: {e}")
-        # Emergency response
-        return render_template('index.html', 
-                             levels=[{"_id": 1, "name": "Critical Error - Contact Admin", "creator": "System", "verifier": "System", "position": 1, "points": 0, "level_id": "error", "difficulty": 5}],
-                             total_levels=1,
+                             levels=levels, 
+                             total_levels=len(levels), 
                              april_fools_active=False)
-
-# Routes
+    except Exception as e:
+        print(f"ERROR LOADING LEVELS: {e}")
+        import traceback
+        traceback.print_exc()
+        return render_template('index.html', 
+                             levels=[], 
+                             total_levels=0, 
+                             april_fools_active=False)
 
 @app.route('/legacy')
 def legacy():
-    """AUTO-LOAD - Instantly loads legacy levels automatically"""
+    """Legacy list - ULTRA-FAST with caching"""
+    try:
+        # Use fast cached levels
+        levels = get_fast_cached_levels(is_legacy=True)
+        
+        return render_template('legacy.html', 
+                             levels=levels, 
+                             total_levels=len(levels))
+    except Exception as e:
+        print(f"Error loading legacy list: {e}")
+        return render_template('legacy.html', 
+                             levels=[], 
+                             total_levels=0)
     legacy_list = get_cached_levels(is_legacy=True)
     
     # If no cache, auto-load it now
@@ -8043,10 +8122,11 @@ def admin_accept_verification(submission_id):
         admin_user = mongo_db.users.find_one({"_id": session['user_id']})
         admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
         
-        # Call the function to accept the verification submission
-        result = accept_verification_submission(submission_id, admin_username)
+        # Call the function to accept the verification submission with placement
+        result = accept_verification_submission(submission_id, admin_username, placement)
         
         if result:
+            flash(f'Verification accepted! Level placed at position {placement}', 'success')
             return redirect(url_for('admin_verifications'))
         else:
             flash('Error accepting verification submission', 'danger')
@@ -8082,7 +8162,7 @@ def text_difficulty_to_numeric(text_difficulty):
     # Convert to lowercase for case-insensitive matching
     return difficulty_mapping.get(text_difficulty.lower(), 10.0)  # Default to 10.0 (Demon)
 
-def accept_verification_submission(submission_id, admin_username):
+def accept_verification_submission(submission_id, admin_username, custom_placement=None):
     """Accept a verification submission and add it to the main list"""
     submission = mongo_db.verification_submissions.find_one({"_id": ObjectId(submission_id)})
     if not submission:
@@ -8107,8 +8187,13 @@ def accept_verification_submission(submission_id, admin_username):
             print("Submitter not found")
             return False
         
-        # Calculate placement position
-        placement = int(submission.get('placement', 1))
+        # Use custom placement from admin if provided, otherwise use submission placement
+        if custom_placement is not None:
+            placement = int(custom_placement)
+            print(f"Using admin custom placement: {placement}")
+        else:
+            placement = int(submission.get('placement', 1))
+            print(f"Using submission placement: {placement}")
         
         # Validate placement
         if placement < 1:
@@ -9983,14 +10068,14 @@ def admin_levels():
                 }).sort("position", 1))
         else:
             if main_cache:
-                levels = main_cache
+                levels = main_cache[:100]  # Only show top 100 from cache
             else:
-                # Load main levels from database
+                # Load only top 100 main levels from database
                 levels = list(mongo_db.levels.find({"$or": [{"is_legacy": False}, {"is_legacy": {"$exists": False}}]}, {
                     "name": 1, "creator": 1, "verifier": 1, "position": 1, "points": 1, 
                     "level_id": 1, "difficulty": 1, "is_legacy": 1, "level_type": 1,
                     "demon_type": 1, "min_percentage": 1
-                }).sort("position", 1))
+                }).sort("position", 1).limit(100))
         
         # Debug: Check thumbnail URLs and file existence
         import os
