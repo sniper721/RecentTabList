@@ -12,40 +12,40 @@ def get_mongodb_connection():
     mongodb_uri = os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/')
     mongodb_db = os.environ.get('MONGODB_DB', 'rtl_database')
     
-    # Enhanced URI with connection options for better reliability
+    # Enhanced URI with extended timeout options for better reliability
     if 'mongodb.net' in mongodb_uri and '?' not in mongodb_uri:
-        mongodb_uri = f"{mongodb_uri}?retryWrites=true&w=majority&connectTimeoutMS=10000&socketTimeoutMS=10000&serverSelectionTimeoutMS=10000"
+        mongodb_uri = f"{mongodb_uri}?retryWrites=true&w=majority&connectTimeoutMS=30000&socketTimeoutMS=30000&serverSelectionTimeoutMS=30000&maxIdleTimeMS=60000"
     
     connection_configs = [
-        # Config 1: Standard connection with relaxed SSL
+        # Config 1: Standard connection with relaxed SSL and extended timeouts
         {
             'name': 'Relaxed SSL Connection',
             'params': {
                 'tls': True,
                 'tlsAllowInvalidCertificates': True,
                 'tlsAllowInvalidHostnames': True,
-                'serverSelectionTimeoutMS': 10000,
-                'socketTimeoutMS': 10000,
-                'connectTimeoutMS': 10000,
+                'serverSelectionTimeoutMS': 30000,
+                'socketTimeoutMS': 30000,
+                'connectTimeoutMS': 30000,
                 'maxPoolSize': 5,
                 'minPoolSize': 1,
-                'maxIdleTimeMS': 20000,
-                'waitQueueTimeoutMS': 5000,
+                'maxIdleTimeMS': 60000,
+                'waitQueueTimeoutMS': 10000,
                 'retryWrites': True,
                 'retryReads': True,
                 'directConnection': False,
                 'connect': False
             }
         },
-        # Config 2: Direct connection to primary (if known)
+        # Config 2: Direct connection to primary (if known) with extended timeouts
         {
             'name': 'Direct Primary Connection',
             'params': {
                 'tls': True,
                 'tlsAllowInvalidCertificates': True,
-                'serverSelectionTimeoutMS': 5000,
-                'socketTimeoutMS': 5000,
-                'connectTimeoutMS': 5000,
+                'serverSelectionTimeoutMS': 15000,
+                'socketTimeoutMS': 15000,
+                'connectTimeoutMS': 15000,
                 'maxPoolSize': 3,
                 'directConnection': True,
                 'connect': True
