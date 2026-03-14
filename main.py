@@ -152,23 +152,23 @@ while retry_count < max_retries:
         mongo_client = MongoClient(
             mongodb_uri,
             tls=True,
-            tlsAllowInvalidCertificates=True,   # Allow invalid certificates for better connectivity
-            tlsAllowInvalidHostnames=True,      # Allow invalid hostnames
-            serverSelectionTimeoutMS=10000,     # Reduced to 10 seconds
-            socketTimeoutMS=10000,              # Reduced to 10 seconds
-            connectTimeoutMS=10000,             # Reduced to 10 seconds
-            maxPoolSize=5,                      # Reduced pool size
+            tlsAllowInvalidCertificates=True,
+            tlsAllowInvalidHostnames=True,
+            serverSelectionTimeoutMS=30000,
+            socketTimeoutMS=30000,
+            connectTimeoutMS=30000,
+            maxPoolSize=10,
             minPoolSize=1,
-            maxIdleTimeMS=20000,                # Reduced idle time
-            waitQueueTimeoutMS=5000,            # Reduced wait queue timeout
+            maxIdleTimeMS=60000,
+            waitQueueTimeoutMS=10000,
             retryWrites=True,
             retryReads=True,
-            directConnection=False,             # Use replica set discovery
-            connect=False                       # Don't connect immediately
+            directConnection=False,
+            connect=False
         )
         mongo_db = mongo_client[mongodb_db]
         # Test connection with timeout
-        mongo_client.admin.command('ping', maxTimeMS=10000)  # Match the shorter timeouts
+        mongo_client.admin.command('ping', maxTimeMS=30000)
         print("✓ MongoDB initialized successfully")
         
         # Set MongoDB reference for changelog notifier
@@ -280,62 +280,129 @@ else:
 levels_cache = {
     'main_list': None,
     'legacy_list': None,
+    'main_list_updated': None,
+    'legacy_list_updated': None,
     'last_updated': None,
     'ttl': 300  # 5 minutes cache TTL
 }
 
+import json
+
+def _save_main_cache_to_file(levels):
+    """Persist main list cache to disk so it survives restarts."""
+    try:
+        serializable = []
+        for lv in levels:
+            lv_copy = dict(lv)
+            lv_copy['_id'] = str(lv_copy['_id'])
+            serializable.append(lv_copy)
+        with open('cache_main_levels.json', 'w') as f:
+            json.dump({
+                'levels': serializable,
+                'last_updated': datetime.now(timezone.utc).isoformat()
+            }, f)
+        print(f"✓ Saved {len(serializable)} levels to cache file")
+    except Exception as e:
+        print(f"Warning: could not save cache file: {e}")
+
+def _load_levels_from_db(is_legacy=False):
+    """Query MongoDB for levels. Returns list or raises.
+    thumbnail_url is excluded — it stores large base64 data that causes socket timeouts."""
+    projection = {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1,
+                  "points": 1, "level_id": 1, "difficulty": 1, "video_url": 1,
+                  "min_percentage": 1, "demon_type": 1}
+    if is_legacy:
+        return list(mongo_db.levels.find(
+            {"is_legacy": True}, projection
+        ).sort("position", 1))
+    else:
+        return list(mongo_db.levels.find(
+            {"is_legacy": {"$ne": True}}, projection
+        ).sort("position", 1).limit(100))
+
 def get_fast_cached_levels(is_legacy=False):
-    """Ultra-fast cached level retrieval with TTL"""
+    """Cached level retrieval with TTL. Serves stale cache on DB error."""
     global levels_cache
-    
+
     cache_key = 'legacy_list' if is_legacy else 'main_list'
+    updated_key = 'legacy_list_updated' if is_legacy else 'main_list_updated'
     now = datetime.now(timezone.utc)
-    
-    # Check if cache is valid
-    if (levels_cache[cache_key] is not None and 
-        levels_cache['last_updated'] is not None):
-        
-        age = (now - levels_cache['last_updated']).total_seconds()
+
+    # Cache hit
+    if (levels_cache[cache_key] is not None and
+            levels_cache[updated_key] is not None):
+        age = (now - levels_cache[updated_key]).total_seconds()
         if age < levels_cache['ttl']:
-            # Cache hit - return immediately
             return levels_cache[cache_key]
-    
+
     # Cache miss - load from database
     try:
-        if is_legacy:
-            levels = list(mongo_db.levels.find(
-                {"is_legacy": True},
-                {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, 
-                 "points": 1, "level_id": 1, "difficulty": 1, "video_url": 1, 
-                 "thumbnail_url": 1, "min_percentage": 1, "demon_type": 1}
-            ).sort("position", 1))
-        else:
-            levels = list(mongo_db.levels.find(
-                {"$or": [{"is_legacy": False}, {"is_legacy": {"$exists": False}}]},
-                {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, 
-                 "points": 1, "level_id": 1, "difficulty": 1, "video_url": 1, 
-                 "thumbnail_url": 1, "min_percentage": 1, "demon_type": 1}
-            ).sort("position", 1).limit(100))
-        
-        # Update cache
+        levels = _load_levels_from_db(is_legacy)
+        # Preserve thumbnail_url local file paths from existing cache
+        if not is_legacy and levels_cache.get('main_list'):
+            existing_thumbs = {str(l.get('_id', '')): l.get('thumbnail_url')
+                               for l in levels_cache['main_list'] if l.get('thumbnail_url')}
+            for lv in levels:
+                key = str(lv.get('_id', ''))
+                if key in existing_thumbs:
+                    lv['thumbnail_url'] = existing_thumbs[key]
         levels_cache[cache_key] = levels
+        levels_cache[updated_key] = now
         levels_cache['last_updated'] = now
-        
+        if not is_legacy:
+            _save_main_cache_to_file(levels)
+        print(f"✓ Refreshed {'legacy' if is_legacy else 'main'} list from DB ({len(levels)} levels)")
         return levels
     except Exception as e:
-        print(f"Error loading levels: {e}")
+        print(f"DB load failed, serving stale cache: {e}")
         return levels_cache.get(cache_key) or []
 
-# Load cache from file on startup
+def _background_refresh():
+    """Refresh main list from DB in a background thread on startup, retrying until success."""
+    import threading
+    def _refresh():
+        delays = [5, 15, 30, 60, 120]  # seconds between retries
+        for attempt, delay in enumerate(delays, 1):
+            try:
+                print(f"Background: refreshing main list from DB (attempt {attempt})...")
+                levels = _load_levels_from_db(is_legacy=False)
+                now = datetime.now(timezone.utc)
+                # Preserve thumbnail_url local file paths
+                existing_thumbs = {str(l.get('_id', '')): l.get('thumbnail_url')
+                                   for l in (levels_cache.get('main_list') or []) if l.get('thumbnail_url')}
+                for lv in levels:
+                    key = str(lv.get('_id', ''))
+                    if key in existing_thumbs:
+                        lv['thumbnail_url'] = existing_thumbs[key]
+                levels_cache['main_list'] = levels
+                levels_cache['main_list_updated'] = now
+                levels_cache['last_updated'] = now
+                _save_main_cache_to_file(levels)
+                print(f"✓ Background refresh complete: {len(levels)} real levels loaded from DB")
+                return
+            except Exception as e:
+                print(f"Background refresh attempt {attempt} failed: {e}")
+                if attempt < len(delays):
+                    print(f"  Retrying in {delay}s...")
+                    time.sleep(delay)
+        print("❌ All background refresh attempts failed - serving stale cache")
+    t = threading.Thread(target=_refresh, daemon=True)
+    t.start()
+
+# Load cache from file on startup — includes thumbnail_url local paths
 try:
-    import json
     with open('cache_main_levels.json', 'r') as f:
         cache_data = json.load(f)
         levels_cache['main_list'] = cache_data.get('levels', [])
-        levels_cache['last_updated'] = datetime.now(timezone.utc)
+        _now = datetime.now(timezone.utc)
+        levels_cache['main_list_updated'] = _now
+        levels_cache['last_updated'] = _now
         print(f"Loaded {len(levels_cache['main_list'])} levels from cache file")
 except Exception as e:
     print(f"Could not load cache file: {e}")
+
+# Immediately kick off a background DB refresh so the cache is fresh ASAP
+_background_refresh()
 
 @app.before_request
 def check_ip_ban_and_verifier_status():
@@ -5722,32 +5789,20 @@ def test_discord():
 
 @app.route('/')
 def index():
-    """Main list - DIRECT DATABASE LOAD - NO CACHE"""
+    """Main list - cached level retrieval"""
     try:
-        # DIRECT DATABASE QUERY - LOAD 100 LEVELS NOW
-        levels = list(mongo_db.levels.find(
-            {"is_legacy": False},
-            {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1, 
-             "points": 1, "level_id": 1, "difficulty": 1, "video_url": 1, 
-             "thumbnail_url": 1, "min_percentage": 1, "demon_type": 1}
-        ).sort("position", 1).limit(100))
-        
-        print(f"LOADED {len(levels)} LEVELS FROM DATABASE")
-        if levels:
-            print(f"First level: {levels[0]['name']}")
-            print(f"Last level: {levels[-1]['name']}")
-        
-        return render_template('index.html', 
-                             levels=levels, 
-                             total_levels=len(levels), 
+        levels = get_fast_cached_levels(is_legacy=False)
+        return render_template('index.html',
+                             levels=levels,
+                             total_levels=len(levels),
                              april_fools_active=False)
     except Exception as e:
         print(f"ERROR LOADING LEVELS: {e}")
         import traceback
         traceback.print_exc()
-        return render_template('index.html', 
-                             levels=[], 
-                             total_levels=0, 
+        return render_template('index.html',
+                             levels=[],
+                             total_levels=0,
                              april_fools_active=False)
 
 @app.route('/legacy')
@@ -13526,6 +13581,21 @@ def api_live_stats():
     return jsonify(stats)
 
 
+@app.route('/api/level_thumbnail/<level_id_str>')
+def api_level_thumbnail(level_id_str):
+    """Return just the thumbnail_url for a single level (fetched lazily by the frontend)."""
+    from flask import jsonify
+    try:
+        try:
+            oid = ObjectId(level_id_str)
+        except Exception:
+            return jsonify({'thumbnail_url': None}), 404
+        level = mongo_db.levels.find_one({"_id": oid}, {"thumbnail_url": 1})
+        if level and level.get('thumbnail_url'):
+            return jsonify({'thumbnail_url': level['thumbnail_url']})
+        return jsonify({'thumbnail_url': None})
+    except Exception as e:
+        return jsonify({'thumbnail_url': None, 'error': str(e)}), 500
 
 
 

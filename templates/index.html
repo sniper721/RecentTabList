@@ -59,35 +59,14 @@
                                 {% set level_name = level.get('name', 'Unknown') %}
                                 {% set video_url = level.get('video_url', '') %}
                                 {% set thumbnail_url = level.get('thumbnail_url', '') %}
-                                
-                                <!-- OPTIMIZED IMAGE SYSTEM FOR BASE64 -->
-                                {% if thumbnail_url and thumbnail_url.strip() %}
-                                    {% if thumbnail_url.startswith('data:image') %}
-                                        <!-- Base64 image (no error handling needed) -->
-                                        <img src="{{ thumbnail_url }}" 
-                                             alt="{{ level_name }}" 
-                                             class="level-thumbnail img-fluid rounded"
-                                             loading="lazy"
-                                             decoding="async">
-                                    {% else %}
-                                        <!-- External URL image with error handling -->
-                                        <img src="{{ thumbnail_url }}" 
-                                             alt="{{ level_name }}" 
-                                             class="level-thumbnail img-fluid rounded"
-                                             loading="lazy"
-                                             decoding="async"
-                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                        <!-- Fallback for broken external images -->
-                                        <div class="level-thumbnail-placeholder bg-light rounded d-flex align-items-center justify-content-center text-muted" 
-                                             style="display: none;">
-                                            <div class="text-center">
-                                                <i class="fas fa-image fa-2x mb-2"></i>
-                                                <div>Image Error</div>
-                                            </div>
-                                        </div>
-                                    {% endif %}
+
+                                {% if thumbnail_url %}
+                                    <img src="{{ thumbnail_url }}"
+                                         alt="{{ level_name }}"
+                                         class="level-thumbnail img-fluid rounded"
+                                         loading="lazy"
+                                         decoding="async">
                                 {% else %}
-                                    <!-- YouTube auto thumbnail -->
                                     {% set youtube_id = '' %}
                                     {% if video_url and video_url.strip() %}
                                         {% if 'youtu.be/' in video_url %}
@@ -96,16 +75,13 @@
                                             {% set youtube_id = video_url.split('v=')[1].split('&')[0] %}
                                         {% endif %}
                                     {% endif %}
-                                    
                                     {% if youtube_id %}
-                                        <!-- Simple YouTube thumbnail - no complex fallbacks -->
-                                        <img src="https://img.youtube.com/vi/{{ youtube_id }}/hqdefault.jpg" 
-                                             alt="{{ level_name }}" 
+                                        <img src="https://img.youtube.com/vi/{{ youtube_id }}/hqdefault.jpg"
+                                             alt="{{ level_name }}"
                                              class="level-thumbnail img-fluid rounded"
                                              loading="lazy"
                                              decoding="async">
                                     {% else %}
-                                        <!-- Clean placeholder for no video -->
                                         <div class="level-thumbnail-placeholder bg-light rounded d-flex align-items-center justify-content-center text-muted">
                                             <div class="text-center">
                                                 <i class="fas fa-image fa-2x mb-2"></i>
@@ -814,5 +790,6 @@
 
 <!-- Background Level Loader Script -->
 <script src="{{ url_for('static', filename='js/background_loader.js') }}"></script>
+
 
 {% endblock %}
