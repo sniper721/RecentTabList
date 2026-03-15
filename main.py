@@ -10061,10 +10061,11 @@ def admin_levels():
             }
         
             mongo_db.levels.insert_one(new_level)
-            
-            # Clear cache since levels changed
-            levels_cache['main_list'] = None
-            levels_cache['legacy_list'] = None
+
+            # Expire timestamps so the next request reloads from DB while keeping
+            # existing thumbnail_url values intact in the cache list
+            levels_cache['main_list_updated'] = None
+            levels_cache['legacy_list_updated'] = None
             
             # Recalculate points for all levels after position changes
             recalculate_all_points()
@@ -10355,11 +10356,26 @@ def admin_edit_level():
                 below_level=below_level,
                 list_type="legacy" if is_legacy else "main"
             )
-    
-    # Clear cache since levels changed
-    levels_cache['main_list'] = None
-    levels_cache['legacy_list'] = None
-    
+
+    # Directly update this level's thumbnail in the in-memory cache so the
+    # new value is visible immediately.  The cache list is kept intact (rather
+    # than set to None) so that OTHER levels' thumbnail_url values survive the
+    # next DB reload (thumbnail_url is excluded from the DB projection to avoid
+    # socket timeouts, making the in-memory cache the sole source for thumbnails).
+    cache_list = levels_cache.get('main_list') or []
+    level_id_str = str(db_level_id)
+    for cached_level in cache_list:
+        if str(cached_level.get('_id', '')) == level_id_str:
+            if thumbnail_type in ('keep', 'keep_existing'):
+                pass  # leave existing thumbnail untouched
+            else:
+                cached_level['thumbnail_url'] = thumbnail_url
+            break
+
+    # Expire timestamps so the next request reloads other fields from DB
+    levels_cache['main_list_updated'] = None
+    levels_cache['legacy_list_updated'] = None
+
     # Only recalculate points if position or legacy status changed (performance optimization)
     if position != old_position or is_legacy != old_is_legacy:
         recalculate_all_points()
