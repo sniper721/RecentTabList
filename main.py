@@ -193,6 +193,13 @@ if retry_count < max_retries:
     # Create indexes for better performance
     try:
         mongo_db.levels.create_index([("is_legacy", 1), ("position", 1)])
+        # Records indexes — critical for sort/filter performance
+        mongo_db.records.create_index([("date_submitted", -1)])
+        mongo_db.records.create_index([("status", 1), ("date_submitted", -1)])
+        mongo_db.records.create_index([("user_id", 1), ("status", 1)])
+        mongo_db.records.create_index([("level_id", 1), ("status", 1)])
+        # Users index for leaderboard
+        mongo_db.users.create_index([("points", -1)])
         print("✓ Database indexes created")
     except Exception as e:
         print(f"Index creation warning: {e}")
@@ -1209,7 +1216,7 @@ def update_user_points(user_id):
         }}
     ]
     
-    records_with_levels = list(mongo_db.records.aggregate(pipeline))
+    records_with_levels = list(mongo_db.records.aggregate(pipeline, allowDiskUse=True))
     total_points = 0
     
     for record in records_with_levels:
@@ -2032,9 +2039,9 @@ def admin_records():
             }
         })
     
-    # Get total count
-    count_pipeline = pipeline + [{"$count": "total"}]
-    total_result = list(mongo_db.records.aggregate(count_pipeline))
+    # Get total count — strip $sort before counting (unnecessary and expensive)
+    count_pipeline = [s for s in pipeline if "$sort" not in s] + [{"$count": "total"}]
+    total_result = list(mongo_db.records.aggregate(count_pipeline, allowDiskUse=True))
     total_records = total_result[0]['total'] if total_result else 0
     
     # Add pagination
@@ -2044,7 +2051,7 @@ def admin_records():
     ])
     
     # Execute query
-    records = list(mongo_db.records.aggregate(pipeline))
+    records = list(mongo_db.records.aggregate(pipeline, allowDiskUse=True))
     
     # Calculate pagination info
     total_pages = (total_records + per_page - 1) // per_page
@@ -2093,7 +2100,7 @@ def admin_edit_record(record_id):
             }}
         ]
         
-        record_result = list(mongo_db.records.aggregate(pipeline))
+        record_result = list(mongo_db.records.aggregate(pipeline, allowDiskUse=True))
         if not record_result:
             flash('Record not found', 'danger')
             return redirect(url_for('admin_records'))
@@ -2212,7 +2219,7 @@ def admin_record_discussion(record_id):
             {"$unwind": "$level"}
         ]
         
-        record_result = list(mongo_db.records.aggregate(record_pipeline))
+        record_result = list(mongo_db.records.aggregate(record_pipeline, allowDiskUse=True))
         if not record_result:
             flash('Record not found', 'danger')
             return redirect(url_for('admin_records'))
@@ -4160,7 +4167,7 @@ def admin_test_environment():
             {"$unwind": "$user"},
             {"$sort": {"date_submitted": -1}},
             {"$limit": 10}
-        ]))
+        ], allowDiskUse=True))
         
         # Get current admin user
         admin_user = mongo_db.users.find_one({"_id": session['user_id']})
@@ -6235,7 +6242,7 @@ def level_detail(level_id):
                 {"$unwind": "$user"},
                 {"$sort": {"progress": -1, "date_submitted": 1}},  # 100% first, then by date
                 {"$limit": 100}  # Limit to first 100 records for performance
-            ]))
+            ], allowDiskUse=True))
         except Exception as e:
             print(f"Error loading records for level {level_id}: {e}")
             # Fallback to simple query
@@ -6902,7 +6909,7 @@ def profile():
         }},
         {"$unwind": "$level"},
         {"$sort": {"date_submitted": -1}}
-    ]))
+    ], allowDiskUse=True))
     
     # Get only APPROVED records for accurate stats counting
     approved_records = list(mongo_db.records.aggregate([
@@ -6915,7 +6922,7 @@ def profile():
         }},
         {"$unwind": "$level"},
         {"$sort": {"date_submitted": -1}}
-    ]))
+    ], allowDiskUse=True))
     
     # Get only APPROVED records on MAIN LIST levels (exclude legacy) for completion counting
     main_list_approved = list(mongo_db.records.aggregate([
@@ -6929,7 +6936,7 @@ def profile():
         {"$unwind": "$level"},
         {"$match": {"level.is_legacy": {"$ne": True}}},  # Exclude legacy levels
         {"$sort": {"date_submitted": -1}}
-    ]))
+    ], allowDiskUse=True))
     
     # Get only APPROVED records on LEGACY levels for legacy completion counting
     legacy_list_approved = list(mongo_db.records.aggregate([
@@ -6943,7 +6950,7 @@ def profile():
         {"$unwind": "$level"},
         {"$match": {"level.is_legacy": True}},  # Only legacy levels
         {"$sort": {"date_submitted": -1}}
-    ]))
+    ], allowDiskUse=True))
     
     # Calculate accurate stats
     approved_count = len(approved_records)  # All approved records
@@ -7948,7 +7955,7 @@ def admin():
         }},
         {"$unwind": "$user"},
         {"$unwind": "$level"}
-    ]))
+    ], allowDiskUse=True))
     
     # Generate stats for the admin dashboard
     try:
@@ -8057,7 +8064,7 @@ def admin_verifications():
             {"$limit": 100}  # Limit to recent 100 submissions
         ]
         
-        verification_submissions = list(mongo_db.verification_submissions.aggregate(pipeline))
+        verification_submissions = list(mongo_db.verification_submissions.aggregate(pipeline, allowDiskUse=True))
         
         return render_template('admin/verifications.html', submissions=verification_submissions)
         
@@ -8093,7 +8100,7 @@ def admin_verification_detail(submission_id):
             {"$unwind": "$user"}
         ]
         
-        submission = list(mongo_db.verification_submissions.aggregate(pipeline))
+        submission = list(mongo_db.verification_submissions.aggregate(pipeline, allowDiskUse=True))
         if not submission:
             flash('Verification submission not found', 'danger')
             return redirect(url_for('admin_verifications'))
@@ -8152,7 +8159,7 @@ def admin_verification_details():
             {"$limit": 100}  # Limit to recent 100 submissions
         ]
         
-        verification_submissions = list(mongo_db.verification_submissions.aggregate(pipeline))
+        verification_submissions = list(mongo_db.verification_submissions.aggregate(pipeline, allowDiskUse=True))
         
         return render_template('admin/verification_details.html', submissions=verification_submissions)
         
@@ -9078,7 +9085,7 @@ Records: {stats['records']} total"""
                 {"$unwind": "$level"},
                 {"$sort": {"date_submitted": -1}},
                 {"$limit": 10}
-            ]))
+            ], allowDiskUse=True))
             result = "Recent Records (max 10):\n"
             for record in records:
                 result += f"  {record['user']['username']} - {record['level']['name']} ({record['progress']}%)\n"
@@ -9143,7 +9150,7 @@ Min %: {level.get('min_percentage', 100)}%"""
                 {"$unwind": "$level"},
                 {"$sort": {"date_submitted": -1}},
                 {"$limit": 15}
-            ]))
+            ], allowDiskUse=True))
             if records:
                 result = f"Pending Records ({len(records)}):\n"
                 for record in records:
@@ -10177,7 +10184,11 @@ def admin_edit_level():
 
     
     level = mongo_db.levels.find_one({"_id": db_level_id})
-    
+
+    if not level:
+        flash('Level not found', 'danger')
+        return redirect(url_for('admin_levels'))
+
     # Handle thumbnail options with improved logic
     thumbnail_type = request.form.get('thumbnail_type', 'auto')
     thumbnail_url = ''
@@ -12181,13 +12192,13 @@ def admin_level_stats():
             {"$group": {"_id": "$creator", "count": {"$sum": 1}}},
             {"$sort": {"count": -1}},
             {"$limit": 10}
-        ]))
+        ], allowDiskUse=True))
         
         top_verifiers = list(mongo_db.levels.aggregate([
             {"$group": {"_id": "$verifier", "count": {"$sum": 1}}},
             {"$sort": {"count": -1}},
             {"$limit": 10}
-        ]))
+        ], allowDiskUse=True))
         
         # Recent activity
         recent_changelog = list(mongo_db.level_changelog.find().sort("timestamp", -1).limit(10))
@@ -12196,7 +12207,7 @@ def admin_level_stats():
         difficulty_dist = list(mongo_db.levels.aggregate([
             {"$group": {"_id": {"$floor": "$difficulty"}, "count": {"$sum": 1}}},
             {"$sort": {"_id": 1}}
-        ]))
+        ], allowDiskUse=True))
         
         return render_template('admin/level_stats.html', 
                              stats=stats, 
@@ -12292,7 +12303,7 @@ def level_analyzer():
                 }},
                 {"$unwind": "$user"},
                 {"$sort": {"date_submitted": -1}}
-            ])) if level else []
+            ], allowDiskUse=True)) if level else []
             
             # Calculate statistics
             stats = {
@@ -12378,7 +12389,7 @@ def progress_tracker():
             }},
             {"$unwind": "$level"},
             {"$sort": {"date_submitted": -1}}
-        ]))
+        ], allowDiskUse=True))
         
         # Calculate comprehensive stats
         progress_stats = {
@@ -12616,7 +12627,7 @@ def stats_overview():
                 "users": {"$sum": 1}
             }},
             {"$sort": {"_id.year": 1, "_id.month": 1}}
-        ]))
+        ], allowDiskUse=True))
         
         stats_data = {
             'levels': {'total': total_levels, 'main': main_levels, 'legacy': legacy_levels},
@@ -12653,7 +12664,7 @@ def stats_players():
             {"$unwind": "$user"},
             {"$sort": {"record_count": -1}},
             {"$limit": 20}
-        ]))
+        ], allowDiskUse=True))
         
         # Player distribution by points
         point_ranges = [
@@ -12703,7 +12714,7 @@ def stats_levels():
             {"$unwind": "$level"},
             {"$sort": {"record_count": -1}},
             {"$limit": 20}
-        ]))
+        ], allowDiskUse=True))
         
         # Difficulty distribution
         difficulty_stats = list(mongo_db.levels.aggregate([
@@ -12713,7 +12724,7 @@ def stats_levels():
                 "avg_points": {"$avg": "$points"}
             }},
             {"$sort": {"_id": 1}}
-        ]))
+        ], allowDiskUse=True))
         
         # Creator statistics
         creator_stats = list(mongo_db.levels.aggregate([
@@ -12724,7 +12735,7 @@ def stats_levels():
             }},
             {"$sort": {"level_count": -1}},
             {"$limit": 15}
-        ]))
+        ], allowDiskUse=True))
         
         # Verifier statistics
         verifier_stats = list(mongo_db.levels.aggregate([
@@ -12734,7 +12745,7 @@ def stats_levels():
             }},
             {"$sort": {"level_count": -1}},
             {"$limit": 15}
-        ]))
+        ], allowDiskUse=True))
         
         stats_data = {
             'popular_levels': popular_levels,
@@ -12792,7 +12803,7 @@ def stats_records():
                 "count": {"$sum": 1}
             }},
             {"$sort": {"_id.year": 1, "_id.month": 1, "_id.day": 1}}
-        ]))
+        ], allowDiskUse=True))
         
         stats_data = {
             'total': total_records,
@@ -12835,7 +12846,7 @@ def stats_activity():
             {"$unwind": "$level"},
             {"$sort": {"date_submitted": -1}},
             {"$limit": 50}
-        ]))
+        ], allowDiskUse=True))
         
         # Recent registrations
         recent_users = list(mongo_db.users.find(
@@ -12864,7 +12875,7 @@ def stats_activity():
                 {"$unwind": "$level"},
                 {"$sort": {"date_submitted": -1}},
                 {"$limit": 20}
-            ]))
+            ], allowDiskUse=True))
         
         stats_data = {
             'recent_approved': recent_approved,
@@ -13474,7 +13485,7 @@ def public_profile(username):
         {"$unwind": "$level"},
         {"$sort": {"date_submitted": -1}},
         {"$limit": 50}
-    ]))
+    ], allowDiskUse=True))
     
     # Get ALL approved completions on MAIN LIST levels only (exclude legacy)
     main_list_completions = list(mongo_db.records.aggregate([
@@ -13488,7 +13499,7 @@ def public_profile(username):
         {"$unwind": "$level"},
         {"$match": {"level.is_legacy": {"$ne": True}}},  # Exclude legacy levels
         {"$project": {"level_id": 1}}
-    ]))
+    ], allowDiskUse=True))
     
     # Get ALL approved completions on LEGACY levels for legacy stats
     legacy_list_completions = list(mongo_db.records.aggregate([
@@ -13502,7 +13513,7 @@ def public_profile(username):
         {"$unwind": "$level"},
         {"$match": {"level.is_legacy": True}},  # Only legacy levels
         {"$project": {"level_id": 1}}
-    ]))
+    ], allowDiskUse=True))
     
     # Get all main list levels for completion grid
     all_levels = list(mongo_db.levels.find({"is_legacy": False}).sort("position", 1))
