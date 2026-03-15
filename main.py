@@ -345,14 +345,37 @@ def get_fast_cached_levels(is_legacy=False):
     # Cache miss - load from database
     try:
         levels = _load_levels_from_db(is_legacy)
-        # Preserve thumbnail_url local file paths from existing cache
-        if not is_legacy and levels_cache.get('main_list'):
+        # Preserve thumbnail_url from existing in-memory cache (avoids re-fetching large base64 data)
+        existing_thumbs = {}
+        cache_source = 'legacy_list' if is_legacy else 'main_list'
+        if levels_cache.get(cache_source):
             existing_thumbs = {str(l.get('_id', '')): l.get('thumbnail_url')
-                               for l in levels_cache['main_list'] if l.get('thumbnail_url')}
-            for lv in levels:
-                key = str(lv.get('_id', ''))
-                if key in existing_thumbs:
-                    lv['thumbnail_url'] = existing_thumbs[key]
+                               for l in levels_cache[cache_source] if l.get('thumbnail_url')}
+        for lv in levels:
+            key = str(lv.get('_id', ''))
+            if key in existing_thumbs:
+                lv['thumbnail_url'] = existing_thumbs[key]
+
+        # For any level still without a thumbnail, fetch directly from DB.
+        # This covers: newly added levels (not yet in cache) and full cache resets
+        # (main_list = None) where existing_thumbs would be empty.
+        levels_needing_thumb = [lv for lv in levels if not lv.get('thumbnail_url')]
+        if levels_needing_thumb:
+            try:
+                ids = [lv['_id'] for lv in levels_needing_thumb]
+                thumb_docs = list(mongo_db.levels.find(
+                    {'_id': {'$in': ids}, 'thumbnail_url': {'$exists': True, '$nin': ['', None]}},
+                    {'thumbnail_url': 1}
+                ))
+                if thumb_docs:
+                    db_thumbs = {str(doc['_id']): doc['thumbnail_url'] for doc in thumb_docs}
+                    for lv in levels:
+                        key = str(lv.get('_id', ''))
+                        if key in db_thumbs:
+                            lv['thumbnail_url'] = db_thumbs[key]
+            except Exception as e:
+                print(f"Warning: could not fetch level thumbnails from DB: {e}")
+
         levels_cache[cache_key] = levels
         levels_cache[updated_key] = now
         levels_cache['last_updated'] = now
@@ -374,13 +397,30 @@ def _background_refresh():
                 print(f"Background: refreshing main list from DB (attempt {attempt})...")
                 levels = _load_levels_from_db(is_legacy=False)
                 now = datetime.now(timezone.utc)
-                # Preserve thumbnail_url local file paths
+                # Preserve thumbnails from existing cache
                 existing_thumbs = {str(l.get('_id', '')): l.get('thumbnail_url')
                                    for l in (levels_cache.get('main_list') or []) if l.get('thumbnail_url')}
                 for lv in levels:
                     key = str(lv.get('_id', ''))
                     if key in existing_thumbs:
                         lv['thumbnail_url'] = existing_thumbs[key]
+                # Fetch thumbnails from DB for any level still missing one
+                levels_needing_thumb = [lv for lv in levels if not lv.get('thumbnail_url')]
+                if levels_needing_thumb:
+                    try:
+                        ids = [lv['_id'] for lv in levels_needing_thumb]
+                        thumb_docs = list(mongo_db.levels.find(
+                            {'_id': {'$in': ids}, 'thumbnail_url': {'$exists': True, '$nin': ['', None]}},
+                            {'thumbnail_url': 1}
+                        ))
+                        if thumb_docs:
+                            db_thumbs = {str(doc['_id']): doc['thumbnail_url'] for doc in thumb_docs}
+                            for lv in levels:
+                                key = str(lv.get('_id', ''))
+                                if key in db_thumbs:
+                                    lv['thumbnail_url'] = db_thumbs[key]
+                    except Exception as e:
+                        print(f"Warning: background refresh could not fetch thumbnails: {e}")
                 levels_cache['main_list'] = levels
                 levels_cache['main_list_updated'] = now
                 levels_cache['last_updated'] = now
@@ -10063,7 +10103,9 @@ def admin_levels():
             mongo_db.levels.insert_one(new_level)
 
             # Expire timestamps so the next request reloads from DB while keeping
-            # existing thumbnail_url values intact in the cache list
+            # existing thumbnail_url values intact in the cache list.
+            # The new level's thumbnail_url will be fetched from DB by the fallback
+            # query inside get_fast_cached_levels on the next reload.
             levels_cache['main_list_updated'] = None
             levels_cache['legacy_list_updated'] = None
             
