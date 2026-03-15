@@ -1,7 +1,10 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from pymongo import MongoClient
 import os
+from dotenv import load_dotenv
 from datetime import datetime, timezone, timedelta
+
+load_dotenv()
 
 # Create minimal app
 app = Flask(__name__)
@@ -10,7 +13,9 @@ app.secret_key = 'test-key'
 # Test MongoDB connection
 try:
     print("Testing MongoDB connection...")
-    MONGODB_URI = "mongodb+srv://spinerspinerreal:EfitlEyLK6Rx8jb2@rtldb.4bu6pci.mongodb.net/?retryWrites=true&w=majority&appName=RTLDB"
+    MONGODB_URI = os.environ.get('MONGODB_URI')
+    if not MONGODB_URI:
+        raise ValueError("MONGODB_URI not set in environment/.env")
     client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
     db = client.rtl_database
     # Test a simple query

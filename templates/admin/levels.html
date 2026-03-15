@@ -62,7 +62,9 @@
                                                         data-level-creator="{{ level.creator }}" data-level-verifier="{{ level.verifier }}"
                                                         data-level-difficulty="{{ level.difficulty }}" data-level-position="{{ level.position }}"
                                                         data-level-video="{{ level.video_url }}" data-level-description="{{ level.description }}"
-                                                        data-level-game-id="{{ level.level_id or '' }}" data-level-points="{{ level.points }}" data-level-thumbnail="{{ level.thumbnail_url or '' }}"
+                                                        data-level-game-id="{{ level.level_id or '' }}" data-level-points="{{ level.points }}"
+                                                        data-level-thumbnail="{{ '' if (level.thumbnail_url or '').startswith('data:image') else (level.thumbnail_url or '') }}"
+                                                        data-level-has-uploaded="{{ 'true' if (level.thumbnail_url or '').startswith('data:image') else 'false' }}"
                                                         data-level-min-percentage="{{ level.min_percentage }}" data-demon-type="{{ level.demon_type or '' }}">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
@@ -117,7 +119,9 @@
                                                             data-level-creator="{{ level.creator }}" data-level-verifier="{{ level.verifier }}"
                                                             data-level-difficulty="{{ level.difficulty }}" data-level-position="{{ level.position }}"
                                                             data-level-video="{{ level.video_url }}" data-level-description="{{ level.description }}"
-                                                            data-level-game-id="{{ level.level_id or '' }}" data-level-points="{{ level.points }}" data-level-thumbnail="{{ level.thumbnail_url or '' }}"
+                                                            data-level-game-id="{{ level.level_id or '' }}" data-level-points="{{ level.points }}"
+                                                            data-level-thumbnail="{{ '' if (level.thumbnail_url or '').startswith('data:image') else (level.thumbnail_url or '') }}"
+                                                            data-level-has-uploaded="{{ 'true' if (level.thumbnail_url or '').startswith('data:image') else 'false' }}"
                                                             data-level-min-percentage="{{ level.min_percentage }}" data-demon-type="{{ level.demon_type or '' }}">
                                                         <i class="fas fa-edit"></i>
                                                     </button>
@@ -554,7 +558,8 @@
             const levelMinPercentage = this.getAttribute('data-level-min-percentage');
             const demonType = this.getAttribute('data-demon-type');
             const levelThumbnail = this.getAttribute('data-level-thumbnail') || '';
-            
+            const hasUploadedImage = this.getAttribute('data-level-has-uploaded') === 'true';
+
             document.getElementById('edit_level_id').value = levelId;
             document.getElementById('edit_name').value = levelName;
             document.getElementById('edit_creator').value = levelCreator;
@@ -564,21 +569,19 @@
             document.getElementById('edit_video_url').value = levelVideo || '';
             document.getElementById('edit_description').value = levelDescription || '';
             document.getElementById('edit_game_level_id').value = levelGameId || '';
-            document.getElementById('edit_thumbnail_url').value = levelThumbnail;
+            document.getElementById('edit_thumbnail_url').value = levelThumbnail.startsWith('http') ? levelThumbnail : '';
             document.getElementById('edit_points').value = levelPoints ? parseFloat(levelPoints).toFixed(2) : '';
             document.getElementById('edit_min_percentage').value = levelMinPercentage || '100';
-            
+
             // Smart thumbnail type detection and selection
             let selectedThumbnailType = 'auto'; // default
-            
-            if (levelThumbnail && levelThumbnail.trim()) {
-                if (levelThumbnail.startsWith('data:image')) {
-                    // Base64 image - select "Keep Current"
-                    selectedThumbnailType = 'keep_existing';
-                } else if (levelThumbnail.startsWith('http')) {
-                    // URL image - select "Custom URL" and populate field
-                    selectedThumbnailType = 'url';
-                }
+
+            if (hasUploadedImage) {
+                // Has an uploaded base64 image - select "Keep Current"
+                selectedThumbnailType = 'keep_existing';
+            } else if (levelThumbnail && levelThumbnail.startsWith('http')) {
+                // URL image - select "Custom URL" and populate field
+                selectedThumbnailType = 'url';
             }
             
             // Set the appropriate radio button

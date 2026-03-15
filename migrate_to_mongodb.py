@@ -8,7 +8,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # MongoDB connection
-MONGODB_URI = os.environ.get('MONGODB_URI', 'mongodb+srv://spinerspinerreal:EfitlEyLK6Rx8jb2@rtldb.4bu6pci.mongodb.net/?retryWrites=true&w=majority&appName=RTLDB/')
+MONGODB_URI = os.environ.get('MONGODB_URI')
+if not MONGODB_URI:
+    raise ValueError("MONGODB_URI not set in environment/.env")
 DATABASE_NAME = os.environ.get('MONGODB_DB', 'rtl_database')
 
 def migrate_data():
