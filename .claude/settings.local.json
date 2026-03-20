@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls main_*.py main_*.py.backup backup_main.py START_APP.py)",
+      "Bash(ls start_*.bat start_*.py)",
+      "Bash(ls fix_*.py check_*.py add_*.py apply_*.py migrate_*.py import_*.py load_*.py auto_*.py)",
+      "Bash(ls test_*.py debug_*.py)",
+      "Bash(ls templates/*.html templates/admin/*.html)"
+    ]
+  }
+}

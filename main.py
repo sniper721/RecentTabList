@@ -7978,24 +7978,23 @@ def admin():
         except Exception as e:
             flash(f'Error awarding verifier points: {e}', 'danger')
     
-    # Get pending records for the existing functionality
-    pending_records = list(mongo_db.records.aggregate([
-        {"$match": {"status": "pending"}},
-        {"$lookup": {
-            "from": "users",
-            "localField": "user_id",
-            "foreignField": "_id",
-            "as": "user"
-        }},
-        {"$lookup": {
-            "from": "levels",
-            "localField": "level_id",
-            "foreignField": "_id",
-            "as": "level"
-        }},
-        {"$unwind": "$user"},
-        {"$unwind": "$level"}
-    ], allowDiskUse=True))
+    # Get pending records - use separate queries to avoid slow $lookup on Atlas M0
+    raw_pending = list(mongo_db.records.find({"status": "pending"}))
+    if raw_pending:
+        user_ids = list({r["user_id"] for r in raw_pending if "user_id" in r})
+        level_ids = list({r["level_id"] for r in raw_pending if "level_id" in r})
+        users_map = {u["_id"]: u for u in mongo_db.users.find({"_id": {"$in": user_ids}})}
+        levels_map = {l["_id"]: l for l in mongo_db.levels.find({"_id": {"$in": level_ids}}, {"thumbnail_url": 0})}
+        pending_records = []
+        for r in raw_pending:
+            user = users_map.get(r.get("user_id"))
+            level = levels_map.get(r.get("level_id"))
+            if user and level:
+                r["user"] = user
+                r["level"] = level
+                pending_records.append(r)
+    else:
+        pending_records = []
     
     # Generate stats for the admin dashboard
     try:
