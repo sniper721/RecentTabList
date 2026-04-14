@@ -120,7 +120,7 @@
                                     {% set min_percentage = level.get('min_percentage', 100)|int %}
                                     {% if min_percentage < 100 %}
                                         {% set points_min = (points_100 * 0.1)|round(2) %}
-                                        {{ format_points(points_min) }} ({{ min_percentage }}%) — {{ format_points(points_100) }} (100%) points
+                                        {{ format_points(points_min) }} ({{ min_percentage }}%) - {{ format_points(points_100) }} (100%) points
                                     {% else %}
                                         {{ format_points(points_100) }} (100%) points
                                     {% endif %}

@@ -108,11 +108,17 @@ class LevelMonitor:
     async def check_all_levels(self):
         """Check all levels in the database for removal"""
         try:
-            # Get all levels that have level_id (GD server ID) from both main and legacy lists
-            levels = list(self.mongo_db.levels.find({
-                "level_id": {"$exists": True, "$ne": None, "$ne": ""},
-                "is_removed": {"$ne": True}  # Don't check already marked as removed
-            }, max_time_ms=60000))  # Add query timeout to prevent hanging
+            # Get all levels that have level_id (GD server ID) from both main and legacy lists.
+            # Exclude thumbnail_url - it's a large base64 blob (100-500KB per doc) that we don't
+            # need here, and fetching all of them at once triggers a socket timeout on Atlas M0.
+            levels = list(self.mongo_db.levels.find(
+                {
+                    "level_id": {"$exists": True, "$ne": None, "$ne": ""},
+                    "is_removed": {"$ne": True}
+                },
+                {"thumbnail_url": 0},   # <-- projection: skip large base64 field
+                max_time_ms=15000       # tight server-side cap; fail fast if Atlas is struggling
+            ))
             
             print(f"🔍 Checking {len(levels)} levels for removal from GD servers...")
             
