@@ -64,6 +64,7 @@
                                     <img src="{{ thumbnail_url }}"
                                          alt="{{ level_name }}"
                                          class="level-thumbnail img-fluid rounded"
+                                         data-mongo-id="{{ level.get('_id', '') }}"
                                          loading="lazy"
                                          decoding="async">
                                 {% else %}
@@ -79,10 +80,12 @@
                                         <img src="https://img.youtube.com/vi/{{ youtube_id }}/hqdefault.jpg"
                                              alt="{{ level_name }}"
                                              class="level-thumbnail img-fluid rounded"
+                                             data-mongo-id="{{ level.get('_id', '') }}"
                                              loading="lazy"
                                              decoding="async">
                                     {% else %}
-                                        <div class="level-thumbnail-placeholder bg-light rounded d-flex align-items-center justify-content-center text-muted">
+                                        <div class="level-thumbnail-placeholder bg-light rounded d-flex align-items-center justify-content-center text-muted"
+                                             data-mongo-id="{{ level.get('_id', '') }}">
                                             <div class="text-center">
                                                 <i class="fas fa-image fa-2x mb-2"></i>
                                                 <div>No Preview</div>
@@ -120,7 +123,7 @@
                                 {% set min_percentage = level.get('min_percentage', 100)|int %}
                                 {% if min_percentage < 100 %}
                                     {% set points_min = (points_100 * 0.1)|round(2) %}
-                                    {{ format_points(points_min) }} ({{ min_percentage }}%) — {{ format_points(points_100) }} (100%) points
+                                    {{ format_points(points_min) }} ({{ min_percentage }}%) - {{ format_points(points_100) }} (100%) points
                                 {% else %}
                                     {{ format_points(points_100) }} (100%) points
                                 {% endif %}
@@ -791,5 +794,65 @@
 <!-- Background Level Loader Script -->
 <script src="{{ url_for('static', filename='js/background_loader.js') }}"></script>
 
+<script>
+// Lazy-load custom thumbnails one-at-a-time as level cards scroll into view.
+// First we try the fast batch endpoint (serves from in-memory cache, no DB).
+// For any still missing after that, we use IntersectionObserver to fetch
+// each card's thumbnail individually - one tiny DB round-trip per card,
+// spread out over the scroll, never a 30MB bulk query.
+(function() {
+    function applyThumb(el, src) {
+        if (!src) return;
+        if (el.tagName === 'IMG') {
+            if (el.src !== src) el.src = src;
+        } else {
+            var img = document.createElement('img');
+            img.src = src;
+            img.className = 'level-thumbnail img-fluid rounded';
+            img.loading = 'lazy';
+            img.decoding = 'async';
+            el.parentNode.replaceChild(img, el);
+        }
+    }
+
+    // Step 1: batch fetch from in-memory cache (fast, no DB hit on warm workers)
+    fetch('/api/level_thumbnails?list=main')
+        .then(function(r) { return r.json(); })
+        .then(function(thumbs) {
+            var remaining = [];
+            document.querySelectorAll('[data-mongo-id]').forEach(function(el) {
+                var mid = el.getAttribute('data-mongo-id');
+                if (thumbs[mid]) {
+                    applyThumb(el, thumbs[mid]);
+                } else {
+                    remaining.push(el);
+                }
+            });
+
+            // Step 2: for any still missing, fetch individually as they scroll in
+            if (!remaining.length) return;
+            var fetching = new Set();
+            var observer = new IntersectionObserver(function(entries) {
+                entries.forEach(function(entry) {
+                    if (!entry.isIntersecting) return;
+                    var el = entry.target;
+                    var mid = el.getAttribute('data-mongo-id');
+                    if (!mid || fetching.has(mid)) return;
+                    fetching.add(mid);
+                    observer.unobserve(el);
+                    fetch('/api/level_thumbnail/' + mid)
+                        .then(function(r) { return r.json(); })
+                        .then(function(data) {
+                            if (data.thumbnail_url) applyThumb(el, data.thumbnail_url);
+                        })
+                        .catch(function() {});
+                });
+            }, {rootMargin: '200px'});
+
+            remaining.forEach(function(el) { observer.observe(el); });
+        })
+        .catch(function() {});
+})();
+</script>
 
 {% endblock %}

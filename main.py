@@ -110,8 +110,12 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here-ch
 
 # ULTRA-FAST Performance optimizations
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000  # 1 year cache for static files
-app.config['TEMPLATES_AUTO_RELOAD'] = False  # Disable auto-reload in production
+app.config['TEMPLATES_AUTO_RELOAD'] = True  # Always re-read templates from disk (picks up edits without restart)
 app.config['JSON_SORT_KEYS'] = False  # Faster JSON responses
+# Upload size cap - images are resized server-side before base64 encoding,
+# so 10MB of raw upload is plenty and keeps us safely under Vercel's 4.5MB
+# function payload once re-encoded & resized.
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
 
 # Enable compression for responses
 try:
@@ -138,95 +142,38 @@ app.config['GOOGLE_CLIENT_SECRET'] = os.environ.get('GOOGLE_CLIENT_SECRET')
 
 # Discord OAuth configuration will be set later with proper validation
 
-# Initialize MongoDB and OAuth
-# Initialize MongoDB and OAuth
-print("Initializing MongoDB connection...")
+# Initialize MongoDB - connect=False defers the actual TCP connection to the
+# first DB operation, so cold-start time is <1ms here. No ping, no retries,
+# no sleep - Vercel functions have a hard timeout and every ms counts.
 import time
-retry_count = 0
-max_retries = 3
+print(f"Initializing MongoDB (deferred connect)...")
+mongo_client = MongoClient(
+    mongodb_uri,
+    tls=True,
+    tlsAllowInvalidCertificates=True,
+    tlsAllowInvalidHostnames=True,
+    serverSelectionTimeoutMS=5000,   # fast fail if Atlas is unreachable
+    connectTimeoutMS=5000,
+    socketTimeoutMS=30000,           # generous for bulk thumbnail transfers
+    maxPoolSize=5,
+    minPoolSize=0,
+    maxIdleTimeMS=30000,
+    waitQueueTimeoutMS=5000,
+    retryWrites=True,
+    retryReads=True,
+    directConnection=False,
+    connect=False                    # lazy - no TCP connection at import time
+)
+mongo_db = mongo_client[mongodb_db]
+print("✓ MongoDB client created (connection deferred to first use)")
 
-while retry_count < max_retries:
-    try:
-        print(f"MongoDB URI: {mongodb_uri[:50]}... (attempt {retry_count + 1}/{max_retries})")
-        print(f"MongoDB DB: {mongodb_db}")
-        mongo_client = MongoClient(
-            mongodb_uri,
-            tls=True,
-            tlsAllowInvalidCertificates=True,
-            tlsAllowInvalidHostnames=True,
-            serverSelectionTimeoutMS=30000,
-            socketTimeoutMS=30000,
-            connectTimeoutMS=30000,
-            maxPoolSize=10,
-            minPoolSize=1,
-            maxIdleTimeMS=60000,
-            waitQueueTimeoutMS=10000,
-            retryWrites=True,
-            retryReads=True,
-            directConnection=False,
-            connect=False
-        )
-        mongo_db = mongo_client[mongodb_db]
-        # Test connection with timeout
-        mongo_client.admin.command('ping', maxTimeMS=30000)
-        print("✓ MongoDB initialized successfully")
-        
-        # Set MongoDB reference for changelog notifier
-        try:
-            from changelog_discord import set_mongo_db
-            set_mongo_db(mongo_db)
-            print("✓ Changelog Discord notifier database reference set")
-        except Exception as e:
-            print(f"⚠️  Warning: Could not set changelog notifier database reference: {e}")
-        break
-    except Exception as e:
-        retry_count += 1
-        print(f"❌ MongoDB connection attempt {retry_count} failed: {e}")
-        if retry_count < max_retries:
-            print(f"Retrying in 2 seconds...")
-            time.sleep(2)  # Reduced retry delay
-        else:
-            print("All MongoDB connection attempts failed")
-            raise Exception("Failed to connect to MongoDB after all retries")
-
-if retry_count < max_retries:
-    # Create indexes for better performance
-    try:
-        mongo_db.levels.create_index([("is_legacy", 1), ("position", 1)])
-        # Records indexes — critical for sort/filter performance
-        mongo_db.records.create_index([("date_submitted", -1)])
-        mongo_db.records.create_index([("status", 1), ("date_submitted", -1)])
-        mongo_db.records.create_index([("user_id", 1), ("status", 1)])
-        mongo_db.records.create_index([("level_id", 1), ("status", 1)])
-        # Users index for leaderboard
-        mongo_db.users.create_index([("points", -1)])
-        print("✓ Database indexes created")
-    except Exception as e:
-        print(f"Index creation warning: {e}")
-else:
-    print("MongoDB initialization error: Failed after all retries")
-    print("Falling back to SQLite...")
-    # Fall back to SQLite if MongoDB fails
-    import subprocess
-    subprocess.run(['python', 'main_sqlite_backup.py'])
-    exit()
-    
-# Initialize console settings
 try:
-    console_settings = mongo_db.site_settings.find_one({"_id": "console"})
-    if not console_settings:
-        # Create default console settings
-        default_console_settings = {
-            "_id": "console",
-            "pin_required": False,
-            "pin": "1234"
-        }
-        mongo_db.site_settings.insert_one(default_console_settings)
-        print("✓ Default console settings created")
-    else:
-        print("✓ Console settings loaded")
-except Exception as e:
-    print(f"Warning: Could not initialize console settings: {e}")
+    from changelog_discord import set_mongo_db
+    set_mongo_db(mongo_db)
+except Exception:
+    pass
+    
+# Console settings are seeded lazily on first use, not at cold-start.
 
 print("Initializing OAuth...")
 oauth = OAuth(app)
@@ -283,6 +230,96 @@ else:
         print("   Please get your Client Secret from Discord Developer Portal")
     print("⚠️  Discord account linking will be disabled")
 
+# In-memory IP ban cache - refreshed every 5 min per worker.
+# Eliminates one MongoDB query per HTTP request (the old find_one in before_request).
+_ip_ban_set: set = set()
+_ip_ban_set_updated = None
+_IP_BAN_TTL = 300  # seconds
+
+# In-memory announcements/polls cache - refreshed every 60s.
+# Announcements and polls rarely change, so fetching them once per minute
+# instead of once per request saves 2 DB queries on every page load.
+_announcements_cache: list = []
+_announcements_cache_updated = None
+_polls_cache: list = []
+_polls_cache_updated = None
+_CONTENT_CACHE_TTL = 60  # seconds
+
+def _get_banned_ip_set():
+    """Return set of currently banned IPs, refreshing from DB at most every 5 min."""
+    global _ip_ban_set, _ip_ban_set_updated
+    now = datetime.now(timezone.utc)
+    if (_ip_ban_set_updated is None or
+            (now - _ip_ban_set_updated).total_seconds() > _IP_BAN_TTL):
+        try:
+            docs = mongo_db.ip_bans.find({"active": True}, {"ip_addresses": 1})
+            new_set: set = set()
+            for doc in docs:
+                for ip in (doc.get('ip_addresses') or []):
+                    new_set.add(ip)
+            _ip_ban_set = new_set
+            _ip_ban_set_updated = now
+        except Exception as e:
+            print(f"IP ban set refresh failed: {e}")
+            # Keep previous set (or empty if first load) - never block on DB error
+            if _ip_ban_set_updated is None:
+                _ip_ban_set_updated = now  # Don't retry every request
+    return _ip_ban_set
+
+def _get_cached_announcements():
+    """Return active announcements, refreshing from DB at most every 60s."""
+    global _announcements_cache, _announcements_cache_updated
+    now = datetime.now(timezone.utc)
+    if (_announcements_cache_updated is None or
+            (now - _announcements_cache_updated).total_seconds() > _CONTENT_CACHE_TTL):
+        try:
+            docs = list(mongo_db.announcements.find({"active": True}).sort("created_at", -1).limit(10))
+            valid = []
+            for a in docs:
+                expires_at = a.get('expires_at')
+                if expires_at:
+                    if expires_at.tzinfo is None:
+                        expires_at = expires_at.replace(tzinfo=timezone.utc)
+                    if expires_at > now:
+                        if a.get('created_at') and a['created_at'].tzinfo is None:
+                            a['created_at'] = a['created_at'].replace(tzinfo=timezone.utc)
+                        a['expires_at'] = expires_at
+                        valid.append(a)
+            _announcements_cache = valid
+            _announcements_cache_updated = now
+        except Exception as e:
+            print(f"Announcements cache refresh failed: {e}")
+            if _announcements_cache_updated is None:
+                _announcements_cache_updated = now
+    return _announcements_cache
+
+def _get_cached_polls():
+    """Return active polls, refreshing from DB at most every 60s."""
+    global _polls_cache, _polls_cache_updated
+    now = datetime.now(timezone.utc)
+    if (_polls_cache_updated is None or
+            (now - _polls_cache_updated).total_seconds() > _CONTENT_CACHE_TTL):
+        try:
+            docs = list(mongo_db.polls.find({"active": True}).sort("created_at", -1).limit(3))
+            valid = []
+            for p in docs:
+                expires_at = p.get('expires_at')
+                if expires_at:
+                    if expires_at.tzinfo is None:
+                        expires_at = expires_at.replace(tzinfo=timezone.utc)
+                    if expires_at > now:
+                        if p.get('created_at') and p['created_at'].tzinfo is None:
+                            p['created_at'] = p['created_at'].replace(tzinfo=timezone.utc)
+                        p['expires_at'] = expires_at
+                        valid.append(p)
+            _polls_cache = valid
+            _polls_cache_updated = now
+        except Exception as e:
+            print(f"Polls cache refresh failed: {e}")
+            if _polls_cache_updated is None:
+                _polls_cache_updated = now
+    return _polls_cache
+
 # Simple cache for levels - OPTIMIZED FOR SPEED
 levels_cache = {
     'main_list': None,
@@ -296,11 +333,13 @@ levels_cache = {
 import json
 
 def _save_main_cache_to_file(levels):
-    """Persist main list cache to disk so it survives restarts."""
+    """Persist main list cache to disk so it survives restarts.
+    Thumbnails are stripped - they live in MongoDB and would bloat the cache
+    to 50MB+ of base64. Also a no-op on Vercel (read-only FS outside /tmp)."""
     try:
         serializable = []
         for lv in levels:
-            lv_copy = dict(lv)
+            lv_copy = {k: v for k, v in lv.items() if k != 'thumbnail_url'}
             lv_copy['_id'] = str(lv_copy['_id'])
             serializable.append(lv_copy)
         with open('cache_main_levels.json', 'w') as f:
@@ -308,13 +347,18 @@ def _save_main_cache_to_file(levels):
                 'levels': serializable,
                 'last_updated': datetime.now(timezone.utc).isoformat()
             }, f)
-        print(f"✓ Saved {len(serializable)} levels to cache file")
+        print(f"✓ Saved {len(serializable)} levels to cache file (no thumbs)")
+    except OSError:
+        # Expected on Vercel - filesystem is read-only outside /tmp
+        pass
     except Exception as e:
         print(f"Warning: could not save cache file: {e}")
 
 def _load_levels_from_db(is_legacy=False):
     """Query MongoDB for levels. Returns list or raises.
-    thumbnail_url is excluded — it stores large base64 data that causes socket timeouts."""
+    thumbnail_url is intentionally excluded - fetching all base64 blobs in one
+    query causes NetworkTimeout on Atlas M0. Thumbnails are loaded individually
+    via /api/level_thumbnail/<id> or bulk-warmed by _warm_thumbnail_cache()."""
     projection = {"_id": 1, "name": 1, "creator": 1, "verifier": 1, "position": 1,
                   "points": 1, "level_id": 1, "difficulty": 1, "video_url": 1,
                   "min_percentage": 1, "demon_type": 1}
@@ -342,209 +386,105 @@ def get_fast_cached_levels(is_legacy=False):
         if age < levels_cache['ttl']:
             return levels_cache[cache_key]
 
-    # Cache miss - load from database
+    # Cache miss - load levels from DB (thumbnails fetched separately).
     try:
-        levels = _load_levels_from_db(is_legacy)
-        # Preserve thumbnail_url from existing in-memory cache (avoids re-fetching large base64 data)
-        existing_thumbs = {}
-        cache_source = 'legacy_list' if is_legacy else 'main_list'
-        if levels_cache.get(cache_source):
-            existing_thumbs = {str(l.get('_id', '')): l.get('thumbnail_url')
-                               for l in levels_cache[cache_source] if l.get('thumbnail_url')}
-        for lv in levels:
-            key = str(lv.get('_id', ''))
-            if key in existing_thumbs:
-                lv['thumbnail_url'] = existing_thumbs[key]
+        # Preserve any thumbnails already in memory - thumbnail_url is excluded
+        # from the DB projection to avoid NetworkTimeout, so it only lives here.
+        old_thumbs = {}
+        for lv in (levels_cache.get(cache_key) or []):
+            if lv.get('thumbnail_url'):
+                old_thumbs[str(lv['_id'])] = lv['thumbnail_url']
 
-        # For any level still without a thumbnail, fetch directly from DB.
-        # This covers: newly added levels (not yet in cache) and full cache resets
-        # (main_list = None) where existing_thumbs would be empty.
-        levels_needing_thumb = [lv for lv in levels if not lv.get('thumbnail_url')]
-        if levels_needing_thumb:
-            try:
-                ids = [lv['_id'] for lv in levels_needing_thumb]
-                thumb_docs = list(mongo_db.levels.find(
-                    {'_id': {'$in': ids}, 'thumbnail_url': {'$exists': True, '$nin': ['', None]}},
-                    {'thumbnail_url': 1}
-                ))
-                if thumb_docs:
-                    db_thumbs = {str(doc['_id']): doc['thumbnail_url'] for doc in thumb_docs}
-                    for lv in levels:
-                        key = str(lv.get('_id', ''))
-                        if key in db_thumbs:
-                            lv['thumbnail_url'] = db_thumbs[key]
-            except Exception as e:
-                print(f"Warning: could not fetch level thumbnails from DB: {e}")
+        levels = _load_levels_from_db(is_legacy)
+
+        # Re-apply preserved thumbnails to the freshly loaded list
+        if old_thumbs:
+            for lv in levels:
+                thumb = old_thumbs.get(str(lv['_id']))
+                if thumb:
+                    lv['thumbnail_url'] = thumb
 
         levels_cache[cache_key] = levels
         levels_cache[updated_key] = now
         levels_cache['last_updated'] = now
         if not is_legacy:
             _save_main_cache_to_file(levels)
+            # Warm thumbnail cache in background on first main-list load
+            if not levels_cache.get('_thumb_warmer_started'):
+                levels_cache['_thumb_warmer_started'] = True
+                _warm_thumbnail_cache()
         print(f"✓ Refreshed {'legacy' if is_legacy else 'main'} list from DB ({len(levels)} levels)")
         return levels
     except Exception as e:
         print(f"DB load failed, serving stale cache: {e}")
         return levels_cache.get(cache_key) or []
 
-def _background_refresh():
-    """Refresh main list from DB in a background thread on startup, retrying until success."""
-    import threading
-    def _refresh():
-        delays = [5, 15, 30, 60, 120]  # seconds between retries
-        for attempt, delay in enumerate(delays, 1):
+def _warm_thumbnail_cache():
+    """Spawn a background thread that fetches each level's thumbnail_url one at a
+    time and stores it in the in-memory cache.  Called automatically on the first
+    main-list DB load.  Once done, /api/level_thumbnails serves all thumbnails
+    instantly and the page JS applies them without any per-card round-trips."""
+    import threading, time as _time
+
+    def _run():
+        cache = levels_cache.get('main_list') or []
+        if not cache:
+            return
+
+        print(f"Thumbnail warmer: loading thumbnails for {len(cache)} levels...")
+        warmed = 0
+        for lv in cache:
+            if lv.get('thumbnail_url'):
+                continue  # already cached
             try:
-                print(f"Background: refreshing main list from DB (attempt {attempt})...")
-                levels = _load_levels_from_db(is_legacy=False)
-                now = datetime.now(timezone.utc)
-                # Preserve thumbnails from existing cache
-                existing_thumbs = {str(l.get('_id', '')): l.get('thumbnail_url')
-                                   for l in (levels_cache.get('main_list') or []) if l.get('thumbnail_url')}
-                for lv in levels:
-                    key = str(lv.get('_id', ''))
-                    if key in existing_thumbs:
-                        lv['thumbnail_url'] = existing_thumbs[key]
-                # Fetch thumbnails from DB for any level still missing one
-                levels_needing_thumb = [lv for lv in levels if not lv.get('thumbnail_url')]
-                if levels_needing_thumb:
-                    try:
-                        ids = [lv['_id'] for lv in levels_needing_thumb]
-                        thumb_docs = list(mongo_db.levels.find(
-                            {'_id': {'$in': ids}, 'thumbnail_url': {'$exists': True, '$nin': ['', None]}},
-                            {'thumbnail_url': 1}
-                        ))
-                        if thumb_docs:
-                            db_thumbs = {str(doc['_id']): doc['thumbnail_url'] for doc in thumb_docs}
-                            for lv in levels:
-                                key = str(lv.get('_id', ''))
-                                if key in db_thumbs:
-                                    lv['thumbnail_url'] = db_thumbs[key]
-                    except Exception as e:
-                        print(f"Warning: background refresh could not fetch thumbnails: {e}")
-                levels_cache['main_list'] = levels
-                levels_cache['main_list_updated'] = now
-                levels_cache['last_updated'] = now
-                _save_main_cache_to_file(levels)
-                print(f"✓ Background refresh complete: {len(levels)} real levels loaded from DB")
-                return
+                oid = lv.get('_id')
+                doc = mongo_db.levels.find_one(
+                    {'_id': oid, 'thumbnail_url': {'$exists': True, '$nin': ['', None]}},
+                    {'thumbnail_url': 1}
+                )
+                if doc and doc.get('thumbnail_url'):
+                    lv['thumbnail_url'] = doc['thumbnail_url']
+                    warmed += 1
             except Exception as e:
-                print(f"Background refresh attempt {attempt} failed: {e}")
-                if attempt < len(delays):
-                    print(f"  Retrying in {delay}s...")
-                    time.sleep(delay)
-        print("❌ All background refresh attempts failed - serving stale cache")
-    t = threading.Thread(target=_refresh, daemon=True)
+                print(f"Thumbnail warmer error for {lv.get('name')}: {e}")
+            _time.sleep(0.5)  # slow pacing - keep pool free for user requests
+
+        print(f"Thumbnail warmer: done - {warmed} thumbnails cached")
+
+    t = threading.Thread(target=_run, daemon=True)
     t.start()
 
-# Load cache from file on startup — includes thumbnail_url local paths
-try:
-    with open('cache_main_levels.json', 'r') as f:
-        cache_data = json.load(f)
-        levels_cache['main_list'] = cache_data.get('levels', [])
-        _now = datetime.now(timezone.utc)
-        levels_cache['main_list_updated'] = _now
-        levels_cache['last_updated'] = _now
-        print(f"Loaded {len(levels_cache['main_list'])} levels from cache file")
-except Exception as e:
-    print(f"Could not load cache file: {e}")
-
-# Immediately kick off a background DB refresh so the cache is fresh ASAP
-_background_refresh()
+# On Vercel each invocation starts fresh - get_fast_cached_levels() hits MongoDB
+# on first use and fills the in-memory cache for subsequent requests in that worker.
 
 @app.before_request
-def check_ip_ban_and_verifier_status():
-    """Check if the current IP is banned and verify verifier points status before processing any request"""
+def check_ip_ban():
+    """Check if the current IP is banned. Uses in-memory cache (refreshed every 5 min)
+    so we do NOT hit MongoDB on every request."""
+    if not request.endpoint:
+        return None
+    if request.endpoint.startswith('static'):
+        return None
+
+    client_ip = request.remote_addr
+    if not client_ip:
+        return None
+
     try:
-        # Skip IP ban check for static files and certain routes
-        if (request.endpoint and 
-            (request.endpoint.startswith('static') or 
-             request.endpoint in ['login', 'register'])):
-            return None
-            
-        # Get client IP address
-        client_ip = request.remote_addr
-        
-        # Check if IP is banned in the database
-        if client_ip:
-            ban_record = mongo_db.ip_bans.find_one({
-                "ip_addresses": client_ip,
-                "active": True
-            })
-            
-            if ban_record:
-                # Log the blocked attempt
-                try:
-                    mongo_db.security_logs.insert_one({
-                        "event_type": "blocked_login_attempt",
-                        "ip_address": client_ip,
-                        "timestamp": datetime.now(timezone.utc),
-                        "user_agent": request.headers.get('User-Agent', 'Unknown'),
-                        "ban_record_id": ban_record.get('_id')
-                    })
-                except:
-                    pass  # Don't fail if logging fails
-                
-                # Return a generic error to avoid revealing system details
-                return "Access denied", 403
-                
+        if client_ip in _get_banned_ip_set():
+            try:
+                mongo_db.security_logs.insert_one({
+                    "event_type": "blocked_login_attempt",
+                    "ip_address": client_ip,
+                    "timestamp": datetime.now(timezone.utc),
+                    "user_agent": request.headers.get('User-Agent', 'Unknown'),
+                })
+            except Exception:
+                pass
+            return "Access denied", 403
     except Exception as e:
-        # Don't block users if there's an error in the ban check
         print(f"IP ban check error: {e}")
-        pass
-    
-    # Verifier points check - this is a placeholder implementation as verifier points
-    # are properly awarded in the admin_approve_record function when records are approved
-    # This check is implemented per project requirements to be in the same location as IP ban checking
-    try:
-        # Only check for verifier points if user is logged in
-        if 'user_id' in session:
-            # This is just a status check and doesn't actually award points
-            # Points are properly awarded in admin_approve_record when records are approved
-            pass
-    except Exception as e:
-        # Don't interfere with normal operation if there's an error in verifier check
-        print(f"Verifier points check error: {e}")
-        pass
-    
-    return None
-    try:
-        # Skip IP ban check for static files and certain routes
-        if (request.endpoint and 
-            (request.endpoint.startswith('static') or 
-             request.endpoint in ['login', 'register'])):
-            return None
-            
-        # Get client IP address
-        client_ip = request.remote_addr
-        
-        # Check if IP is banned in the database
-        if client_ip:
-            ban_record = mongo_db.ip_bans.find_one({
-                "ip_addresses": client_ip,
-                "active": True
-            })
-            
-            if ban_record:
-                # Log the blocked attempt
-                try:
-                    mongo_db.security_logs.insert_one({
-                        "event_type": "blocked_login_attempt",
-                        "ip_address": client_ip,
-                        "timestamp": datetime.now(timezone.utc),
-                        "user_agent": request.headers.get('User-Agent', 'Unknown'),
-                        "ban_record_id": ban_record.get('_id')
-                    })
-                except:
-                    pass  # Don't fail if logging fails
-                
-                # Return a generic error to avoid revealing system details
-                return "Access denied", 403
-                
-    except Exception as e:
-        # Don't block users if there's an error in the ban check
-        print(f"IP ban check error: {e}")
-        pass
-    
+
     return None
 
 def get_cached_levels(is_legacy=False, quick_load=False):
@@ -580,35 +520,79 @@ def retry_db_operation(max_retries=3, delay=1):
     return decorator
 
 def convert_image_to_base64(file):
-    """Convert uploaded image file to base64 data URL"""
+    """Convert uploaded image file to a resized JPEG/PNG base64 data URL.
+    Resizes to max 1280px on the longer edge and re-encodes at ~82% quality
+    so even a 10MB phone photo lands well under Vercel's 4.5MB payload cap
+    and the DB document stays small."""
     try:
-        # Check file size (max 5MB)
-        file.seek(0, 2)  # Seek to end
+        file.seek(0, 2)
         file_size = file.tell()
-        file.seek(0)  # Reset to beginning
-        
-        if file_size > 5 * 1024 * 1024:  # 5MB limit
+        file.seek(0)
+        if file_size > 10 * 1024 * 1024:
             return None
-        
-        # Check file type
+
         allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
-        content_type = file.content_type
-        
+        content_type = (file.content_type or '').lower()
         if content_type not in allowed_types:
             return None
-        
-        # Read and encode file
-        file_data = file.read()
-        encoded_data = base64.b64encode(file_data).decode('utf-8')
-        
-        # Create data URL
-        data_url = f"data:{content_type};base64,{encoded_data}"
-        
-        return data_url
-        
+
+        from PIL import Image
+        import io
+        img = Image.open(file)
+        # GIFs: take the first frame so we don't explode file size on animated uploads
+        if getattr(img, 'is_animated', False):
+            img.seek(0)
+        img.load()
+
+        max_edge = 1280
+        if max(img.size) > max_edge:
+            img.thumbnail((max_edge, max_edge), Image.LANCZOS)
+
+        buf = io.BytesIO()
+        if content_type == 'image/png' and img.mode in ('RGBA', 'LA', 'P'):
+            img.save(buf, format='PNG', optimize=True)
+            out_mime = 'image/png'
+        else:
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            img.save(buf, format='JPEG', quality=82, optimize=True, progressive=True)
+            out_mime = 'image/jpeg'
+
+        encoded_data = base64.b64encode(buf.getvalue()).decode('utf-8')
+        return f"data:{out_mime};base64,{encoded_data}"
+
     except Exception as e:
         print(f"Error converting image to base64: {e}")
         return None
+
+
+@app.after_request
+def _cache_headers(response):
+    """Long-cache versioned static assets; never cache dynamic HTML.
+    Speeds up repeat visits on Vercel since the CDN + browser both honor this."""
+    path = request.path or ''
+    if path.startswith('/static/'):
+        response.headers.setdefault(
+            'Cache-Control', 'public, max-age=31536000, immutable'
+        )
+    elif response.mimetype == 'text/html':
+        response.headers.setdefault(
+            'Cache-Control', 'no-cache, no-store, must-revalidate'
+        )
+    return response
+
+
+@app.errorhandler(413)
+def _request_entity_too_large(e):
+    """Triggered when upload exceeds MAX_CONTENT_LENGTH. Return JSON for
+    fetch/XHR callers and flash+redirect for plain form posts."""
+    from flask import jsonify
+    msg = 'Upload is too large. Max 10MB - try a smaller image.'
+    wants_json = request.is_json or 'application/json' in (request.accept_mimetypes.best or '')
+    if wants_json:
+        return jsonify({'error': msg}), 413
+    flash(msg, 'danger')
+    return redirect(request.referrer or '/'), 303
 
 def get_video_embed_info(video_url):
     """Extract video platform and embed information from URL"""
@@ -717,103 +701,36 @@ def utility_processor():
         return f"{points_float:.1f}".rstrip('0').rstrip('.')
     
     def get_active_announcements():
-        """Get active announcements that haven't expired and were created after user joined"""
-        try:
-            now = datetime.now(timezone.utc)
-            
-            # Get user join date if logged in
-            user_join_date = None
-            if 'user_id' in session:
-                user = mongo_db.users.find_one({"_id": session['user_id']})
-                if user and 'date_joined' in user:
-                    user_join_date = user['date_joined']
-            
-            query = {"active": True}
-            # If user has a join date, only show announcements created after they joined
-            if user_join_date:
-                query["created_at"] = {"$gte": user_join_date}
-            
-            announcements = list(mongo_db.announcements.find(query).sort("created_at", -1).limit(5))
-            
-            # Filter and fix timezone issues
-            active_announcements = []
-            for announcement in announcements:
-                # Fix timezone if needed
-                expires_at = announcement.get('expires_at')
-                if expires_at:
-                    if expires_at.tzinfo is None:
-                        expires_at = expires_at.replace(tzinfo=timezone.utc)
-                    
-                    # Check if still active
-                    if expires_at > now:
-                        # Fix created_at timezone too
-                        if announcement.get('created_at') and announcement['created_at'].tzinfo is None:
-                            announcement['created_at'] = announcement['created_at'].replace(tzinfo=timezone.utc)
-                        announcement['expires_at'] = expires_at
-                        active_announcements.append(announcement)
-            
-            return active_announcements
-        except Exception as e:
-            print(f"Error getting active announcements: {e}")
-            return []
+        """Get active announcements from in-memory cache, filtered by user join date."""
+        all_ann = _get_cached_announcements()
+        user_join_date = session.get('date_joined') if 'user_id' in session else None
+        if user_join_date:
+            return [a for a in all_ann if not a.get('created_at') or a['created_at'] >= user_join_date]
+        return all_ann
     
     def get_active_polls():
-        """Get active polls that haven't expired and were created after user joined, filtering out closed polls for current user"""
+        """Get active polls from in-memory cache, filtered by user join date and closed polls."""
         try:
-            now = datetime.now(timezone.utc)
-            
-            # Get user join date if logged in
-            user_join_date = None
-            if 'user_id' in session:
-                user = mongo_db.users.find_one({"_id": session['user_id']})
-                if user and 'date_joined' in user:
-                    user_join_date = user['date_joined']
-            
-            query = {"active": True}
-            # If user has a join date, only show polls created after they joined
-            if user_join_date:
-                query["created_at"] = {"$gte": user_join_date}
-            
-            polls = list(mongo_db.polls.find(query).sort("created_at", -1).limit(3))  # Show max 3 polls
-            
-            # Filter and fix timezone issues
-            active_polls = []
-            try:
-                closed_polls = session.get('closed_polls', []) if 'user_id' in session else []
-            except RuntimeError:
-                # No request context available
-                closed_polls = []
-            
-            for poll in polls:
-                # Skip polls that user has closed
+            all_polls = _get_cached_polls()
+            user_join_date = session.get('date_joined') if 'user_id' in session else None
+            closed_polls = session.get('closed_polls', []) if 'user_id' in session else []
+            user_id = session.get('user_id')
+
+            result = []
+            for poll in all_polls:
                 if str(poll['_id']) in closed_polls:
                     continue
-                    
-                # Fix timezone if needed
-                expires_at = poll.get('expires_at')
-                if expires_at:
-                    if expires_at.tzinfo is None:
-                        expires_at = expires_at.replace(tzinfo=timezone.utc)
-                    
-                    # Check if still active
-                    if expires_at > now:
-                        # Fix created_at timezone too
-                        if poll.get('created_at') and poll['created_at'].tzinfo is None:
-                            poll['created_at'] = poll['created_at'].replace(tzinfo=timezone.utc)
-                        poll['expires_at'] = expires_at
-                        
-                        # Check if current user has voted (if logged in)
-                        poll['user_has_voted'] = False
-                        if 'user_id' in session:
-                            user_id = session['user_id']
-                            for option in poll.get('options', []):
-                                if user_id in option.get('voters', []):
-                                    poll['user_has_voted'] = True
-                                    break
-                        
-                        active_polls.append(poll)
-            
-            return active_polls
+                if user_join_date and poll.get('created_at') and poll['created_at'] < user_join_date:
+                    continue
+                # Check voted status in-memory (voters list is already in the cached doc)
+                poll['user_has_voted'] = False
+                if user_id:
+                    for option in poll.get('options', []):
+                        if user_id in option.get('voters', []):
+                            poll['user_has_voted'] = True
+                            break
+                result.append(poll)
+            return result
         except Exception as e:
             print(f"Error getting active polls: {e}")
             return []
@@ -849,10 +766,19 @@ def utility_processor():
             }
     
     def get_notification_count():
-        """Get unread notification count for current user"""
-        if 'user_id' in session:
-            return get_unread_notification_count(session['user_id'])
-        return 0
+        """Get unread notification count for current user (no DB user lookup - uses session)."""
+        if 'user_id' not in session:
+            return 0
+        try:
+            user_id = session['user_id']
+            user_join_date = session.get('date_joined')
+            query = {"user_id": user_id, "read": False}
+            if user_join_date:
+                query["created_at"] = {"$gte": user_join_date}
+            return mongo_db.notifications.count_documents(query)
+        except Exception as e:
+            print(f"Error getting notification count: {e}")
+            return 0
     
 
     
@@ -965,26 +891,26 @@ def reinitialize_db_connection():
         if mongo_client:
             mongo_client.close()
         
-        # Create new connection
+        # Create new connection - same conservative timeouts as initial startup
         mongo_client = MongoClient(
             mongodb_uri,
             tls=True,
-            tlsAllowInvalidCertificates=False,
-            tlsAllowInvalidHostnames=False,
-            serverSelectionTimeoutMS=60000,
-            socketTimeoutMS=60000,
-            connectTimeoutMS=30000,
-            maxPoolSize=10,
-            minPoolSize=1,
+            tlsAllowInvalidCertificates=True,
+            tlsAllowInvalidHostnames=True,
+            serverSelectionTimeoutMS=5000,
+            connectTimeoutMS=5000,
+            socketTimeoutMS=30000,
+            maxPoolSize=5,
+            minPoolSize=0,
             maxIdleTimeMS=30000,
-            waitQueueTimeoutMS=10000,
+            waitQueueTimeoutMS=5000,
             retryWrites=True,
-            retryReads=True
+            retryReads=True,
+            connect=False
         )
         mongo_db = mongo_client[mongodb_db]
         
-        # Test new connection
-        mongo_client.admin.command('ping', maxTimeMS=30000)
+        mongo_client.admin.command('ping', maxTimeMS=5000)
         print("✓ MongoDB connection reinitialized successfully")
         return True
     except Exception as e:
@@ -2079,7 +2005,7 @@ def admin_records():
             }
         })
     
-    # Get total count — strip $sort before counting (unnecessary and expensive)
+    # Get total count - strip $sort before counting (unnecessary and expensive)
     count_pipeline = [s for s in pipeline if "$sort" not in s] + [{"$count": "total"}]
     total_result = list(mongo_db.records.aggregate(count_pipeline, allowDiskUse=True))
     total_records = total_result[0]['total'] if total_result else 0
@@ -5834,6 +5760,82 @@ def test_discord():
     
     return result
 
+@app.route('/api/level_thumbnails')
+def api_level_thumbnails():
+    """Return base64 thumbnail_url for all levels as JSON.
+    Called asynchronously by the browser after the page renders so that
+    the main page load is never blocked by large base64 transfers.
+
+    IMPORTANT: We only serve from the in-memory cache - no DB fallback.
+    Fetching 100+ thumbnail_url blobs from Atlas M0 in one query exceeds
+    the 30s socket timeout. On a cold worker, the browser gets {} and shows
+    YouTube fallbacks; on a warm worker (cache populated), custom thumbnails
+    are returned instantly. The cache is populated when levels are edited or
+    when individual level pages are loaded (see api_single_level_thumbnail)."""
+    from flask import jsonify
+    list_type = request.args.get('list', 'main')
+    is_legacy = list_type == 'legacy'
+
+    cache_key = 'legacy_list' if is_legacy else 'main_list'
+    cached = levels_cache.get(cache_key) or []
+    result = {
+        str(lv['_id']): lv['thumbnail_url']
+        for lv in cached
+        if lv.get('thumbnail_url')
+    }
+
+    resp = jsonify(result)
+    resp.headers['Cache-Control'] = 'no-store'
+    return resp
+
+
+@app.route('/api/level_thumbnail/<level_id>')
+def api_single_level_thumbnail(level_id):
+    """Fetch and cache the thumbnail for one level.
+    Called lazily (e.g. when a level card is scrolled into view) to
+    gradually warm the in-memory thumbnail cache without a bulk DB query."""
+    from flask import jsonify
+    from bson import ObjectId
+    # Try ObjectId first; fall back to integer for levels with numeric _id
+    try:
+        oid = ObjectId(level_id)
+    except Exception:
+        try:
+            oid = int(level_id)
+        except Exception:
+            return jsonify({'error': 'invalid id'}), 400
+
+    # Check in-memory cache first
+    for lst_key in ('main_list', 'legacy_list'):
+        for lv in (levels_cache.get(lst_key) or []):
+            if str(lv.get('_id', '')) == level_id and lv.get('thumbnail_url'):
+                resp = jsonify({'thumbnail_url': lv['thumbnail_url']})
+                resp.headers['Cache-Control'] = 'no-store'
+                return resp
+
+    # Not in cache - fetch just this one document (one small DB round-trip)
+    try:
+        doc = mongo_db.levels.find_one(
+            {'_id': oid, 'thumbnail_url': {'$exists': True, '$nin': ['', None]}},
+            {'thumbnail_url': 1}
+        )
+        if doc and doc.get('thumbnail_url'):
+            thumb = doc['thumbnail_url']
+            # Store in cache for subsequent requests
+            for lst_key in ('main_list', 'legacy_list'):
+                for lv in (levels_cache.get(lst_key) or []):
+                    if str(lv.get('_id', '')) == level_id:
+                        lv['thumbnail_url'] = thumb
+                        break
+            resp = jsonify({'thumbnail_url': thumb})
+            resp.headers['Cache-Control'] = 'no-store'
+            return resp
+    except Exception as e:
+        print(f"Single thumbnail fetch failed for {level_id}: {e}")
+
+    return jsonify({}), 200
+
+
 @app.route('/')
 def index():
     """Main list - cached level retrieval"""
@@ -6325,8 +6327,9 @@ def login():
             session['username'] = user['username']
             session['is_admin'] = user.get('is_admin', False)
             session['head_admin'] = user.get('head_admin', False)  # Add this line
+            session['date_joined'] = user.get('date_joined')
             session.permanent = True  # Make session permanent
-            
+
             # Load user preferences
             session['theme'] = user.get('theme_preference', 'light')
             
@@ -6725,12 +6728,12 @@ def google_callback():
         session['username'] = user['username']
         session['is_admin'] = user.get('is_admin', False)
         session['head_admin'] = user.get('head_admin', False)
+        session['date_joined'] = user.get('date_joined')
         session.permanent = True  # Make session permanent
-        
+
         # Load user preferences
         session['theme'] = user.get('theme_preference', 'light')
 
-        
         # Log login activity
         login_entry = {
             "user_id": user['_id'],
@@ -6872,8 +6875,9 @@ def discord_callback():
             session['username'] = user['username']
             session['is_admin'] = user.get('is_admin', False)
             session['head_admin'] = user.get('head_admin', False)
+            session['date_joined'] = user.get('date_joined')
             session.permanent = True
-            
+
             # Load user preferences
             session['theme'] = user.get('theme_preference', 'light')
             
@@ -13649,21 +13653,6 @@ def api_live_stats():
     return jsonify(stats)
 
 
-@app.route('/api/level_thumbnail/<level_id_str>')
-def api_level_thumbnail(level_id_str):
-    """Return just the thumbnail_url for a single level (fetched lazily by the frontend)."""
-    from flask import jsonify
-    try:
-        try:
-            oid = ObjectId(level_id_str)
-        except Exception:
-            return jsonify({'thumbnail_url': None}), 404
-        level = mongo_db.levels.find_one({"_id": oid}, {"thumbnail_url": 1})
-        if level and level.get('thumbnail_url'):
-            return jsonify({'thumbnail_url': level['thumbnail_url']})
-        return jsonify({'thumbnail_url': None})
-    except Exception as e:
-        return jsonify({'thumbnail_url': None, 'error': str(e)}), 500
 
 
 
@@ -14122,6 +14111,9 @@ if __name__ == '__main__':
     periodic_thread = threading.Thread(target=periodic_tasks, daemon=True)
     periodic_thread.start()
     print("✅ Periodic tasks thread started")
-    
+
+    # Warm the thumbnail cache in the background so images show immediately
+    _warm_thumbnail_cache()
+
     port = int(os.environ.get('PORT', 10000))
     app.run(debug=True, host='0.0.0.0', port=port)
