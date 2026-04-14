@@ -112,6 +112,10 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-here-ch
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 31536000  # 1 year cache for static files
 app.config['TEMPLATES_AUTO_RELOAD'] = False  # Disable auto-reload in production
 app.config['JSON_SORT_KEYS'] = False  # Faster JSON responses
+# Upload size cap — images are resized server-side before base64 encoding,
+# so 10MB of raw upload is plenty and keeps us safely under Vercel's 4.5MB
+# function payload once re-encoded & resized.
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
 
 # Enable compression for responses
 try:
@@ -148,61 +152,49 @@ max_retries = 3
 while retry_count < max_retries:
     try:
         print(f"MongoDB URI: {mongodb_uri[:50]}... (attempt {retry_count + 1}/{max_retries})")
-        print(f"MongoDB DB: {mongodb_db}")
         mongo_client = MongoClient(
             mongodb_uri,
             tls=True,
             tlsAllowInvalidCertificates=True,
             tlsAllowInvalidHostnames=True,
-            serverSelectionTimeoutMS=30000,
+            # Fast connection timeout for cold starts; generous socket timeout
+            # for large data transfers (e.g. streaming 100 base64 thumbnails).
+            serverSelectionTimeoutMS=5000,
             socketTimeoutMS=30000,
-            connectTimeoutMS=30000,
-            maxPoolSize=10,
-            minPoolSize=1,
-            maxIdleTimeMS=60000,
-            waitQueueTimeoutMS=10000,
+            connectTimeoutMS=5000,
+            maxPoolSize=5,
+            minPoolSize=0,
+            maxIdleTimeMS=30000,
+            waitQueueTimeoutMS=5000,
             retryWrites=True,
             retryReads=True,
             directConnection=False,
             connect=False
         )
         mongo_db = mongo_client[mongodb_db]
-        # Test connection with timeout
-        mongo_client.admin.command('ping', maxTimeMS=30000)
+        # Quick ping to confirm credentials/network are good
+        mongo_client.admin.command('ping', maxTimeMS=5000)
         print("✓ MongoDB initialized successfully")
-        
-        # Set MongoDB reference for changelog notifier
+
         try:
             from changelog_discord import set_mongo_db
             set_mongo_db(mongo_db)
-            print("✓ Changelog Discord notifier database reference set")
-        except Exception as e:
-            print(f"⚠️  Warning: Could not set changelog notifier database reference: {e}")
+        except Exception:
+            pass
         break
     except Exception as e:
         retry_count += 1
         print(f"❌ MongoDB connection attempt {retry_count} failed: {e}")
         if retry_count < max_retries:
-            print(f"Retrying in 2 seconds...")
-            time.sleep(2)  # Reduced retry delay
+            time.sleep(0.5)
         else:
             print("All MongoDB connection attempts failed")
             raise Exception("Failed to connect to MongoDB after all retries")
 
 if retry_count < max_retries:
-    # Create indexes for better performance
-    try:
-        mongo_db.levels.create_index([("is_legacy", 1), ("position", 1)])
-        # Records indexes — critical for sort/filter performance
-        mongo_db.records.create_index([("date_submitted", -1)])
-        mongo_db.records.create_index([("status", 1), ("date_submitted", -1)])
-        mongo_db.records.create_index([("user_id", 1), ("status", 1)])
-        mongo_db.records.create_index([("level_id", 1), ("status", 1)])
-        # Users index for leaderboard
-        mongo_db.users.create_index([("points", -1)])
-        print("✓ Database indexes created")
-    except Exception as e:
-        print(f"Index creation warning: {e}")
+    # Indexes are created once via /create_indexes route or manually in Atlas.
+    # Skipping at startup to avoid 5+ extra DB round-trips on every Vercel cold start.
+    pass
 else:
     print("MongoDB initialization error: Failed after all retries")
     print("Falling back to SQLite...")
@@ -211,22 +203,7 @@ else:
     subprocess.run(['python', 'main_sqlite_backup.py'])
     exit()
     
-# Initialize console settings
-try:
-    console_settings = mongo_db.site_settings.find_one({"_id": "console"})
-    if not console_settings:
-        # Create default console settings
-        default_console_settings = {
-            "_id": "console",
-            "pin_required": False,
-            "pin": "1234"
-        }
-        mongo_db.site_settings.insert_one(default_console_settings)
-        print("✓ Default console settings created")
-    else:
-        print("✓ Console settings loaded")
-except Exception as e:
-    print(f"Warning: Could not initialize console settings: {e}")
+# Console settings are seeded lazily on first use, not at cold-start.
 
 print("Initializing OAuth...")
 oauth = OAuth(app)
@@ -296,11 +273,13 @@ levels_cache = {
 import json
 
 def _save_main_cache_to_file(levels):
-    """Persist main list cache to disk so it survives restarts."""
+    """Persist main list cache to disk so it survives restarts.
+    Thumbnails are stripped — they live in MongoDB and would bloat the cache
+    to 50MB+ of base64. Also a no-op on Vercel (read-only FS outside /tmp)."""
     try:
         serializable = []
         for lv in levels:
-            lv_copy = dict(lv)
+            lv_copy = {k: v for k, v in lv.items() if k != 'thumbnail_url'}
             lv_copy['_id'] = str(lv_copy['_id'])
             serializable.append(lv_copy)
         with open('cache_main_levels.json', 'w') as f:
@@ -308,7 +287,10 @@ def _save_main_cache_to_file(levels):
                 'levels': serializable,
                 'last_updated': datetime.now(timezone.utc).isoformat()
             }, f)
-        print(f"✓ Saved {len(serializable)} levels to cache file")
+        print(f"✓ Saved {len(serializable)} levels to cache file (no thumbs)")
+    except OSError:
+        # Expected on Vercel — filesystem is read-only outside /tmp
+        pass
     except Exception as e:
         print(f"Warning: could not save cache file: {e}")
 
@@ -436,20 +418,9 @@ def _background_refresh():
     t = threading.Thread(target=_refresh, daemon=True)
     t.start()
 
-# Load cache from file on startup — includes thumbnail_url local paths
-try:
-    with open('cache_main_levels.json', 'r') as f:
-        cache_data = json.load(f)
-        levels_cache['main_list'] = cache_data.get('levels', [])
-        _now = datetime.now(timezone.utc)
-        levels_cache['main_list_updated'] = _now
-        levels_cache['last_updated'] = _now
-        print(f"Loaded {len(levels_cache['main_list'])} levels from cache file")
-except Exception as e:
-    print(f"Could not load cache file: {e}")
-
-# Immediately kick off a background DB refresh so the cache is fresh ASAP
-_background_refresh()
+# On Vercel each invocation starts fresh — the cache file no longer ships in
+# the repo and background threads die with the invocation, so we skip both.
+# get_fast_cached_levels() will hit MongoDB on first use and fill the cache.
 
 @app.before_request
 def check_ip_ban_and_verifier_status():
@@ -580,35 +551,79 @@ def retry_db_operation(max_retries=3, delay=1):
     return decorator
 
 def convert_image_to_base64(file):
-    """Convert uploaded image file to base64 data URL"""
+    """Convert uploaded image file to a resized JPEG/PNG base64 data URL.
+    Resizes to max 1280px on the longer edge and re-encodes at ~82% quality
+    so even a 10MB phone photo lands well under Vercel's 4.5MB payload cap
+    and the DB document stays small."""
     try:
-        # Check file size (max 5MB)
-        file.seek(0, 2)  # Seek to end
+        file.seek(0, 2)
         file_size = file.tell()
-        file.seek(0)  # Reset to beginning
-        
-        if file_size > 5 * 1024 * 1024:  # 5MB limit
+        file.seek(0)
+        if file_size > 10 * 1024 * 1024:
             return None
-        
-        # Check file type
+
         allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
-        content_type = file.content_type
-        
+        content_type = (file.content_type or '').lower()
         if content_type not in allowed_types:
             return None
-        
-        # Read and encode file
-        file_data = file.read()
-        encoded_data = base64.b64encode(file_data).decode('utf-8')
-        
-        # Create data URL
-        data_url = f"data:{content_type};base64,{encoded_data}"
-        
-        return data_url
-        
+
+        from PIL import Image
+        import io
+        img = Image.open(file)
+        # GIFs: take the first frame so we don't explode file size on animated uploads
+        if getattr(img, 'is_animated', False):
+            img.seek(0)
+        img.load()
+
+        max_edge = 1280
+        if max(img.size) > max_edge:
+            img.thumbnail((max_edge, max_edge), Image.LANCZOS)
+
+        buf = io.BytesIO()
+        if content_type == 'image/png' and img.mode in ('RGBA', 'LA', 'P'):
+            img.save(buf, format='PNG', optimize=True)
+            out_mime = 'image/png'
+        else:
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            img.save(buf, format='JPEG', quality=82, optimize=True, progressive=True)
+            out_mime = 'image/jpeg'
+
+        encoded_data = base64.b64encode(buf.getvalue()).decode('utf-8')
+        return f"data:{out_mime};base64,{encoded_data}"
+
     except Exception as e:
         print(f"Error converting image to base64: {e}")
         return None
+
+
+@app.after_request
+def _cache_headers(response):
+    """Long-cache versioned static assets; never cache dynamic HTML.
+    Speeds up repeat visits on Vercel since the CDN + browser both honor this."""
+    path = request.path or ''
+    if path.startswith('/static/'):
+        response.headers.setdefault(
+            'Cache-Control', 'public, max-age=31536000, immutable'
+        )
+    elif response.mimetype == 'text/html':
+        response.headers.setdefault(
+            'Cache-Control', 'no-cache, no-store, must-revalidate'
+        )
+    return response
+
+
+@app.errorhandler(413)
+def _request_entity_too_large(e):
+    """Triggered when upload exceeds MAX_CONTENT_LENGTH. Return JSON for
+    fetch/XHR callers and flash+redirect for plain form posts."""
+    from flask import jsonify
+    msg = 'Upload is too large. Max 10MB — try a smaller image.'
+    wants_json = request.is_json or 'application/json' in (request.accept_mimetypes.best or '')
+    if wants_json:
+        return jsonify({'error': msg}), 413
+    flash(msg, 'danger')
+    return redirect(request.referrer or '/'), 303
 
 def get_video_embed_info(video_url):
     """Extract video platform and embed information from URL"""
@@ -983,8 +998,7 @@ def reinitialize_db_connection():
         )
         mongo_db = mongo_client[mongodb_db]
         
-        # Test new connection
-        mongo_client.admin.command('ping', maxTimeMS=30000)
+        mongo_client.admin.command('ping', maxTimeMS=5000)
         print("✓ MongoDB connection reinitialized successfully")
         return True
     except Exception as e:

@@ -61,5 +61,9 @@ Thumbs.db
 # Logs
 *.log
 
-#db files 
+#db files
 demonlist.db
+
+# Runtime caches (must not be committed — they served stale data to Vercel workers)
+cache_main_levels.json
+cache_legacy_levels.json
