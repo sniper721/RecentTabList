@@ -520,10 +520,14 @@ def retry_db_operation(max_retries=3, delay=1):
     return decorator
 
 def convert_image_to_base64(file):
-    """Convert uploaded image file to a resized JPEG/PNG base64 data URL.
-    Resizes to max 1280px on the longer edge and re-encodes at ~82% quality
-    so even a 10MB phone photo lands well under Vercel's 4.5MB payload cap
-    and the DB document stays small."""
+    """Convert uploaded image file to a resized JPEG base64 data URL.
+
+    Target size: ≤ 480 px on the longer edge at 72 % JPEG quality.
+    This keeps each thumbnail document under ~30 KB, which MongoDB Atlas M0
+    can transfer in milliseconds instead of timing out on large blobs.
+    PNG inputs with transparency are converted to JPEG (white background) so
+    we always produce the smallest possible output.
+    """
     try:
         file.seek(0, 2)
         file_size = file.tell()
@@ -544,22 +548,27 @@ def convert_image_to_base64(file):
             img.seek(0)
         img.load()
 
-        max_edge = 1280
+        # Keep aspect ratio but cap at 480 px — small enough for fast DB transfer
+        max_edge = 480
         if max(img.size) > max_edge:
             img.thumbnail((max_edge, max_edge), Image.LANCZOS)
 
+        # Always output JPEG for consistency and smallest size.
+        # Flatten any alpha channel onto a white background first.
+        if img.mode in ('RGBA', 'LA', 'P'):
+            background = Image.new('RGB', img.size, (255, 255, 255))
+            if img.mode == 'P':
+                img = img.convert('RGBA')
+            background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+            img = background
+        elif img.mode != 'RGB':
+            img = img.convert('RGB')
+
         buf = io.BytesIO()
-        if content_type == 'image/png' and img.mode in ('RGBA', 'LA', 'P'):
-            img.save(buf, format='PNG', optimize=True)
-            out_mime = 'image/png'
-        else:
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
-            img.save(buf, format='JPEG', quality=82, optimize=True, progressive=True)
-            out_mime = 'image/jpeg'
+        img.save(buf, format='JPEG', quality=72, optimize=True, progressive=True)
 
         encoded_data = base64.b64encode(buf.getvalue()).decode('utf-8')
-        return f"data:{out_mime};base64,{encoded_data}"
+        return f"data:image/jpeg;base64,{encoded_data}"
 
     except Exception as e:
         print(f"Error converting image to base64: {e}")
@@ -1342,19 +1351,29 @@ def shift_level_positions(position, is_legacy=False, direction=1):
         {"$inc": {"position": direction}}
     )
 
-def recalculate_all_points():
-    """Recalculate points for all levels AND users using the real-time system"""
+def recalculate_all_points(levels_only=False):
+    """Recalculate points for all levels (and optionally users) using the real-time system.
+
+    Pass levels_only=True in request handlers to skip the expensive per-user
+    recalculation (O(n_users × n_records) DB queries).  User points will be
+    at most one level-edit stale; the dedicated /admin/recalculate_all_points
+    route resets them fully when needed.
+    """
     if REAL_TIME_POINTS_AVAILABLE:
         try:
             from real_time_points_system import RealTimePointsManager
             manager = RealTimePointsManager(mongo_db)
-            
+
             # Recalculate all level points
             levels_updated = manager.recalculate_all_level_points()
-            
+
+            if levels_only:
+                print(f"✅ Level points recalculated: {levels_updated} levels updated (user points skipped)")
+                return levels_updated, 0
+
             # Recalculate all user points
             users_updated = manager.recalculate_all_user_points()
-            
+
             print(f"✅ Real-time recalculation: {levels_updated} levels, {users_updated} users updated")
             return levels_updated, users_updated
             
@@ -3803,15 +3822,16 @@ def admin_recalculate_all_points():
     try:
         # Step 1: Recalculate all level points
         print("🔄 Admin recalculate: Starting level points recalculation...")
-        levels = list(mongo_db.levels.find({}))
+        _pts_proj = {"_id": 1, "position": 1, "is_legacy": 1, "points": 1}
+        levels = list(mongo_db.levels.find({}, _pts_proj))
         levels_updated = 0
-        
+
         for level in levels:
             position = level.get("position", 0)
             is_legacy = level.get("is_legacy", False)
             current_points = level.get("points", 0)
             correct_points = calculate_level_points(position, is_legacy)
-            
+
             if abs(current_points - correct_points) > 0.01:
                 result = mongo_db.levels.update_one(
                     {"_id": level["_id"]},
@@ -3819,12 +3839,12 @@ def admin_recalculate_all_points():
                 )
                 if result.modified_count > 0:
                     levels_updated += 1
-        
+
         # Step 2: Recalculate all user points using verified method
         print("🔄 Admin recalculate: Starting user points recalculation...")
-        
-        # Reload levels with correct points
-        levels = list(mongo_db.levels.find({}))
+
+        # Reload levels with correct points (no thumbnail needed)
+        levels = list(mongo_db.levels.find({}, {"_id": 1, "points": 1, "is_legacy": 1}))
         level_lookup = {str(level['_id']): level for level in levels}
         
         users = list(mongo_db.users.find({}))
@@ -6215,40 +6235,44 @@ def level_detail(level_id):
         level = None
         level_id_for_records = None
         
+        # Exclude thumbnail_url — the detail page embeds a video player, not
+        # a static image.  Skipping the large base64 blob avoids socket timeouts.
+        _detail_proj = {"thumbnail_url": 0}
+
         # Try multiple approaches to find the level
         # 1. Try as ObjectId first (for new levels)
         try:
             level_object_id = ObjectId(level_id)
-            level = mongo_db.levels.find_one({"_id": level_object_id})
+            level = mongo_db.levels.find_one({"_id": level_object_id}, _detail_proj)
             level_id_for_records = level_object_id
             print(f"Found level by ObjectId: {level_id}")
         except (ValueError, InvalidId):
             pass
-        
+
         # 2. If not found, try as integer (for legacy levels)
         if not level:
             try:
                 level_int_id = int(level_id)
-                level = mongo_db.levels.find_one({"_id": level_int_id})
+                level = mongo_db.levels.find_one({"_id": level_int_id}, _detail_proj)
                 level_id_for_records = level_int_id
                 print(f"Found level by int ID: {level_id}")
             except (ValueError, TypeError):
                 pass
-        
+
         # 3. If still not found, try searching by level_id field (GD level ID)
         if not level:
             try:
-                level = mongo_db.levels.find_one({"level_id": level_id})
+                level = mongo_db.levels.find_one({"level_id": level_id}, _detail_proj)
                 if level:
                     level_id_for_records = level["_id"]
                     print(f"Found level by level_id field: {level_id}")
             except Exception:
                 pass
-        
+
         # 4. Final attempt: search by name (case insensitive)
         if not level:
             try:
-                level = mongo_db.levels.find_one({"name": {"$regex": f"^{level_id}$", "$options": "i"}})
+                level = mongo_db.levels.find_one({"name": {"$regex": f"^{level_id}$", "$options": "i"}}, _detail_proj)
                 if level:
                     level_id_for_records = level["_id"]
                     print(f"Found level by name: {level_id}")
@@ -6941,8 +6965,9 @@ def profile():
         return redirect(url_for('login'))
     
     user = mongo_db.users.find_one({"_id": session['user_id']}, max_time_ms=60000)
-    
-    # Get ALL records for display in tabs (includes pending/rejected)
+
+    # Single aggregation — fetch all user records with level info in one DB round-trip.
+    # preserveNullAndEmptyArrays keeps records whose level was deleted so they still show.
     all_user_records = list(mongo_db.records.aggregate([
         {"$match": {"user_id": session['user_id']}},
         {"$lookup": {
@@ -6951,55 +6976,19 @@ def profile():
             "foreignField": "_id",
             "as": "level"
         }},
-        {"$unwind": "$level"},
+        {"$unwind": {"path": "$level", "preserveNullAndEmptyArrays": True}},
         {"$sort": {"date_submitted": -1}}
     ], allowDiskUse=True))
-    
-    # Get only APPROVED records for accurate stats counting
-    approved_records = list(mongo_db.records.aggregate([
-        {"$match": {"user_id": session['user_id'], "status": "approved"}},
-        {"$lookup": {
-            "from": "levels",
-            "localField": "level_id",
-            "foreignField": "_id",
-            "as": "level"
-        }},
-        {"$unwind": "$level"},
-        {"$sort": {"date_submitted": -1}}
-    ], allowDiskUse=True))
-    
-    # Get only APPROVED records on MAIN LIST levels (exclude legacy) for completion counting
-    main_list_approved = list(mongo_db.records.aggregate([
-        {"$match": {"user_id": session['user_id'], "status": "approved"}},
-        {"$lookup": {
-            "from": "levels",
-            "localField": "level_id",
-            "foreignField": "_id",
-            "as": "level"
-        }},
-        {"$unwind": "$level"},
-        {"$match": {"level.is_legacy": {"$ne": True}}},  # Exclude legacy levels
-        {"$sort": {"date_submitted": -1}}
-    ], allowDiskUse=True))
-    
-    # Get only APPROVED records on LEGACY levels for legacy completion counting
-    legacy_list_approved = list(mongo_db.records.aggregate([
-        {"$match": {"user_id": session['user_id'], "status": "approved"}},
-        {"$lookup": {
-            "from": "levels",
-            "localField": "level_id",
-            "foreignField": "_id",
-            "as": "level"
-        }},
-        {"$unwind": "$level"},
-        {"$match": {"level.is_legacy": True}},  # Only legacy levels
-        {"$sort": {"date_submitted": -1}}
-    ], allowDiskUse=True))
-    
+
+    # Derive filtered views in Python — no extra DB round-trips
+    approved_records     = [r for r in all_user_records if r.get('status') == 'approved']
+    main_list_approved   = [r for r in approved_records if not r.get('level', {}).get('is_legacy', False)]
+    legacy_list_approved = [r for r in approved_records if r.get('level', {}).get('is_legacy', False)]
+
     # Calculate accurate stats
-    approved_count = len(approved_records)  # All approved records
-    main_completed_count = len([r for r in main_list_approved if r['progress'] == 100])  # Main list completions
-    legacy_completed_count = len([r for r in legacy_list_approved if r['progress'] == 100])  # Legacy completions
+    approved_count         = len(approved_records)
+    main_completed_count   = len([r for r in main_list_approved   if r.get('progress') == 100])
+    legacy_completed_count = len([r for r in legacy_list_approved if r.get('progress') == 100])
     total_submissions = len(all_user_records)
     pending_count = len([r for r in all_user_records if r.get('status') == 'pending'])
     
@@ -7729,7 +7718,7 @@ def admin_delete_level_enhanced(level_id):
         )
         
         # Recalculate points for all levels after position changes
-        recalculate_all_points()
+        recalculate_all_points(levels_only=True)
         
         # Log admin action
         reason_text = f" (Reason: {removal_reason})" if removal_reason else ""
@@ -7783,15 +7772,25 @@ def admin_dashboard():
         flash('Access denied. Admin privileges required.', 'danger')
         return redirect(url_for('index'))
     
-    # Get basic stats for dashboard
-    stats = {
-        'pending_records': mongo_db.records.count_documents({"status": "pending"}),
-        'total_users': mongo_db.users.count_documents({}),
-        'total_levels': mongo_db.levels.count_documents({"is_legacy": False}),
-        'legacy_levels': mongo_db.levels.count_documents({"is_legacy": True}),
-        'total_records': mongo_db.records.count_documents({"status": "approved"})
-    }
-    
+    # Get basic stats for dashboard — each query is capped at 5 s so a slow
+    # Atlas cold start never causes the whole dashboard to 504.
+    try:
+        stats = {
+            'pending_records': mongo_db.records.count_documents({"status": "pending"},   maxTimeMS=5000),
+            'total_users':     mongo_db.users.count_documents({},                        maxTimeMS=5000),
+            'total_levels':    mongo_db.levels.count_documents({"is_legacy": False},     maxTimeMS=5000),
+            'legacy_levels':   mongo_db.levels.count_documents({"is_legacy": True},      maxTimeMS=5000),
+            'total_records':   mongo_db.records.count_documents({"status": "approved"},  maxTimeMS=5000),
+        }
+    except Exception:
+        stats = {
+            'pending_records': '—',
+            'total_users':     '—',
+            'total_levels':    '—',
+            'legacy_levels':   '—',
+            'total_records':   '—',
+        }
+
     return render_template('admin/dashboard.html', stats=stats)
 
 @app.route('/admin/profanity')
@@ -10113,7 +10112,7 @@ def admin_levels():
             levels_cache['legacy_list_updated'] = None
             
             # Recalculate points for all levels after position changes
-            recalculate_all_points()
+            recalculate_all_points(levels_only=True)
             
             # Log level placement to changelog
             above_level = None
@@ -10185,18 +10184,6 @@ def admin_levels():
                     "demon_type": 1, "min_percentage": 1
                 }).sort("position", 1).limit(100))
         
-        # Debug: Check thumbnail URLs and file existence
-        import os
-        for level in levels:
-            thumb = level.get('thumbnail_url', '')
-            if thumb:
-                if thumb.startswith('/static/uploads/'):
-                    file_path = thumb[1:]  # Remove leading slash
-                    exists = os.path.exists(file_path)
-                    print(f"Level {level['name']}: FILE {file_path} - {'EXISTS' if exists else 'MISSING'}")
-                else:
-                    print(f"Level {level['name']}: URL {thumb}")
-        
         return render_template('admin/levels.html', levels=levels, is_legacy_filter=is_legacy_filter)
     
     except Exception as e:
@@ -10229,7 +10216,11 @@ def admin_edit_level():
     demon_type = None  # Demon subcategories removed
 
     
-    level = mongo_db.levels.find_one({"_id": db_level_id})
+    # Exclude thumbnail_url — it can be hundreds of KB of base64 and causes
+    # socket timeouts on Atlas M0.  The thumbnail is handled separately via the
+    # thumbnail_type form field; the 'keep_existing' path never needs to read
+    # the current value because we simply omit thumbnail_url from update_data.
+    level = mongo_db.levels.find_one({"_id": db_level_id}, {"thumbnail_url": 0})
 
     if not level:
         flash('Level not found', 'danger')
@@ -10261,8 +10252,11 @@ def admin_edit_level():
                 flash('No file selected for upload.', 'warning')
                 thumbnail_url = ''
     elif thumbnail_type == 'keep' or thumbnail_type == 'keep_existing':
-        # Keep existing thumbnail
-        thumbnail_url = level.get('thumbnail_url', '')
+        # Keep existing thumbnail — thumbnail_url is excluded from the find_one
+        # projection to avoid socket timeouts, but that's fine: the update_data
+        # block below omits thumbnail_url for keep/keep_existing, and the cache
+        # update also leaves the existing value untouched (see `pass` branch below).
+        thumbnail_url = ''
     # If thumbnail_type == 'auto', thumbnail_url stays empty (uses YouTube auto)
     
     # Handle position changes
@@ -10423,7 +10417,7 @@ def admin_edit_level():
 
     # Only recalculate points if position or legacy status changed (performance optimization)
     if position != old_position or is_legacy != old_is_legacy:
-        recalculate_all_points()
+        recalculate_all_points(levels_only=True)
     
     flash('Level updated successfully!', 'success')
     return redirect(url_for('admin_levels') + '?updated=' + str(db_level_id))
@@ -10448,12 +10442,12 @@ def admin_delete_level():
     
     removal_reason = request.form.get('removal_reason', '').strip()  # Get optional removal reason
     
-    # Get level info before deletion
-    level = mongo_db.levels.find_one({"_id": level_id})
+    # Get level info before deletion (exclude large thumbnail_url)
+    level = mongo_db.levels.find_one({"_id": level_id}, {"thumbnail_url": 0})
     if not level:
         flash('Level not found', 'danger')
         return redirect(url_for('admin_levels'))
-    
+
     level_position = level['position']
     is_legacy = level.get('is_legacy', False)
     admin_username = session.get('username', 'Unknown')
@@ -10496,7 +10490,7 @@ def admin_delete_level():
     )
     
     # Recalculate points for all levels after position changes
-    recalculate_all_points()
+    recalculate_all_points(levels_only=True)
     
     # Log admin action
     reason_text = f" (Reason: {removal_reason})" if removal_reason else ""
@@ -10529,12 +10523,12 @@ def admin_move_to_legacy():
             flash('Invalid level ID format', 'danger')
             return redirect(url_for('admin_levels'))
     
-    # Get level info before moving
-    level = mongo_db.levels.find_one({"_id": level_id})
+    # Get level info before moving (exclude large thumbnail_url)
+    level = mongo_db.levels.find_one({"_id": level_id}, {"thumbnail_url": 0})
     if not level or level.get('is_legacy', False):
         flash('Level not found or already in legacy', 'danger')
         return redirect(url_for('admin_levels'))
-    
+
     old_position = level['position']
     
     # Find the highest position in the legacy list
@@ -10568,7 +10562,7 @@ def admin_move_to_legacy():
     levels_cache['legacy_list'] = None
     
     # Recalculate points for all levels after position changes
-    recalculate_all_points()
+    recalculate_all_points(levels_only=True)
     
     flash('Level moved to legacy list successfully!', 'success')
     return redirect(url_for('admin_levels'))
@@ -10593,8 +10587,8 @@ def admin_move_to_main():
     
     position = int(request.form.get('position'))
     
-    # Get level info before moving
-    level = mongo_db.levels.find_one({"_id": level_id})
+    # Get level info before moving (exclude large thumbnail_url)
+    level = mongo_db.levels.find_one({"_id": level_id}, {"thumbnail_url": 0})
     if not level or not level.get('is_legacy', False):
         flash('Level not found or already in main list', 'danger')
         return redirect(url_for('admin_levels'))
@@ -10631,7 +10625,7 @@ def admin_move_to_main():
     )
     
     # Recalculate points for all levels after position changes
-    recalculate_all_points()
+    recalculate_all_points(levels_only=True)
     
     flash('Level moved to main list successfully!', 'success')
     return redirect(url_for('admin_levels'))

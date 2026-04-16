@@ -795,11 +795,10 @@
 <script src="{{ url_for('static', filename='js/background_loader.js') }}"></script>
 
 <script>
-// Lazy-load custom thumbnails one-at-a-time as level cards scroll into view.
-// First we try the fast batch endpoint (serves from in-memory cache, no DB).
-// For any still missing after that, we use IntersectionObserver to fetch
-// each card's thumbnail individually - one tiny DB round-trip per card,
-// spread out over the scroll, never a 30MB bulk query.
+// Thumbnail loader: fetch custom thumbnails eagerly, top-to-bottom, 3 at a time.
+// Step 1 hits the fast in-memory batch endpoint (warm workers: instant).
+// Step 2 fetches anything still missing immediately — no waiting for scroll.
+// Loading starts before the user reaches each card so thumbnails are ready.
 (function() {
     function applyThumb(el, src) {
         if (!src) return;
@@ -809,13 +808,37 @@
             var img = document.createElement('img');
             img.src = src;
             img.className = 'level-thumbnail img-fluid rounded';
-            img.loading = 'lazy';
             img.decoding = 'async';
             el.parentNode.replaceChild(img, el);
         }
     }
 
-    // Step 1: batch fetch from in-memory cache (fast, no DB hit on warm workers)
+    function fetchOne(el, onDone) {
+        var mid = el.getAttribute('data-mongo-id');
+        fetch('/api/level_thumbnail/' + mid)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.thumbnail_url) applyThumb(el, data.thumbnail_url);
+            })
+            .catch(function() {})
+            .finally(onDone);
+    }
+
+    // Fetch items in order with a concurrency cap so we don't flood Atlas M0.
+    function loadAll(items, concurrency) {
+        var idx = 0, active = 0;
+        function next() {
+            while (active < concurrency && idx < items.length) {
+                active++;
+                (function(el) {
+                    fetchOne(el, function() { active--; next(); });
+                })(items[idx++]);
+            }
+        }
+        next();
+    }
+
+    // Step 1: batch endpoint — instant on warm workers, empty on cold start
     fetch('/api/level_thumbnails?list=main')
         .then(function(r) { return r.json(); })
         .then(function(thumbs) {
@@ -829,27 +852,8 @@
                 }
             });
 
-            // Step 2: for any still missing, fetch individually as they scroll in
-            if (!remaining.length) return;
-            var fetching = new Set();
-            var observer = new IntersectionObserver(function(entries) {
-                entries.forEach(function(entry) {
-                    if (!entry.isIntersecting) return;
-                    var el = entry.target;
-                    var mid = el.getAttribute('data-mongo-id');
-                    if (!mid || fetching.has(mid)) return;
-                    fetching.add(mid);
-                    observer.unobserve(el);
-                    fetch('/api/level_thumbnail/' + mid)
-                        .then(function(r) { return r.json(); })
-                        .then(function(data) {
-                            if (data.thumbnail_url) applyThumb(el, data.thumbnail_url);
-                        })
-                        .catch(function() {});
-                });
-            }, {rootMargin: '200px'});
-
-            remaining.forEach(function(el) { observer.observe(el); });
+            // Step 2: fetch all remaining items eagerly, top of page first
+            if (remaining.length) loadAll(remaining, 3);
         })
         .catch(function() {});
 })();
