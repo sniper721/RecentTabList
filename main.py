@@ -1419,13 +1419,21 @@ def log_level_change(action, level_name, admin_username, **kwargs):
             "admin": admin_username,
             **kwargs  # Additional data like position, above_level, below_level, etc.
         }
-        
+
         mongo_db.level_changelog.insert_one(changelog_entry)
         print(f"📝 Logged level change: {action} - {level_name}")
-        
-        # Send enhanced Discord notification
-        send_enhanced_changelog_notification(action, level_name, admin_username, **kwargs)
-        
+
+        # Fire Discord notification in a daemon thread so the HTTP call
+        # doesn't block the response. The changelog entry is already saved above.
+        import threading
+        t = threading.Thread(
+            target=send_enhanced_changelog_notification,
+            args=(action, level_name, admin_username),
+            kwargs=kwargs,
+            daemon=True
+        )
+        t.start()
+
     except Exception as e:
         print(f"Error logging level change: {e}")
 
@@ -1565,35 +1573,28 @@ def auto_manage_legacy_list():
         level_at_101 = mongo_db.levels.find_one({
             "position": 101,
             "is_legacy": {"$ne": True}
-        })
-        
+        }, {"name": 1, "points": 1})
+
         if level_at_101:
-            # Find the next available legacy position
-            highest_legacy = mongo_db.levels.find_one(
+            # Shift all existing legacy levels down by 1 to make room at position 101
+            mongo_db.levels.update_many(
                 {"is_legacy": True},
-                sort=[("position", -1)]
+                {"$inc": {"position": 1}}
             )
-            next_legacy_position = 101 if not highest_legacy else highest_legacy["position"] + 1
-            
-            # Move the level to legacy
+
+            # Place the pushed level at the top of the legacy list (position 101)
             mongo_db.levels.update_one(
                 {"_id": level_at_101["_id"]},
                 {"$set": {
                     "is_legacy": True,
-                    "position": next_legacy_position,
-                    "points": 0  # Legacy levels have 0 points
+                    "position": 101,
+                    "points": 0
                 }}
             )
-            
-            # Fix: Properly shift positions in the main list to fill the gap at position 101
+
+            # Shift main list levels above 101 down to fill the gap
             mongo_db.levels.update_many(
                 {"position": {"$gt": 101}, "is_legacy": {"$ne": True}},
-                {"$inc": {"position": -1}}
-            )
-            
-            # Also update any levels that might have is_legacy field missing (treat as False)
-            mongo_db.levels.update_many(
-                {"position": {"$gt": 101}, "is_legacy": {"$exists": False}},
                 {"$inc": {"position": -1}}
             )
             
@@ -1602,15 +1603,12 @@ def auto_manage_legacy_list():
             levels_cache['main_list'] = None
             levels_cache['legacy_list'] = None
             
-            # Recalculate user points for this level (remove points since it's now legacy)
-            old_points = level_at_101.get('points', 0)
-            recalculate_user_points_after_level_move(level_at_101["_id"], old_points, 0.0)
+            # User points will be updated on next manual recalculate — skipping here to avoid timeout
             
             # Note: We don't log this as a separate changelog entry since 
             # the placement message already mentions "This pushes X to the legacy list"
             
-            print(f"🔄 Automatically moved {level_at_101['name']} to legacy list at position #{next_legacy_position}")
-            print(f"🔄 Shifted main list positions to fill the gap")
+            print(f"🔄 Automatically moved {level_at_101['name']} to legacy list at position #101")
             return level_at_101["name"]
         
         return None
@@ -1664,7 +1662,7 @@ def get_top10_pushout_info(new_position):
         level_at_10 = mongo_db.levels.find_one({
             "position": 10,
             "is_legacy": {"$ne": True}
-        })
+        }, {"name": 1})
         
         if level_at_10:
             return level_at_10["name"]
@@ -3958,7 +3956,7 @@ def admin_add_level():
                 level_at_100 = mongo_db.levels.find_one({
                     "position": 100,
                     "is_legacy": {"$ne": True}
-                })
+                }, {"name": 1})
                 
                 if level_at_100:
                     pushed_to_legacy = level_at_100["name"]
@@ -3972,15 +3970,16 @@ def admin_add_level():
             current_first = mongo_db.levels.find_one({
                 "position": 1,
                 "is_legacy": {"$ne": True}
-            })
+            }, {"name": 1})
             if current_first:
                 dethroned_level = current_first["name"]
-        
+
         # Handle legacy list positioning
         if is_legacy:
             # For legacy levels, find the next available position starting from 101
             highest_legacy = mongo_db.levels.find_one(
-                {"is_legacy": True}, 
+                {"is_legacy": True},
+                {"position": 1},
                 sort=[("position", -1)]
             )
             if highest_legacy:
@@ -3990,7 +3989,7 @@ def admin_add_level():
                     existing_at_position = mongo_db.levels.find_one({
                         "position": position,
                         "is_legacy": True
-                    })
+                    }, {"_id": 1})
                     if existing_at_position:
                         # Position taken, use next available
                         position = highest_legacy['position'] + 1
@@ -4038,23 +4037,6 @@ def admin_add_level():
         # Insert the new level
         mongo_db.levels.insert_one(new_level)
         
-        # Use real-time points system to handle the addition and recalculate all points
-        if REAL_TIME_POINTS_AVAILABLE:
-            try:
-                from real_time_points_system import RealTimePointsManager
-                manager = RealTimePointsManager(mongo_db)
-                
-                # Recalculate all level points (since positions shifted)
-                levels_updated = manager.recalculate_all_level_points()
-                
-                # Recalculate all user points (since level points changed)
-                users_updated = manager.recalculate_all_user_points()
-                
-                print(f"✅ Level addition triggered real-time recalculation: {levels_updated} levels, {users_updated} users updated")
-                
-            except Exception as e:
-                print(f"⚠️ Warning: Real-time points recalculation failed after level addition: {e}")
-        
         # Handle automatic legacy management (only for main list additions)
         if not is_legacy:
             auto_manage_legacy_list()
@@ -4094,13 +4076,7 @@ def admin_add_level():
         
         # Log admin action
         log_admin_action(admin_username, f"ADDED LEVEL: {name}", f"Position {position}, {difficulty}/10 difficulty")
-        
-        # Update historical rankings
-        try:
-            update_historical_rankings()
-        except Exception as e:
-            print(f"Warning: Failed to update historical rankings: {e}")
-        
+
         flash(f'Level "{name}" added successfully at position {position}', 'success')
         return redirect(url_for('admin_levels'))
         
@@ -7671,19 +7647,19 @@ def admin_delete_level_enhanced(level_id):
     try:
         removal_reason = request.form.get('removal_reason', '').strip()
         
-        # Get level info before deletion
-        level = mongo_db.levels.find_one({"_id": ObjectId(level_id)})
+        # Get level info before deletion (exclude thumbnail blob — it's large and not needed for history)
+        level = mongo_db.levels.find_one({"_id": ObjectId(level_id)}, {"thumbnail_url": 0})
         if not level:
             return {'error': 'Level not found'}, 404
-        
+
         level_position = level['position']
         is_legacy = level.get('is_legacy', False)
         admin_username = session.get('username', 'Unknown')
-        
+
         # Delete associated records
         mongo_db.records.delete_many({"level_id": ObjectId(level_id)})
-        
-        # Save history before deleting
+
+        # Save history before deleting (thumbnail already excluded from level doc)
         history_entry = {
             "level_id": ObjectId(level_id),
             "action": "deleted",
@@ -7717,9 +7693,6 @@ def admin_delete_level_enhanced(level_id):
             {"$inc": {"position": -1}}
         )
         
-        # Recalculate points for all levels after position changes
-        recalculate_all_points(levels_only=True)
-        
         # Log admin action
         reason_text = f" (Reason: {removal_reason})" if removal_reason else ""
         log_admin_action(admin_username, f"REMOVED LEVEL: {level['name']}", f"Position {level_position}{reason_text}")
@@ -7745,8 +7718,8 @@ def admin_remove_level_with_reason():
             flash('Level ID is required', 'danger')
             return redirect(url_for('admin_levels'))
         
-        # Get level info
-        level = mongo_db.levels.find_one({"_id": ObjectId(level_id)})
+        # Get level info (thumbnail not needed here)
+        level = mongo_db.levels.find_one({"_id": ObjectId(level_id)}, {"thumbnail_url": 0})
         if not level:
             flash('Level not found', 'danger')
             return redirect(url_for('admin_levels'))
@@ -13528,7 +13501,20 @@ def public_profile(username):
         flash('This profile is private', 'warning')
         return redirect(url_for('index'))
     
-    # Get user's recent approved records for display (limited to 50)
+    # Fetch all main list levels first so we can classify completions in Python
+    # (avoids two extra aggregations with expensive $lookup joins)
+    all_levels = list(mongo_db.levels.find({"is_legacy": False}, {"thumbnail_url": 0}).sort("position", 1))
+    main_level_id_set = {lv['_id'] for lv in all_levels}
+
+    # Get all approved 100% completions for this user — no join needed, classify in Python
+    all_completions = list(mongo_db.records.find(
+        {"user_id": profile_user['_id'], "status": "approved", "progress": 100},
+        {"level_id": 1}
+    ))
+    completed_main_ids = {c['level_id'] for c in all_completions if c['level_id'] in main_level_id_set}
+    legacy_completed_count = sum(1 for c in all_completions if c['level_id'] not in main_level_id_set)
+
+    # Recent approved records for display — strip thumbnail from joined level doc
     user_records = list(mongo_db.records.aggregate([
         {"$match": {"user_id": profile_user['_id'], "status": "approved"}},
         {"$lookup": {
@@ -13538,59 +13524,20 @@ def public_profile(username):
             "as": "level"
         }},
         {"$unwind": "$level"},
+        {"$project": {"level.thumbnail_url": 0}},
         {"$sort": {"date_submitted": -1}},
         {"$limit": 50}
     ], allowDiskUse=True))
     
-    # Get ALL approved completions on MAIN LIST levels only (exclude legacy)
-    main_list_completions = list(mongo_db.records.aggregate([
-        {"$match": {"user_id": profile_user['_id'], "status": "approved", "progress": 100}},
-        {"$lookup": {
-            "from": "levels",
-            "localField": "level_id",
-            "foreignField": "_id",
-            "as": "level"
-        }},
-        {"$unwind": "$level"},
-        {"$match": {"level.is_legacy": {"$ne": True}}},  # Exclude legacy levels
-        {"$project": {"level_id": 1}}
-    ], allowDiskUse=True))
-    
-    # Get ALL approved completions on LEGACY levels for legacy stats
-    legacy_list_completions = list(mongo_db.records.aggregate([
-        {"$match": {"user_id": profile_user['_id'], "status": "approved", "progress": 100}},
-        {"$lookup": {
-            "from": "levels",
-            "localField": "level_id",
-            "foreignField": "_id",
-            "as": "level"
-        }},
-        {"$unwind": "$level"},
-        {"$match": {"level.is_legacy": True}},  # Only legacy levels
-        {"$project": {"level_id": 1}}
-    ], allowDiskUse=True))
-    
-    # Get all main list levels for completion grid
-    all_levels = list(mongo_db.levels.find({"is_legacy": False}).sort("position", 1))
-    
-    # Create a set of completed level IDs for quick lookup (only main list completions)
-    completed_levels = {completion['level_id'] for completion in main_list_completions}
-    
     # Calculate stats
-    total_main_levels = len(all_levels)  # all_levels already filtered for non-legacy
-    completed_main_levels = len(completed_levels)
-    legacy_completed_count = len(legacy_list_completions)
-    
-    # Debug logging to help identify the issue
+    total_main_levels = len(all_levels)
+    completed_main_levels = len(completed_main_ids)
 
-
-
-    
-    return render_template('public_profile.html', 
-                         user=profile_user,  # Use profile_user instead of user to avoid confusion
+    return render_template('public_profile.html',
+                         user=profile_user,
                          records=user_records,
                          all_levels=all_levels,
-                         completed_levels=completed_levels,
+                         completed_levels=completed_main_ids,
                          total_main_levels=total_main_levels,
                          completed_main_levels=completed_main_levels,
                          main_completed_count=completed_main_levels,
@@ -13772,8 +13719,8 @@ def recent_tab_roulette():
                 {"$set": {"active": False, "ended_at": datetime.now(timezone.utc)}}
             )
             
-            # Get random level from main list (non-legacy)
-            available_levels = list(mongo_db.levels.find({"is_legacy": False}))
+            # Get random level from main list (non-legacy) — skip thumbnail blobs to avoid timeout
+            available_levels = list(mongo_db.levels.find({"is_legacy": False}, {"thumbnail_url": 0}))
             if not available_levels:
                 flash('No levels available for roulette', 'danger')
                 return redirect(url_for('recent_tab_roulette'))
@@ -13849,8 +13796,8 @@ def recent_tab_roulette():
                         # Continue with next level
                         next_target = next_level_num  # Target percentage = level number
                         
-                        # Get next random level
-                        available_levels = list(mongo_db.levels.find({"is_legacy": False}))
+                        # Get next random level — skip thumbnail blobs to avoid timeout
+                        available_levels = list(mongo_db.levels.find({"is_legacy": False}, {"thumbnail_url": 0}))
                         import random
                         next_level = random.choice(available_levels)
                         
@@ -13873,7 +13820,7 @@ def recent_tab_roulette():
                         # Refresh current session data
                         current_session = mongo_db.roulette_sessions.find_one({"_id": current_session['_id']})
                     
-                    level_info = mongo_db.levels.find_one({"_id": next_level['_id']})
+                    level_info = mongo_db.levels.find_one({"_id": next_level['_id']}, {"thumbnail_url": 0})
                     
             except ValueError:
                 flash('Please enter a valid number for percentage!', 'danger')
@@ -13899,7 +13846,7 @@ def recent_tab_roulette():
     # Get current level info if session exists
     current_level_info = None
     if current_session:
-        current_level_info = mongo_db.levels.find_one({"_id": current_session['current_level_id']})
+        current_level_info = mongo_db.levels.find_one({"_id": current_session['current_level_id']}, {"thumbnail_url": 0})
     
     return render_template('roulette.html', 
                          current_session=current_session,
