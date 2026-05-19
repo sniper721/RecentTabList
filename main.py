@@ -8799,27 +8799,16 @@ def check_for_duplicate_levels():
 
 @app.route('/admin/console')
 def admin_console():
-    """Admin Console - Protected by PIN"""
+    """Admin Console"""
     if 'user_id' not in session:
         flash('Please log in to access admin panel', 'warning')
         return redirect(url_for('login'))
-    
+
     # Allow both regular admins and head admins to access
     if not session.get('is_admin') and not session.get('head_admin'):
         flash('Access denied. Admin privileges required.', 'danger')
         return redirect(url_for('admin'))
-    
-    # Check if PIN is required
-    console_settings = mongo_db.site_settings.find_one({"_id": "console"})
-    if console_settings and console_settings.get('pin_required', False):
-        # Check for temporary PIN verification for this request only
-        if not session.get('console_pin_verified_temp'):
-            # Redirect to PIN entry page
-            return redirect(url_for('admin_console_pin'))
-        else:
-            # Clear the temporary verification flag so PIN is required again next time
-            session.pop('console_pin_verified_temp', None)
-    
+
     # Generate stats for the console
     try:
         from datetime import datetime, timedelta, timezone
@@ -8881,23 +8870,17 @@ def admin_console_execute():
         # Track console command execution
         admin_user = mongo_db.users.find_one({"_id": session['user_id']})
         admin_username = admin_user['username'] if admin_user else 'Unknown Admin'
-        
-        # Don't log PIN entries for security
-        if not command.isdigit():
-            # Special handling for RTL commands to flag them as dangerous
-            if command.startswith('rtl.'):
-                rtl_cmd = command[4:].split('(')[0]  # Extract just the command name
-                if rtl_cmd in ['login_as', 'ban_user', 'unban_user', 'clear_cache', 'recalc_points', 'backup_db']:
-                    log_admin_action(admin_username, f"RTL DANGEROUS COMMAND", f"Executed: {command[:100]}")
-                else:
-                    log_admin_action(admin_username, f"RTL COMMAND", f"Executed: {command[:100]}")
+
+        # Special handling for RTL commands to flag them as dangerous
+        if command.startswith('rtl.'):
+            rtl_cmd = command[4:].split('(')[0]
+            if rtl_cmd in ['login_as', 'ban_user', 'unban_user', 'clear_cache', 'recalc_points', 'backup_db']:
+                log_admin_action(admin_username, f"RTL DANGEROUS COMMAND", f"Executed: {command[:100]}")
             else:
-                log_admin_action(admin_username, "CONSOLE COMMAND", f"Executed: {command[:100]}")
-        
-        # Check if this is a PIN verification for login_as
-        if 'pending_login_as' in session and command.isdigit():
-            return handle_super_admin_pin_verification(command)
-        
+                log_admin_action(admin_username, f"RTL COMMAND", f"Executed: {command[:100]}")
+        else:
+            log_admin_action(admin_username, "CONSOLE COMMAND", f"Executed: {command[:100]}")
+
         # Execute the command
         result = execute_console_command(command)
         return {'success': True, 'result': result}
@@ -8905,78 +8888,6 @@ def admin_console_execute():
     except Exception as e:
         return {'success': False, 'error': str(e)}
 
-def handle_super_admin_pin_verification(provided_pin):
-    """Handle Super Admin PIN verification for login_as command"""
-    try:
-        username = session.get('pending_login_as')
-        if not username:
-            return {'success': False, 'error': 'No pending login_as command'}
-        
-        # Check super admin PIN
-        console_settings = mongo_db.site_settings.find_one({"_id": "console"})
-        correct_super_pin = console_settings.get('super_admin_pin', '9999') if console_settings else '9999'
-        
-        if provided_pin != correct_super_pin:
-            # Log failed attempt
-            try:
-                mongo_db.admin_logs.insert_one({
-                    "action": "failed_login_as_attempt",
-                    "admin_user": session.get('username', 'Unknown'),
-                    "target_user": username,
-                    "timestamp": datetime.now(timezone.utc),
-                    "reason": "Invalid super admin PIN"
-                })
-            except:
-                pass
-            
-            # Clear pending login
-            session.pop('pending_login_as', None)
-            return {'success': True, 'result': "❌ INVALID SUPER ADMIN PIN!\nAccess denied. This attempt has been logged."}
-        
-        # PIN is correct, proceed with login
-        user = mongo_db.users.find_one({"username": username})
-        if not user:
-            session.pop('pending_login_as', None)
-            return {'success': True, 'result': f"User '{username}' not found"}
-        
-        # Get current session info for logging
-        current_user = session.get('username', 'Unknown')
-        
-        # Log the successful admin login action
-        try:
-            mongo_db.admin_logs.insert_one({
-                "action": "admin_login_as",
-                "admin_user": current_user,
-                "target_user": username,
-                "timestamp": datetime.now(timezone.utc)
-            })
-        except:
-            pass  # Don't fail if logging fails
-        
-        # Send Discord notification for this critical action
-        log_admin_action(current_user, "ADMIN LOGIN AS USER", f"Logged in as user: {username}")
-        
-        # Switch session to target user
-        session['user_id'] = user['_id']
-        session['username'] = user['username']
-        session['is_admin'] = user.get('is_admin', False)
-        session['head_admin'] = user.get('head_admin', False)
-        session.permanent = True
-        
-        # Clear pending login
-        session.pop('pending_login_as', None)
-        
-        admin_status = ""
-        if user.get('head_admin'):
-            admin_status = " [HEAD ADMIN]"
-        elif user.get('is_admin'):
-            admin_status = " [ADMIN]"
-        
-        return {'success': True, 'result': f"✅ Successfully logged in as '{username}'{admin_status}\nUser ID: {user['_id']}\nPoints: {user.get('points', 0)}\n\n⚠️ SECURITY WARNING: This action has been logged!"}
-        
-    except Exception as e:
-        session.pop('pending_login_as', None)
-        return {'success': False, 'error': str(e)}
 
 def execute_console_command(command):
     """Execute console commands with custom RTL commands and Python support"""
@@ -9019,7 +8930,7 @@ RTL System Commands:
   rtl.recalc_points() - Recalculate all level points
   rtl.system_info() - Show system information
   rtl.backup_db() - Initiate database backup
-  rtl.login_as('user') - Login as any user (REQUIRES SUPER PIN!)
+  rtl.login_as('user') - Login as any user (DANGEROUS - action is logged)
   rtl.whoami() - Show current session info
   rtl.admin_logs() - Show recent admin actions
   
@@ -9331,17 +9242,34 @@ Note: Install psutil for detailed system metrics"""
             user = mongo_db.users.find_one({"username": username})
             if not user:
                 return f"User '{username}' not found"
-            
-            # Store the target username in session for PIN verification
-            session['pending_login_as'] = username
-            
+
+            current_user = session.get('username', 'Unknown')
+
+            try:
+                mongo_db.admin_logs.insert_one({
+                    "action": "admin_login_as",
+                    "admin_user": current_user,
+                    "target_user": username,
+                    "timestamp": datetime.now(timezone.utc)
+                })
+            except:
+                pass
+
+            log_admin_action(current_user, "ADMIN LOGIN AS USER", f"Logged in as user: {username}")
+
+            session['user_id'] = user['_id']
+            session['username'] = user['username']
+            session['is_admin'] = user.get('is_admin', False)
+            session['head_admin'] = user.get('head_admin', False)
+            session.permanent = True
+
             admin_status = ""
             if user.get('head_admin'):
                 admin_status = " [HEAD ADMIN]"
             elif user.get('is_admin'):
                 admin_status = " [ADMIN]"
-            
-            return f"🔐 SUPER ADMIN PIN REQUIRED\n\nTarget User: {username}{admin_status}\nUser ID: {user['_id']}\nPoints: {user.get('points', 0)}\n\nPlease enter the Super Admin PIN to proceed:"
+
+            return f"✅ Successfully logged in as '{username}'{admin_status}\nUser ID: {user['_id']}\nPoints: {user.get('points', 0)}\n\n⚠️ SECURITY WARNING: This action has been logged!"
         
         elif command == 'whoami()':
             # Show current session info
@@ -9713,95 +9641,6 @@ def randomize_level_positions(levels):
     all_levels = main_levels + legacy_levels
     return all_levels
 
-@app.route('/admin/console/pin', methods=['GET', 'POST'])
-def admin_console_pin():
-    """PIN entry page for admin console"""
-    if 'user_id' not in session:
-        flash('Please log in to access admin panel', 'warning')
-        return redirect(url_for('login'))
-    
-    # Allow both regular admins and head admins to access
-    if not session.get('is_admin') and not session.get('head_admin'):
-        flash('Access denied. Admin privileges required.', 'danger')
-        return redirect(url_for('admin'))
-    
-    # Check if PIN is required
-    console_settings = mongo_db.site_settings.find_one({"_id": "console"})
-    if not console_settings or not console_settings.get('pin_required', False):
-        # PIN not required, redirect to console
-        return redirect(url_for('admin_console'))
-    
-    if request.method == 'POST':
-        pin = request.form.get('pin', '')
-        stored_pin = console_settings.get('pin', '')
-        
-        if pin == stored_pin:
-            # PIN correct, set temporary session flag for this request only
-            session['console_pin_verified_temp'] = True
-            flash('PIN verified successfully!', 'success')
-            return redirect(url_for('admin_console'))
-        else:
-            flash('Invalid PIN. Please try again.', 'danger')
-    
-    return render_template('admin/console_pin.html')
-
-@app.route('/admin/console/pin/change', methods=['GET', 'POST'])
-def admin_console_pin_change():
-    """Change the console PIN - Admin only"""
-    if 'user_id' not in session:
-        flash('Please log in to access admin panel', 'warning')
-        return redirect(url_for('login'))
-    
-    # Allow both regular admins and head admins to access
-    if not session.get('is_admin') and not session.get('head_admin'):
-        flash('Access denied. Admin privileges required.', 'danger')
-        return redirect(url_for('admin'))
-    
-    console_settings = mongo_db.site_settings.find_one({"_id": "console"})
-    if not console_settings:
-        console_settings = {"pin_required": False, "pin": "1234", "super_admin_pin": "9999"}
-    
-    if request.method == 'POST':
-        action = request.form.get('action')
-        
-        if action == 'change_pin':
-            new_pin = request.form.get('new_pin', '')
-            if new_pin:
-                mongo_db.site_settings.update_one(
-                    {"_id": "console"},
-                    {"$set": {"pin": new_pin}},
-                    upsert=True
-                )
-                flash('Console PIN changed successfully!', 'success')
-                return redirect(url_for('admin_console_pin_change'))
-            else:
-                flash('PIN cannot be empty.', 'danger')
-        
-        elif action == 'change_super_pin':
-            new_super_pin = request.form.get('new_super_pin', '')
-            if new_super_pin:
-                mongo_db.site_settings.update_one(
-                    {"_id": "console"},
-                    {"$set": {"super_admin_pin": new_super_pin}},
-                    upsert=True
-                )
-                flash('Super Admin PIN changed successfully!', 'success')
-                return redirect(url_for('admin_console_pin_change'))
-            else:
-                flash('Super Admin PIN cannot be empty.', 'danger')
-        
-        elif action == 'toggle_pin':
-            pin_required = console_settings.get('pin_required', False)
-            mongo_db.site_settings.update_one(
-                {"_id": "console"},
-                {"$set": {"pin_required": not pin_required}},
-                upsert=True
-            )
-            flash(f'PIN requirement {"enabled" if not pin_required else "disabled"}.', 'success')
-            # Update console_settings for rendering
-            console_settings['pin_required'] = not pin_required
-    
-    return render_template('admin/console_pin_change.html', settings=console_settings)
 
 @app.route('/admin/make_head_admin', methods=['POST'])
 def admin_make_head_admin():

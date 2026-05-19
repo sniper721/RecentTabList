@@ -48,7 +48,7 @@
             </div>
             <div class="card-body p-0">
                 {% for level in levels %}
-                <div class="d-flex align-items-center p-3 border-bottom level-card mb-4" data-level-id="{{ level.get('_id', '') }}" style="cursor: pointer; transition: all 0.2s ease;">
+                <div class="d-flex align-items-start p-3 level-card" data-level-id="{{ level.get('_id', '') }}" style="cursor: pointer; transition: all 0.2s ease;">
                     <div class="me-4">
                         <div class="position-relative">
                             {% set level_name = level.get('name', 'Unknown') %}
@@ -101,7 +101,7 @@
                         </div>
                     </div>
                     <div class="flex-grow-1">
-                        <h5 class="mb-1">{{ level.get('name', 'Unknown') }}</h5>
+                        <h5 class="mb-1">#{{ level.get('position', 0) }} &ndash; {{ level.get('name', 'Unknown') }}</h5>
                         <p class="mb-1 text-muted">{{ get_translation('by') }} {{ level.get('creator', 'Unknown') }}</p>
                         <small class="text-muted d-block">{{ get_translation('verified_by') }} {{ level.get('verifier', 'Unknown') }}</small>
                         {% if level.get('level_id') %}
@@ -115,20 +115,6 @@
                             </div>
                         {% endif %}
                         
-                        <!-- Points System Display -->
-                        <div class="mt-2">
-                            <small class="text-muted">
-                                {% set position = level.get('position', 0) %}
-                                {% set points_100 = (250 * (0.9636214148582346 ** (position - 1)))|round(2) %}
-                                {% set min_percentage = level.get('min_percentage', 100)|int %}
-                                {% if min_percentage < 100 %}
-                                    {% set points_min = (points_100 * 0.1)|round(2) %}
-                                    {{ format_points(points_min) }} ({{ min_percentage }}%) - {{ format_points(points_100) }} (100%) points
-                                {% else %}
-                                    {{ format_points(points_100) }} (100%) points
-                                {% endif %}
-                            </small>
-                        </div>
                     </div>
                     <div class="text-end">
                         {% set difficulty = (level.difficulty|default(5.0)|float)|round|int if level is not mapping else (level['difficulty']|default(5.0)|float)|round|int %}
@@ -140,7 +126,12 @@
                         {% set position = level.get('position', 0) %}
                         {% set points = level.get('points', 0) %}
                         {% set points_num = points|float if points else ((100 - position + 1) / 10)|round(2) %}
-                        <small class="text-muted">{{ format_points(points_num) }} points</small>
+                        {% set min_percentage = level.get('min_percentage', 100)|int %}
+                        {% if min_percentage < 100 %}
+                            <small class="text-muted">{{ format_points(points_num) }} ({{ min_percentage }}%) points</small>
+                        {% else %}
+                            <small class="text-muted">{{ format_points(points_num) }} points</small>
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}
