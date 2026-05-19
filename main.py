@@ -943,7 +943,7 @@ def calculate_record_points(record, level):
         return 0.0
     min_percentage = level.get('min_percentage', 100)
     if record['progress'] >= min_percentage and min_percentage < 100:
-        return round(float(level['points']) * 0.2, 2)  # 20% of full points
+        return round(float(level['points']) * min_percentage / 100, 2)
 
     return 0.0
 
@@ -3883,7 +3883,7 @@ def admin_recalculate_all_points():
                         else:
                             min_percentage = level.get('min_percentage', 100)
                             if record['progress'] >= min_percentage and min_percentage < 100:
-                                points = round(float(level['points']) * 0.2, 2)
+                                points = round(float(level['points']) * min_percentage / 100, 2)
                             else:
                                 points = 0.0
                     
@@ -9896,7 +9896,7 @@ def admin_levels():
             
             # Calculate points
             if points_str and points_str.strip():
-                points = int(float(points_str))
+                points = float(points_str)
             else:
                 level_type = request.form.get('level_type', 'Level')
                 points = calculate_level_points(position, is_legacy, level_type)
@@ -10123,7 +10123,7 @@ def admin_edit_level():
     
     # Calculate points
     if points_str and points_str.strip():
-        points = int(float(points_str))
+        points = float(points_str)
     else:
         level_type = request.form.get('level_type', level.get('level_type', 'Level'))
         points = calculate_level_points(position, is_legacy, level_type)
