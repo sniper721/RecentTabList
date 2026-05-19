@@ -937,11 +937,14 @@ def calculate_record_points(record, level):
     if record['progress'] == 100:
         return float(level['points'])
     
-    # Partial completion - 10% of full points when reaching minimum percentage
+    # Partial completion - 20% of full points when reaching minimum percentage
+    # Only applies to levels in the top 50
+    if level.get('position', 0) > 50:
+        return 0.0
     min_percentage = level.get('min_percentage', 100)
     if record['progress'] >= min_percentage and min_percentage < 100:
-        return round(float(level['points']) * 0.1, 2)  # 10% of full points
-    
+        return round(float(level['points']) * 0.2, 2)  # 20% of full points
+
     return 0.0
 
 def award_verifier_points(level_id, verifier_user_id):
@@ -1187,7 +1190,8 @@ def update_user_points(user_id):
             "status": 1,  # Include status field
             "level.points": 1,
             "level.is_legacy": 1,
-            "level.min_percentage": 1
+            "level.min_percentage": 1,
+            "level.position": 1
         }}
     ]
     
@@ -3872,12 +3876,16 @@ def admin_recalculate_all_points():
                     elif record['progress'] == 100:
                         points = float(level['points'])
                     else:
-                        # Partial completion - 10% of full points when reaching minimum percentage
-                        min_percentage = level.get('min_percentage', 100)
-                        if record['progress'] >= min_percentage and min_percentage < 100:
-                            points = round(float(level['points']) * 0.1, 2)
-                        else:
+                        # Partial completion - 20% of full points when reaching minimum percentage
+                        # Only applies to levels in the top 50
+                        if level.get('position', 0) > 50:
                             points = 0.0
+                        else:
+                            min_percentage = level.get('min_percentage', 100)
+                            if record['progress'] >= min_percentage and min_percentage < 100:
+                                points = round(float(level['points']) * 0.2, 2)
+                            else:
+                                points = 0.0
                     
                     correct_total_points += points
             

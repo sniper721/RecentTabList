@@ -119,9 +119,11 @@
                         {% set points = level.get('points', 0) %}
                         {% set points_num = points|float if points else ((100 - position + 1) / 10)|round(2) %}
                         {% set min_percentage = level.get('min_percentage', 100)|int %}
-                        {% set points_at_list = (points_num * min_percentage / 100)|round(2) %}
+                        {% set points_at_list = (points_num * 0.2)|round(2) %}
                         <div class="text-muted"><strong>{{ format_points(points_num) }} pts (100%)</strong></div>
+                        {% if position <= 50 and min_percentage < 100 %}
                         <small class="text-muted">{{ format_points(points_at_list) }} pts ({{ min_percentage }}%)</small>
+                        {% endif %}
                     </div>
                 </div>
                 {% endfor %}

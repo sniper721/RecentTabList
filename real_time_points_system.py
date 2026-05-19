@@ -43,10 +43,13 @@ class RealTimePointsManager:
         if record['progress'] == 100:
             return float(level['points'])
         
-        # Partial completion - 10% of full points when reaching minimum percentage
+        # Partial completion - 20% of full points when reaching minimum percentage
+        # Only applies to levels in the top 50
+        if level.get('position', 0) > 50:
+            return 0.0
         min_percentage = level.get('min_percentage', 100)
         if record['progress'] >= min_percentage and min_percentage < 100:
-            return round(float(level['points']) * 0.1, 2)
+            return round(float(level['points']) * 0.2, 2)
         
         return 0.0
     
