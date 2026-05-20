@@ -31,7 +31,7 @@ class RealTimePointsManager:
         # p = 250(0.9636)^(x-1) where x is the placement of the level on the list
         # Position 1 = 250(0.9636)^0 = 250 points
         # Position 150 = 250(0.9636)^149 ≈ 1 point
-        return round(250 * (0.9636214148582346 ** (position - 1)), 2)
+        return round(250 * (0.9636214148582346 ** (position - 1)), 1)
     
     def calculate_record_points(self, record, level):
         """Calculate points earned from a record"""
