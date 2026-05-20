@@ -943,7 +943,7 @@ def calculate_record_points(record, level):
         return 0.0
     min_percentage = level.get('min_percentage', 100)
     if record['progress'] >= min_percentage and min_percentage < 100:
-        return round(float(level['points']) * min_percentage / 100, 2)
+        return round(float(level['points']) * 0.20, 2)
 
     return 0.0
 
@@ -3883,7 +3883,7 @@ def admin_recalculate_all_points():
                         else:
                             min_percentage = level.get('min_percentage', 100)
                             if record['progress'] >= min_percentage and min_percentage < 100:
-                                points = round(float(level['points']) * min_percentage / 100, 2)
+                                points = round(float(level['points']) * 0.20, 2)
                             else:
                                 points = 0.0
                     

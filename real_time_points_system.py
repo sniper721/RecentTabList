@@ -49,8 +49,8 @@ class RealTimePointsManager:
             return 0.0
         min_percentage = level.get('min_percentage', 100)
         if record['progress'] >= min_percentage and min_percentage < 100:
-            return round(float(level['points']) * min_percentage / 100, 2)
-        
+            return round(float(level['points']) * 0.20, 2)
+
         return 0.0
     
     def recalculate_all_level_points(self):
