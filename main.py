@@ -11079,13 +11079,38 @@ def admin_settings():
             "ping_threshold": 1,
             "role_id": "1388326130183966720"
         }
-    
-    return render_template('admin/settings.html', 
+
+    # Get level monitor status
+    try:
+        monitor_settings = mongo_db.site_settings.find_one({"_id": "level_monitor"})
+        monitor_info = {
+            "enabled": monitor_settings.get('enabled', False) if monitor_settings else False,
+            "check_interval": (monitor_settings.get('check_interval', 1800) // 60) if monitor_settings else 30
+        }
+
+        # Get last monitoring cycle
+        last_cycle = mongo_db.monitoring_cycles.find_one({}, sort=[("cycle_end", -1)])
+        if last_cycle:
+            from datetime import datetime, timezone
+            time_ago = (datetime.now(timezone.utc) - last_cycle['cycle_end']).total_seconds()
+            monitor_info['last_cycle'] = {
+                'time_ago_seconds': int(time_ago),
+                'checked': last_cycle.get('levels_checked', 0),
+                'removed': last_cycle.get('levels_removed', 0),
+                'total_removed': last_cycle.get('total_removed_in_db', 0)
+            }
+        else:
+            monitor_info['last_cycle'] = None
+    except Exception as e:
+        monitor_info = {"error": str(e), "enabled": False}
+
+    return render_template('admin/settings.html',
                          system_info=system_info,
                          cache_info=cache_info,
                          db_stats=db_stats,
                          site_settings=site_settings,
-                         changelog_settings=changelog_settings)
+                         changelog_settings=changelog_settings,
+                         monitor_info=monitor_info)
 
 @app.route('/admin/webhook_settings')
 def admin_webhook_settings():
@@ -13790,6 +13815,79 @@ def api_notification_count():
     user_id = session['user_id']
     count = get_unread_notification_count(user_id)
     return {'count': count}
+
+@app.route('/api/level_monitor/status', methods=['GET'])
+def api_level_monitor_status():
+    """Get level monitor status"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return {'error': 'Access denied'}, 403
+
+    try:
+        from level_monitor import get_level_monitor
+        monitor = get_level_monitor()
+
+        monitor_settings = mongo_db.site_settings.find_one({"_id": "level_monitor"})
+        last_cycle = mongo_db.monitoring_cycles.find_one({}, sort=[("cycle_end", -1)])
+
+        return {
+            'running': monitor.running if monitor else False,
+            'enabled': monitor_settings.get('enabled', False) if monitor_settings else False,
+            'interval_minutes': (monitor_settings.get('check_interval', 1800) // 60) if monitor_settings else 30,
+            'last_cycle': {
+                'checked': last_cycle.get('levels_checked', 0),
+                'removed': last_cycle.get('levels_removed', 0),
+                'total_removed': last_cycle.get('total_removed_in_db', 0),
+                'timestamp': last_cycle['cycle_end'].isoformat() if last_cycle else None
+            } if last_cycle else None,
+            'removed_levels_count': mongo_db.levels.count_documents({"is_removed": True})
+        }
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+@app.route('/api/level_monitor/toggle', methods=['POST'])
+def api_level_monitor_toggle():
+    """Toggle level monitor on/off"""
+    if 'user_id' not in session or not session.get('is_admin'):
+        return {'error': 'Access denied'}, 403
+
+    try:
+        from level_monitor import start_level_monitor, stop_level_monitor, get_level_monitor
+
+        action = request.json.get('action', 'toggle')
+
+        monitor_settings = mongo_db.site_settings.find_one({"_id": "level_monitor"})
+        is_enabled = monitor_settings.get('enabled', False) if monitor_settings else False
+
+        if action == 'toggle':
+            new_state = not is_enabled
+        elif action == 'enable':
+            new_state = True
+        elif action == 'disable':
+            new_state = False
+        else:
+            return {'error': 'Invalid action'}, 400
+
+        # Update database
+        mongo_db.site_settings.update_one(
+            {"_id": "level_monitor"},
+            {"$set": {"enabled": new_state, "last_updated": datetime.now(timezone.utc)}},
+            upsert=True
+        )
+
+        # Update running monitor
+        monitor = get_level_monitor()
+        if new_state and not (monitor and monitor.running):
+            # Start the monitor
+            start_level_monitor(mongo_db, discord_bot=None)
+            return {'status': 'started', 'enabled': True}
+        elif not new_state and monitor and monitor.running:
+            # Stop the monitor
+            stop_level_monitor()
+            return {'status': 'stopped', 'enabled': False}
+
+        return {'status': 'toggled', 'enabled': new_state}
+    except Exception as e:
+        return {'error': str(e)}, 500
 
 @app.route('/test_notifications')
 def test_notifications():

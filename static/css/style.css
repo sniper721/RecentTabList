@@ -375,25 +375,21 @@ p {
         border-radius: 0 !important;
     }
 
-    .level-card {
-        flex-direction: row;
-        text-align: left;
-        border-radius: 0;
-    }
-
     /* 2-column square card grid on mobile */
     .card-body.p-0 {
-        display: grid;
+        display: grid !important;
         grid-template-columns: 1fr 1fr;
+        gap: 0;
     }
 
     .level-card {
         flex-direction: column !important;
         align-items: stretch !important;
         padding: 0 !important;
-        border-radius: 6px !important;
-        border: 2px solid var(--border-color);
+        border-radius: 0 !important;
+        border: 1px solid var(--border-color) !important;
         overflow: hidden;
+        text-align: left;
     }
 
     .level-card > .me-4 {
@@ -401,18 +397,18 @@ p {
     }
 
     .level-thumbnail-container {
-        width: 100%;
-        height: auto;
+        width: 100% !important;
+        height: auto !important;
         aspect-ratio: 16 / 9;
         flex-shrink: 0;
     }
 
     .level-card > .flex-grow-1 {
-        padding: 0.4rem 0.5rem 0;
+        padding: 0.4rem 0.5rem 0 !important;
     }
 
     .level-card > .text-end {
-        padding: 0 0.5rem 0.4rem;
+        padding: 0 0.5rem 0.4rem !important;
         text-align: left !important;
     }
 

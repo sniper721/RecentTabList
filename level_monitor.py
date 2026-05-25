@@ -119,12 +119,16 @@ class LevelMonitor:
                 {"thumbnail_url": 0},   # <-- projection: skip large base64 field
                 max_time_ms=15000       # tight server-side cap; fail fast if Atlas is struggling
             ))
-            
-            print(f"🔍 Checking {len(levels)} levels for removal from GD servers...")
-            
+
+            print(f"\n{'='*60}")
+            print(f"🔍 LEVEL MONITORING CYCLE START - Checking {len(levels)} levels")
+            print(f"⏰ Time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+            print(f"{'='*60}\n")
+
             checked_count = 0
             removed_count = 0
-            
+            cycle_start = datetime.now(timezone.utc)
+
             for level in levels:
                 try:
                     level_id = level.get('level_id')
@@ -160,8 +164,29 @@ class LevelMonitor:
                     else:
                         print(f"❌ Error checking level {level.get('name', 'Unknown')}: {e}")
             
-            print(f"✅ Level check complete: {checked_count} levels checked, {removed_count} removed levels detected")
-                    
+            cycle_end = datetime.now(timezone.utc)
+            cycle_duration = (cycle_end - cycle_start).total_seconds()
+
+            print(f"\n{'='*60}")
+            print(f"✅ LEVEL MONITORING CYCLE COMPLETE")
+            print(f"   Checked: {checked_count} levels")
+            print(f"   Removed: {removed_count} levels")
+            print(f"   Duration: {cycle_duration:.1f}s")
+            print(f"{'='*60}\n")
+
+            # Log cycle to database for audit trail
+            try:
+                self.mongo_db.monitoring_cycles.insert_one({
+                    "cycle_start": cycle_start,
+                    "cycle_end": cycle_end,
+                    "duration_seconds": cycle_duration,
+                    "levels_checked": checked_count,
+                    "levels_removed": removed_count,
+                    "total_removed_in_db": self.mongo_db.levels.count_documents({"is_removed": True})
+                })
+            except Exception as log_err:
+                print(f"⚠️ Could not log cycle: {log_err}")
+
         except Exception as e:
             print(f"❌ Error in check_all_levels: {e}")
             # Don't re-raise - allow monitoring to continue even if there are errors
@@ -684,6 +709,76 @@ def stop_level_monitor():
 def get_level_monitor():
     """Get the current level monitor instance"""
     return level_monitor
+
+async def test_level_monitor(mongo_db, test_level_id=3445):
+    """Test if the level monitor can access APIs and database"""
+    print("\n🧪 TESTING LEVEL MONITOR CONNECTIVITY\n")
+
+    monitor = LevelMonitor(mongo_db)
+
+    # Test 1: Database connectivity
+    try:
+        count = mongo_db.levels.count_documents({})
+        print(f"✅ Database: Connected ({count} levels in database)")
+    except Exception as e:
+        print(f"❌ Database: Failed - {e}")
+        return False
+
+    # Test 2: Settings
+    try:
+        settings = mongo_db.site_settings.find_one({"_id": "level_monitor"})
+        enabled = settings.get('enabled', False) if settings else False
+        interval = settings.get('check_interval', 1800) // 60 if settings else 30
+        print(f"✅ Settings: Enabled={enabled}, Interval={interval}min")
+        if not enabled:
+            print(f"⚠️  WARNING: Monitoring is DISABLED in settings!")
+    except Exception as e:
+        print(f"❌ Settings: {e}")
+
+    # Test 3: API connectivity
+    print(f"\n🔗 Testing API connections with level ID {test_level_id}...")
+    monitor.session = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10))
+
+    try:
+        # Test GDBrowser
+        try:
+            result = await monitor.check_gdbrowser(test_level_id)
+            print(f"  ✅ GDBrowser: {'Found' if result else 'Not found'}")
+        except Exception as e:
+            print(f"  ❌ GDBrowser: {e}")
+
+        # Test Alternative API
+        try:
+            result = await monitor.check_alternative_api(test_level_id)
+            print(f"  ✅ Alternative: {'Found' if result else 'Not found'}")
+        except Exception as e:
+            print(f"  ❌ Alternative: {e}")
+
+        # Test Direct GD
+        try:
+            result = await monitor.check_gd_direct(test_level_id)
+            print(f"  ✅ Direct GD: {'Found' if result else 'Not found'}")
+        except Exception as e:
+            print(f"  ❌ Direct GD: {e}")
+
+    finally:
+        await monitor.session.close()
+
+    # Test 4: Recent monitoring cycles
+    try:
+        last_cycle = mongo_db.monitoring_cycles.find_one({}, sort=[("cycle_end", -1)])
+        if last_cycle:
+            time_ago = (datetime.now(timezone.utc) - last_cycle['cycle_end']).total_seconds() / 60
+            print(f"\n📊 Last monitoring cycle: {time_ago:.1f} minutes ago")
+            print(f"   - Checked: {last_cycle.get('levels_checked', '?')} levels")
+            print(f"   - Removed: {last_cycle.get('levels_removed', '?')} levels")
+        else:
+            print(f"\n⚠️  No monitoring cycles in database - monitor may never have run!")
+    except Exception as e:
+        print(f"⚠️  Could not check monitoring cycles: {e}")
+
+    print("\n✅ Monitor test complete\n")
+    return True
 
 if __name__ == "__main__":
     # For testing

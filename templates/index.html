@@ -172,11 +172,11 @@
             </div>
             <div class="card-body">
                 <p><strong>{{ get_translation('list_admin') }}:</strong> <span class="credit-name" data-person="miifin">Miifin</span></p>
-                <p><strong>{{ get_translation('list_moderators') }}:</strong> 
-                    <span class="credit-name" data-person="monika">Monika</span>, 
-                    <span class="credit-name" data-person="applepi">ApplePi</span>, 
-                    <span class="credit-name" data-person="dairyfarmer">DairyFarmer</span>, 
-                    <span class="credit-name" data-person="scorch">Scorch</span>
+                <p><strong>{{ get_translation('list_moderators') }}:</strong>
+                    <span class="credit-name" data-person="monika">Monika</span>,
+                    <span class="credit-name" data-person="applepi">ApplePi</span>,
+                    <span class="credit-name" data-person="scorch">Scorch</span>,
+                    <span class="credit-name" data-person="kye">Kye</span>
                 </p>
                 <p><strong>{{ get_translation('list_coders') }}:</strong> <span class="credit-name" data-person="engine">ENGINE</span>, <span class="credit-name" data-person="scorch">Scorch</span></p>
                 <p><strong>{{ get_translation('server_moderator') }}:</strong> <span class="credit-name" data-person="cesium">Cesium</span></p>
@@ -426,11 +426,6 @@
             name: 'Miifin',
             socials: [
                 {
-                    platform: 'YouTube',
-                    url: 'https://www.youtube.com/@BowOwner',
-                    icon: '/static/images/youtube-icon.svg'
-                },
-                {
                     platform: 'Discord',
                     username: 'baiuri',
                     icon: '/static/images/discord-icon.svg',
@@ -441,11 +436,6 @@
         'monika': {
             name: 'Monika',
             socials: [
-                {
-                    platform: 'YouTube',
-                    url: 'https://www.youtube.com/@InsaneI',
-                    icon: '/static/images/youtube-icon.svg'
-                },
                 {
                     platform: 'Discord',
                     username: 'monika.golden',
@@ -458,21 +448,6 @@
             name: 'ENGINE',
             socials: [
                 {
-                    platform: 'YouTube',
-                    url: 'https://www.youtube.com/@ENGINE009',
-                    icon: '/static/images/youtube-icon.svg'
-                },
-                {
-                    platform: 'Twitter',
-                    url: 'https://x.com/ENGINE_009',
-                    icon: '/static/images/twitter-icon.svg'
-                },
-                {
-                    platform: 'GitHub',
-                    url: 'https://github.com/ENGINERTL',
-                    icon: '/static/images/github-icon.svg'
-                },
-                {
                     platform: 'Discord',
                     username: 'engine009',
                     icon: '/static/images/discord-icon.svg',
@@ -483,11 +458,6 @@
         'applepi': {
             name: 'ApplePi',
             socials: [
-                {
-                    platform: 'YouTube',
-                    url: 'https://www.youtube.com/@paulskino1234',
-                    icon: '/static/images/youtube-icon.svg'
-                },
                 {
                     platform: 'Discord',
                     username: 'ipodnicks',
@@ -507,24 +477,25 @@
                 }
             ]
         },
-        'dairyfarmer': {
-            name: 'DairyFarmer',
+        'scorch': {
+            name: 'Scorch',
             socials: [
                 {
                     platform: 'Discord',
-                    username: 'dairyfarmer17_',
+                    username: 'scorch.exe_',
                     icon: '/static/images/discord-icon.svg',
                     copyable: true
                 }
             ]
         },
-        'scorch': {
-            name: 'Scorch',
+        'kye': {
+            name: 'Kye',
             socials: [
                 {
-                    platform: 'GitHub',
-                    url: 'https://github.com/Scorch9',
-                    icon: '/static/images/github-icon.svg'
+                    platform: 'Discord',
+                    username: 'kye0928',
+                    icon: '/static/images/discord-icon.svg',
+                    copyable: true
                 }
             ]
         }
@@ -549,7 +520,7 @@
     });
 
     function showSocialModal(data) {
-        modalTitle.textContent = data.name + "'s Social Media";
+        modalTitle.textContent = data.name + "'s Discord";
         socialLinks.innerHTML = '';
         
         data.socials.forEach(social => {
