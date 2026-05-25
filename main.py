@@ -13353,13 +13353,14 @@ def public_profile(username):
     all_levels = list(mongo_db.levels.find({"is_legacy": False}, {"thumbnail_url": 0}).sort("position", 1))
     main_level_id_set = {lv['_id'] for lv in all_levels}
 
-    # Get all approved 100% completions for this user — no join needed, classify in Python
+    # Get all approved completions for this user — no join needed, classify in Python
     all_completions = list(mongo_db.records.find(
-        {"user_id": profile_user['_id'], "status": "approved", "progress": 100},
-        {"level_id": 1}
+        {"user_id": profile_user['_id'], "status": "approved"},
+        {"level_id": 1, "progress": 1}
     ))
-    completed_main_ids = {c['level_id'] for c in all_completions if c['level_id'] in main_level_id_set}
-    legacy_completed_count = sum(1 for c in all_completions if c['level_id'] not in main_level_id_set)
+    completed_main_ids = {c['level_id'] for c in all_completions if c['level_id'] in main_level_id_set and c.get('progress', 0) == 100}
+    partial_main_ids = {c['level_id'] for c in all_completions if c['level_id'] in main_level_id_set and c.get('progress', 0) < 100 and c['level_id'] not in completed_main_ids}
+    legacy_completed_count = sum(1 for c in all_completions if c['level_id'] not in main_level_id_set and c.get('progress', 0) == 100)
 
     # Recent approved records for display — strip thumbnail from joined level doc
     user_records = list(mongo_db.records.aggregate([
@@ -13385,6 +13386,7 @@ def public_profile(username):
                          records=user_records,
                          all_levels=all_levels,
                          completed_levels=completed_main_ids,
+                         partial_levels=partial_main_ids,
                          total_main_levels=total_main_levels,
                          completed_main_levels=completed_main_levels,
                          main_completed_count=completed_main_levels,

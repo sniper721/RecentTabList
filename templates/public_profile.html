@@ -95,15 +95,22 @@
                     <div class="levels-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; max-height: 400px; overflow-y: auto;">
                         {% for level in all_levels %}
                             {% if level._id in completed_levels %}
-                                <!-- Completed level - green text (no link to prevent video thumbnails) -->
-                                <div class="level-item text-success" 
+                                <!-- Completed level - green -->
+                                <div class="level-item text-success"
                                      style="font-size: 0.75rem; padding: 4px; border-radius: 4px; background-color: rgba(40, 167, 69, 0.1); text-align: center;">
                                     <div class="level-position fw-bold">#{{ level.position }}</div>
                                     <div class="level-name text-truncate" style="font-size: 0.7rem;">{{ level.name }}</div>
                                 </div>
+                            {% elif level._id in partial_levels %}
+                                <!-- Partial record accepted - yellow -->
+                                <div class="level-item text-warning"
+                                     style="font-size: 0.75rem; padding: 4px; border-radius: 4px; background-color: rgba(251, 191, 36, 0.1); text-align: center;">
+                                    <div class="level-position fw-bold">#{{ level.position }}</div>
+                                    <div class="level-name text-truncate" style="font-size: 0.7rem;">{{ level.name }}</div>
+                                </div>
                             {% else %}
-                                <!-- Not completed level - red text -->
-                                <div class="level-item text-danger" 
+                                <!-- Not completed - red -->
+                                <div class="level-item text-danger"
                                      style="font-size: 0.75rem; padding: 4px; border-radius: 4px; background-color: rgba(220, 53, 69, 0.1); text-align: center;">
                                     <div class="level-position fw-bold">#{{ level.position }}</div>
                                     <div class="level-name text-truncate" style="font-size: 0.7rem;">{{ level.name }}</div>

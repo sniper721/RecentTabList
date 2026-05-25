@@ -381,10 +381,47 @@ p {
         border-radius: 0;
     }
 
-    .level-card .text-end {
-        text-align: right !important;
+    /* 2-column square card grid on mobile */
+    .card-body.p-0 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
     }
-    
+
+    .level-card {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        padding: 0 !important;
+        border-radius: 6px !important;
+        border: 2px solid var(--border-color);
+        overflow: hidden;
+    }
+
+    .level-card > .me-4 {
+        margin-right: 0 !important;
+    }
+
+    .level-thumbnail-container {
+        width: 100%;
+        height: auto;
+        aspect-ratio: 16 / 9;
+        flex-shrink: 0;
+    }
+
+    .level-card > .flex-grow-1 {
+        padding: 0.4rem 0.5rem 0;
+    }
+
+    .level-card > .text-end {
+        padding: 0 0.5rem 0.4rem;
+        text-align: left !important;
+    }
+
+    /* Hide verifier and ID on mobile grid to keep cards compact */
+    .level-card small.text-muted.d-block,
+    .level-card .d-flex.align-items-center {
+        display: none !important;
+    }
+
     .navbar-brand {
         font-size: 1.25rem;
     }
@@ -455,7 +492,7 @@ p {
     }
     
     /* Mobile card improvements */
-    .card-body {
+    .card-body:not(.p-0) {
         padding: 1rem;
     }
     
@@ -475,19 +512,19 @@ p {
 
     /* Tighten text in small cards */
     .level-card h5 {
-        font-size: 0.95rem;
+        font-size: 0.82rem;
         margin-bottom: 0.1rem;
     }
 
     .level-card .text-muted,
     .level-card small {
-        font-size: 0.78rem;
+        font-size: 0.75rem;
     }
 
     .level-card .text-end strong {
-        font-size: 0.82rem;
+        font-size: 0.75rem;
     }
-    
+
     /* Position badge for small screens */
     .position-absolute.top-0.start-0 {
         position: absolute !important;
@@ -528,24 +565,24 @@ p {
 
 /* Dark Theme */
 [data-bs-theme="dark"] {
-    --primary-color: #60a5fa;
-    --primary-hover: #3b82f6;
-    --secondary-color: #64748b;
-    --success-color: #34d399;
-    --danger-color: #f87171;
-    --warning-color: #fbbf24;
-    --info-color: #22d3ee;
-    --background-color: #0f172a;
-    --surface-color: #1e293b;
-    --card-color: #1e293b;
-    --text-primary: #f1f5f9;
-    --text-secondary: #cbd5e1;
-    --text-muted: #64748b;
-    --border-color: #334155;
-    --border-light: #475569;
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.3);
+    --primary-color: #4a8ac4;
+    --primary-hover: #2d6aa0;
+    --secondary-color: #4a5568;
+    --success-color: #2a9e78;
+    --danger-color: #c45a5a;
+    --warning-color: #b8962a;
+    --info-color: #1a9db5;
+    --background-color: #090e18;
+    --surface-color: #141c28;
+    --card-color: #141c28;
+    --text-primary: #d0d8e4;
+    --text-secondary: #8a9ab0;
+    --text-muted: #4a5568;
+    --border-color: #222e3f;
+    --border-light: #2e3d52;
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.4);
 }
 
 /* Blue Ocean Theme */
