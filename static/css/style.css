@@ -375,10 +375,10 @@ p {
         border-radius: 0 !important;
     }
 
-    /* 2-column square card grid on mobile */
+    /* Single-column card layout on mobile */
     .card-body.p-0 {
         display: grid !important;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr;
         gap: 0;
     }
 
