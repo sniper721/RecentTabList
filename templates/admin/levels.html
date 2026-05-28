@@ -65,7 +65,8 @@
                                                         data-level-game-id="{{ level.level_id or '' }}" data-level-points="{{ level.points }}"
                                                         data-level-thumbnail="{{ '' if (level.thumbnail_url or '').startswith('data:image') else (level.thumbnail_url or '') }}"
                                                         data-level-has-uploaded="{{ 'true' if (level.thumbnail_url or '').startswith('data:image') else 'false' }}"
-                                                        data-level-min-percentage="{{ level.min_percentage }}" data-demon-type="{{ level.demon_type or '' }}">
+                                                        data-level-min-percentage="{{ level.min_percentage }}" data-demon-type="{{ level.demon_type or '' }}"
+                                                        data-level-duration="{{ level.length_mmss or '' }}">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
                                                 <button class="btn btn-sm btn-warning ms-1" data-bs-toggle="modal" data-bs-target="#moveLegacyModal" data-level-game-id="{{ level._id }}">
@@ -122,7 +123,8 @@
                                                             data-level-game-id="{{ level.level_id or '' }}" data-level-points="{{ level.points }}"
                                                             data-level-thumbnail="{{ '' if (level.thumbnail_url or '').startswith('data:image') else (level.thumbnail_url or '') }}"
                                                             data-level-has-uploaded="{{ 'true' if (level.thumbnail_url or '').startswith('data:image') else 'false' }}"
-                                                            data-level-min-percentage="{{ level.min_percentage }}" data-demon-type="{{ level.demon_type or '' }}">
+                                                            data-level-min-percentage="{{ level.min_percentage }}" data-demon-type="{{ level.demon_type or '' }}"
+                                                            data-level-duration="{{ level.length_mmss or '' }}">
                                                         <i class="fas fa-edit"></i>
                                                     </button>
                                                     <button class="btn btn-sm btn-info ms-1" data-bs-toggle="modal" data-bs-target="#moveMainModal" data-level-game-id="{{ level._id }}">
@@ -312,6 +314,11 @@
                             <div class="mb-3">
                                 <label for="edit_game_level_id" class="form-label">Level ID (Optional)</label>
                                 <input type="text" class="form-control" id="edit_game_level_id" name="game_level_id" placeholder="Enter Geometry Dash level ID">
+                            </div>
+                            <div class="mb-3">
+                                <label for="edit_duration" class="form-label">Duration (m:ss)</label>
+                                <input type="text" class="form-control" id="edit_duration" name="duration" placeholder="e.g. 2:47" pattern="^\d+:[0-5]\d$">
+                                <small class="form-text text-muted">Leave blank to clear. Format: minutes:seconds</small>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -559,6 +566,7 @@
             const demonType = this.getAttribute('data-demon-type');
             const levelThumbnail = this.getAttribute('data-level-thumbnail') || '';
             const hasUploadedImage = this.getAttribute('data-level-has-uploaded') === 'true';
+            const levelDuration = this.getAttribute('data-level-duration') || '';
 
             document.getElementById('edit_level_id').value = levelId;
             document.getElementById('edit_name').value = levelName;
@@ -572,6 +580,7 @@
             document.getElementById('edit_thumbnail_url').value = levelThumbnail.startsWith('http') ? levelThumbnail : '';
             document.getElementById('edit_points').value = levelPoints ? parseFloat(levelPoints).toFixed(2) : '';
             document.getElementById('edit_min_percentage').value = levelMinPercentage || '100';
+            document.getElementById('edit_duration').value = levelDuration;
 
             // Smart thumbnail type detection and selection
             let selectedThumbnailType = 'auto'; // default

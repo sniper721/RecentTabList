@@ -809,6 +809,102 @@ def utility_processor():
         get_translation=get_translation
     )
 
+_GD_SPEEDS = {0: 311.58, 1: 251.16, 2: 387.42, 3: 468.0, 4: 576.0}
+_SPEED_PORTALS = {200: 1, 201: 0, 202: 2, 203: 3, 204: 4}
+
+def _decode_level_string(raw):
+    if raw.count(',') > 5 and (raw.startswith('kA') or '1,' in raw):
+        return raw
+    for transform in [
+        lambda s: s.replace('-', '+').replace('_', '/') + '=' * (-len(s) % 4),
+        lambda s: s,
+    ]:
+        try:
+            import zlib as _zlib, base64 as _b64
+            return _zlib.decompress(_b64.b64decode(transform(raw.strip())), 15 | 32).decode('utf-8')
+        except Exception:
+            pass
+    return None
+
+def _parse_level_duration(level_string):
+    sections = level_string.split(';')
+    if len(sections) < 2:
+        return None
+    header_parts = sections[0].split(',')
+    header = {}
+    for i in range(0, len(header_parts) - 1, 2):
+        header[header_parts[i]] = header_parts[i + 1]
+    start_idx = int(header.get('kA4', 0))
+    portals, max_x = [], 0.0
+    for obj_str in sections[1:]:
+        if not obj_str:
+            continue
+        parts = obj_str.split(',')
+        obj = {}
+        for i in range(0, len(parts) - 1, 2):
+            try:
+                obj[int(parts[i])] = parts[i + 1]
+            except (ValueError, IndexError):
+                continue
+        obj_id = int(obj.get(1, 0))
+        x = float(obj.get(2, 0))
+        if obj_id in _SPEED_PORTALS:
+            portals.append((x, _SPEED_PORTALS[obj_id]))
+        if x > max_x:
+            max_x = x
+    if max_x == 0:
+        return None
+    portals.sort()
+    total, cur_x, cur_spd = 0.0, 0.0, _GD_SPEEDS[start_idx]
+    for px, si in portals:
+        if px >= max_x:
+            break
+        d = px - cur_x
+        if d > 0:
+            total += d / cur_spd
+        cur_x, cur_spd = px, _GD_SPEEDS[si]
+    remaining = max_x - cur_x
+    if remaining > 0:
+        total += remaining / cur_spd
+    return max(1, int(total))
+
+def fetch_level_length_from_gd_api(level_id):
+    """Download level data and compute actual duration. Returns (category, mmss, seconds) or (None, None, None)."""
+    if not level_id:
+        return None, None, None
+    try:
+        # Get category from metadata endpoint
+        meta = requests.get(f"https://gdbrowser.com/api/level/{level_id}", timeout=5)
+        category = None
+        if meta.status_code == 200:
+            data = meta.json()
+            if isinstance(data, dict) and not data.get('error'):
+                category = data.get('length')
+
+        # Download and parse level data for exact duration
+        dl = requests.get(f"https://gdbrowser.com/download/{level_id}", timeout=20)
+        if dl.status_code == 200:
+            raw = dl.text
+            level_string = None
+            if ':' in raw and raw[:5].replace(':', '').isdigit():
+                parts = raw.split(':')
+                for i, part in enumerate(parts):
+                    if part == '4' and i + 1 < len(parts):
+                        level_string = _decode_level_string(parts[i + 1])
+                        break
+            else:
+                level_string = _decode_level_string(raw) or (raw if ',' in raw else None)
+
+            if level_string:
+                seconds = _parse_level_duration(level_string)
+                if seconds:
+                    mmss = f"{seconds // 60}:{seconds % 60:02d}"
+                    return category, mmss, seconds
+    except Exception as e:
+        print(f"⚠️ Could not compute level duration for ID {level_id}: {e}")
+
+    return None, None, None
+
 def calculate_level_points(position, is_legacy=False, level_type="Level"):
     """Calculate points based on position using exponential formula"""
     if is_legacy:
@@ -4011,7 +4107,15 @@ def admin_add_level():
         # Create new level first
         new_level_id = ObjectId()
         points = calculate_level_points(position, is_legacy)
-        
+
+        # Fetch level length from GD API if level_id is provided
+        gd_length = None
+        gd_length_mmss = None
+        gd_length_seconds = None
+        numeric_level_id = int(level_id) if level_id and level_id.strip() else None
+        if numeric_level_id:
+            gd_length, gd_length_mmss, gd_length_seconds = fetch_level_length_from_gd_api(numeric_level_id)
+
         new_level = {
             "_id": new_level_id,
             "name": name,
@@ -4022,11 +4126,18 @@ def admin_add_level():
             "demon_type": None,  # Demon subcategories removed
             "points": points,
             "video_url": video_url,
-            "level_id": int(level_id) if level_id and level_id.strip() else None,
+            "level_id": numeric_level_id,
             "min_percentage": min_percentage,
             "is_legacy": is_legacy,
             "date_added": datetime.now(timezone.utc)
         }
+
+        if gd_length:
+            new_level["length"] = gd_length
+        if gd_length_mmss:
+            new_level["length_mmss"] = gd_length_mmss
+        if gd_length_seconds:
+            new_level["length_seconds"] = gd_length_seconds
         
         # Shift existing levels down based on list type
         if is_legacy:
@@ -10151,7 +10262,14 @@ def admin_edit_level():
         "points": points,
         "min_percentage": min_percentage
     }
-    
+
+    # Duration (m:ss) — manual entry, stored as length_mmss
+    duration_input = request.form.get('duration', '').strip()
+    if duration_input:
+        update_data["length_mmss"] = duration_input
+    else:
+        update_data["length_mmss"] = None
+
     # Only update thumbnail_url if we're not keeping the existing one or if we have a new value
     if thumbnail_type != 'keep' and thumbnail_type != 'keep_existing':
         update_data["thumbnail_url"] = thumbnail_url

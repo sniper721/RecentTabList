@@ -27,6 +27,17 @@
                         <p><strong>Verifier:</strong> {{ level.get('verifier', 'Unknown') }}</p>
                         {% set level_id = level.get('level_id') %}
                         <p><strong>Level ID:</strong> {{ level_id or 'N/A' }}</p>
+                        <p><strong>Length:</strong>
+                            {% set mmss = level.get('length_mmss', '') %}
+                            {% set cat = level.get('length', '') %}
+                            {% if mmss %}
+                                {{ mmss }}
+                            {% elif cat %}
+                                {{ cat }}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </p>
                     </div>
                     <div class="col-md-6">
                         {% set date_added = level.get('date_added', '') %}
@@ -37,8 +48,7 @@
                         {% set min_percentage = level.get('min_percentage', 100)|int %}
                         {% set points_at_list = (points_display * min_percentage / 100)|round(2) %}
                         <p><strong>Points for 100%:</strong> {{ format_points(points_display) }}</p>
-                        <p><strong>Points for {{ min_percentage }}%:</strong> {{ format_points(points_at_list) }}</p>
-
+                        <p><strong>Points for list% ({{ min_percentage }}%):</strong> {{ format_points(points_at_list) }}</p>
                         <p><strong>Minimum Percentage:</strong> {{ min_percentage }}%</p>
                         
 
@@ -296,7 +306,7 @@
             <div class="card-body">
                 <p>To submit a record for this level, you need:</p>
                 <ul>
-                    <li>A video showing your gameplay with a progress of at least 50%</li>
+                    <li>A video showing your gameplay</li>
                     <li>Clear evidence that it's your own gameplay</li>
                     <li>No speedhacks or other cheats</li>
                 </ul>
